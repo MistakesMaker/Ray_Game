@@ -41,8 +41,8 @@ import { Player } from './player.js';
 import { Ray, PlayerGravityWell } from './ray.js';
 import { Target, Heart, BonusPoint, LootDrop } from './entities.js';
 import { BossManager } from './bossManager.js';
-import { GravityWellBoss } from './gravityWellBoss.js';
-import { MirrorShieldBoss } from './mirrorShieldBoss.js';
+import { GravityWellBoss } from './gravityWellBoss.js'; 
+import { MirrorShieldBoss } from './mirrorShieldBoss.js'; 
 
 
 // --- Canvas and Context ---
@@ -87,13 +87,14 @@ let heartSpawnIntervalId = null; let bonusPointSpawnIntervalId = null;
 let resumeCountdownTimerId = null;
 let activeBuffNotifications = [];
 let postPopupImmunityTimer = 0; let postDamageImmunityTimer = 0;
-const HIGH_SCORES_KEY = 'lightBlasterOmegaHighScoresII_Modular_Detailed';
+const HIGH_SCORES_KEY = 'lightBlasterOmegaHighScoresII_Modular_Detailed'; 
 const inputState = {
     keys: { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false, w: false, a: false, s: false, d: false },
     mouseX: canvas.width / 2,
     mouseY: canvas.height / 2,
 };
 let evolutionChoices = []; let bossLootPool = []; let freeUpgradeChoicesData = [];
+let currentActiveScreenElement = null; // Track the currently displayed screen
 
 
 // --- Helper Functions & Initialization Data Logic ---
@@ -103,7 +104,7 @@ function addHighScore(name, scoreValue, finalStatsSnapshot) {
     const newScoreEntry = { name: name, score: scoreValue, timestamp: Date.now(), stats: finalStatsSnapshot };
     scores.push(newScoreEntry);
     scores.sort((a, b) => b.score - a.score);
-    const topScores = scores.slice(0, 10);
+    const topScores = scores.slice(0, 10); 
     localStorage.setItem(HIGH_SCORES_KEY, JSON.stringify(topScores));
     return topScores;
 }
@@ -223,7 +224,7 @@ function updateShootInterval() {
     }
 }
 function spawnRay(){
-    if(!player||gameOver||isAnyPauseActiveInternal() || player.isFiringOmegaLaser ){ return; }
+    if(!player||gameOver||isAnyPauseActiveInternal() || player.isFiringOmegaLaser ){ return; } 
     const baseAimAngle = player.aimAngle;
     const numRaysToSpawn = 1 + player.scatterShotLevel;
     const angleBetweenRays = (numRaysToSpawn > 1 && numRaysToSpawn <= 2) ? CONSTANTS.SCATTER_SHOT_ANGLE_OFFSET : (numRaysToSpawn > 2) ? CONSTANTS.SCATTER_SHOT_ANGLE_OFFSET / (numRaysToSpawn -1) : 0;
@@ -263,150 +264,61 @@ function spawnBonusPointObject(){
 }
 
 // --- Game Initialization ---
-// js/main.js
-// ... (imports and other code remain the same) ...
-
-// --- Game Initialization ---
 function initGame() {
-    console.log("initGame called"); // DEBUG: Confirm it's being called
-
-    // --- Core Game State Reset ---
-    gameRunning = true;
-    gameOver = false;
-    score = 0;
-    updateScoreDisplay(score); // UI update
-
-    gamePausedForEvolution = false;
-    gamePausedForFreeUpgrade = false;
-    gamePausedByEsc = false;
-    isCountingDownToResume = false;
-    gamePausedForLootChoice = false;
-    evolutionPendingAfterBoss = false;
-    shrinkMeCooldown = 0;
-
-    lootDrops = [];
-    decoys = [];
-    bossDefeatEffects = [];
-    rays = []; // Clear existing rays
-    targets = [];
-    hearts = [];
-    bonusPoints = [];
-    activeBuffNotifications = [];
-
-    gameplayTimeElapsed = 0;
-    shootIntervalUpdateTimer = 0;
-
-    // --- Player Related Resets (needs to happen BEFORE new Player instance if re-using) ---
-    // It's often cleaner to always create a new Player instance for a full reset.
-    // If you were re-using the 'player' object, you'd reset all its properties here.
-    // But since we do `player = new Player(...)`, many are reset by the constructor.
-
-    // --- Ray Speed and Behavior Resets ---
-    currentRaySpeedMultiplier = 1.0; // CRITICAL: Reset ray speed multiplier
-    _currentRayMaxLifetime = CONSTANTS.BASE_RAY_MAX_LIFETIME; // Reset ray lifetime
-
-    // --- Color Unlocks ---
-    currentRayColors = [...CONSTANTS.INITIAL_RAY_COLORS]; // Reset to initial colors
-    nextColorUnlockScore = CONSTANTS.NEW_COLOR_UNLOCK_INTERVAL;
-    nextUnlockableColorIndex = 0;
-
-    // --- Immunity Timers ---
-    postPopupImmunityTimer = 0;
-    postDamageImmunityTimer = 0;
-
-    // --- Survival Bonus ---
-    survivalUpgrades = 0;
-    currentSurvivalPointsInterval = CONSTANTS.BASE_SURVIVAL_POINTS_INTERVAL;
-    survivalScoreThisCycle = 0;
-    survivalPointsTimer = 0;
-
-    // --- Player Growth ---
+    gameRunning = true; gameOver = false;
+    currentActiveScreenElement = null; // Game screen is active
+    showScreen(null, false, gameScreenCallbacks);
+    score = 0; updateScoreDisplay(score);
+    gamePausedForEvolution = false; gamePausedForFreeUpgrade = false; gamePausedByEsc = false;
+    isCountingDownToResume = false; gamePausedForLootChoice = false; evolutionPendingAfterBoss = false;
+    shrinkMeCooldown = 0; lootDrops = []; decoys = []; bossDefeatEffects = [];
+    gameplayTimeElapsed = 0; shootIntervalUpdateTimer = 0; currentRaySpeedMultiplier = 1.0;
     currentEffectiveDefaultGrowthFactor = CONSTANTS.DEFAULT_PLAYER_RADIUS_GROWTH_FACTOR;
     currentPlayerRadiusGrowthFactor = currentEffectiveDefaultGrowthFactor;
+    currentRayColors = [...CONSTANTS.INITIAL_RAY_COLORS];
+    nextColorUnlockScore = CONSTANTS.NEW_COLOR_UNLOCK_INTERVAL; nextUnlockableColorIndex = 0;
+    rays = [];
+    _currentRayMaxLifetime = CONSTANTS.BASE_RAY_MAX_LIFETIME;
+    postPopupImmunityTimer = 0; postDamageImmunityTimer = 0;
+    targets = []; hearts = []; bonusPoints = []; activeBuffNotifications = [];
+    survivalUpgrades = 0; currentSurvivalPointsInterval = CONSTANTS.BASE_SURVIVAL_POINTS_INTERVAL;
+    survivalScoreThisCycle = 0; survivalPointsTimer = 0;
 
-    // --- Create or Reset Player ---
     player = new Player(canvas.width / 2, canvas.height / 2, CONSTANTS.PLAYER_SPEED_BASE);
-    // Player constructor already sets many defaults, but explicitly reset things that might persist
-    // or are configured by evolutions/loot from a previous game.
-    player.hp = CONSTANTS.PLAYER_MAX_HP;
-    player.maxHp = CONSTANTS.PLAYER_MAX_HP;
-    player.immuneColorsList = []; // Already handled by new Player
-    player.baseRadius = CONSTANTS.PLAYER_BASE_RADIUS; // Handled by new Player
-    player.radius = player.baseRadius; // Handled by new Player
-    player.velX = 0; player.velY = 0; // Handled by new Player
-    player.pickupAttractionLevel = 0;
-    player.pickupAttractionRadius = CONSTANTS.BASE_PICKUP_ATTRACTION_RADIUS;
-    player.evolutionIntervalModifier = 1.0; // Reset evolution speed
-    player.rayDamageBonus = 0;
-    player.hasTargetPierce = false;
-    player.chainReactionChance = 0.0;
-    player.scatterShotLevel = 0;
-    player.ownRaySpeedMultiplier = 1.0; // CRITICAL: Reset player's ray speed bonus
-    player.damageReductionFactor = 0.0;
-    player.hpPickupBonus = 0;
-    player.bossStunChanceBonus = 0.0;
-    player.timeSinceLastHit = Number.MAX_SAFE_INTEGER; // To allow immediate regen if conditions met
-    player.hpRegenTimer = 0;
-    player.hpRegenBonusFromEvolution = 0;
-    player.acquiredBossUpgrades = []; // Clear previously acquired boss loot
-    player.activeAbilities = { '1': null, '2': null, '3': null }; // Reset fixed slot abilities
-    player.visualModifiers = {}; // Clear visual mods
-    player.bleedOnHit = false;
-    player.momentumDamageBonus = 0;
-    player.bossDamageReduction = 0;
-    player.teleporting = false; player.teleportEffectTimer = 0;
-    player.activeMiniWell = null;
-    player.timesHit = 0;
-    player.totalDamageDealt = 0;
-    player.hasShieldOvercharge = false; // Reset mouse abilities
-    player.isShieldOvercharging = false;
-    player.shieldOverchargeTimer = 0;
-    player.shieldOverchargeCooldownTimer = 0;
-    player.hasOmegaLaser = false;
-    player.isFiringOmegaLaser = false;
-    player.omegaLaserTimer = 0;
-    player.omegaLaserCooldownTimer = 0;
-    player.currentSpeed = CONSTANTS.PLAYER_SPEED_BASE; // Ensure player speed is reset
+    // Player constructor sets most defaults, but explicit reset for fixed abilities:
+    player.activeAbilities = { '1': null, '2': null, '3': null }; 
 
-
-    // --- Re-initialize Data Pools & UI ---
-    initializeAllPossibleRayColors(); // In case it was modified (though it shouldn't be)
-    initializeRayPool(Ray); // Re-initialize the ray pool
-    initEvolutionChoicesInternal(); // Reset evolution choice levels/states
-    populateBossLootPoolInternal(); // In case descriptions or availability changed (unlikely here but good practice)
-    initFreeUpgradeChoicesInternal(); // Reset free upgrade states
+    initializeAllPossibleRayColors();
+    initializeRayPool(Ray);
+    initEvolutionChoicesInternal();
+    populateBossLootPoolInternal(); 
+    initFreeUpgradeChoicesInternal();
 
     uiUpdateHealthDisplay(player.hp, player.maxHp);
     uiUpdateBuffIndicator(player.immuneColorsList, getReadableColorNameFromUtils);
     uiUpdateSurvivalBonusIndicator(survivalUpgrades, CONSTANTS.MAX_SURVIVAL_UPGRADES);
     uiUpdateActiveBuffIndicator(player, postPopupImmunityTimer, postDamageImmunityTimer);
-    uiUpdateAbilityCooldownUI(player); // Update for locked/unlocked states
+    uiUpdateAbilityCooldownUI(player);
 
     if (pausePlayerStatsPanel) pausePlayerStatsPanel.style.display = 'none';
-
-    // --- Boss Manager Reset ---
     const bossManagerAudioContext = { playSound, audioChaserSpawnSound, audioReflectorSpawnSound, audioSingularitySpawnSound };
     bossManager = new BossManager(CONSTANTS.BOSS_SPAWN_START_SCORE, CONSTANTS.BOSS_SPAWN_SCORE_INTERVAL, bossManagerAudioContext);
-    // bossManager.reset(); // The constructor effectively resets it, but an explicit reset method is also good.
 
-    // --- Timers and Intervals ---
-    lastEvolutionScore = 0; // Reset score tracking for evolutions
-    currentShootInterval = CONSTANTS.BASE_RAY_SHOOT_INTERVAL; // Reset shoot interval
+    currentShootInterval = CONSTANTS.BASE_RAY_SHOOT_INTERVAL;
     lastSetShootInterval = CONSTANTS.BASE_RAY_SHOOT_INTERVAL;
+    shootIntervalId = null;
 
-    pauseAllGameIntervals(); // Clear any lingering intervals
-    resumeAllGameIntervals(); // Start new game intervals
-    updateShootInterval(); // Set the initial shoot interval correctly
+    pauseAllGameIntervals();
+    resumeAllGameIntervals();
 
-    // --- Final Setup ---
     applyMusicPlayStateWrapper();
-    spawnTarget(); // Spawn initial target
+    spawnTarget(); 
     lastTime = performance.now();
     if (animationFrameId) cancelAnimationFrame(animationFrameId);
     animationFrameId = requestAnimationFrame(gameLoop);
-    updateAllHighScoreDisplays(); // Refresh high score display (though not strictly necessary on game start)
-    showScreen(null, false, gameScreenCallbacks); // Ensure game canvas is shown
+    updateAllHighScoreDisplays();
 }
+
 
 // --- Game Loop Core ---
 function gameLoop(timestamp) {
@@ -474,15 +386,15 @@ function updateGame(deltaTime) {
         wellsToDetonate.forEach(well => {
             if (well && well.isActive) {
                 well.detonate({ targetX: mouseX, targetY: mouseY, player: player });
-                if (player && player.activeAbilities) {
-                    for (const slot in player.activeAbilities) { // Check if the detonated well was tied to a numbered ability
-                        if (player.activeAbilities[slot] && player.activeAbilities[slot].id === 'miniGravityWell' && player.activeMiniWell === null) { // If it was player's main well
-                            player.activeAbilities[slot].cooldownTimer = player.activeAbilities[slot].cooldownDuration;
-                             gameContextForEventListeners.callbacks.forceAbilityUIUpdate = true; // Signal UI update
-                            break; 
-                        }
-                    }
-                 }
+                // Cooldown logic is handled within activateAbility when the well is detonated via key press
+                // If it expires naturally, the UI will update when the player next attempts to use it or when cooldowns are generally polled
+                if (player && player.activeAbilities && player.activeAbilities['2'] && player.activeMiniWell === null) {
+                    // This logic might be redundant if activateAbility covers it well.
+                    // It's to ensure UI updates if the well expires on its own and was tied to slot '2'.
+                    // player.activeAbilities['2'].cooldownTimer = player.activeAbilities['2'].cooldownDuration; // This would start cooldown on natural expiry
+                    // player.activeAbilities['2'].justBecameReady = false;
+                    // gameContextForEventListeners.callbacks.forceAbilityUIUpdate = true; // A way to signal UI needs update
+                }
             }
         });
         for (let i = decoys.length - 1; i >= 0; i--) { if(decoys[i] && !decoys[i].isActive) { if(player && player.activeMiniWell === decoys[i]) player.activeMiniWell = null; decoys.splice(i, 1);}}
@@ -509,14 +421,14 @@ function updateGame(deltaTime) {
                 currentGrowthFactor: currentPlayerRadiusGrowthFactor,
                 score: score,
                 updateHealthDisplayCallback: (currentHp, maxHp) => uiUpdateHealthDisplay(currentHp, maxHp),
-                updateAbilityCooldownCallback: (pInst) => uiUpdateAbilityCooldownUI(pInst), // This will now be called more frequently
+                updateAbilityCooldownCallback: (pInst) => uiUpdateAbilityCooldownUI(pInst), 
                 isAnyPauseActiveCallback: isAnyPauseActiveInternal,
                 decoysArray: decoys,
                 bossDefeatEffectsArray: bossDefeatEffects,
                 allRays: rays,
                 screenShakeParams: {isScreenShaking, screenShakeTimer, currentShakeMagnitude, currentShakeType, hitShakeDx, hitShakeDy},
                 activeBuffNotificationsArray: activeBuffNotifications,
-                CONSTANTS, // Pass the whole constants object
+                CONSTANTS, 
                 endGameCallback: endGameInternal,
                 updateScoreCallback: (amount) => { score += amount; updateScoreDisplay(score); checkForNewColorUnlock(); },
                 forceAbilityUIUpdate: false 
@@ -756,12 +668,7 @@ function updateGame(deltaTime) {
     }
 }
 
-// --- (drawGame, endGameInternal, togglePauseMenuInternal, startResumeCountdownInternal - SAME AS PREVIOUS FULL FILE) ---
-// --- (triggerEvolutionInternal, selectEvolutionInternal, triggerFreeUpgradeInternal, handleFreeUpgradeCloseInternal - SAME AS PREVIOUS FULL FILE) ---
-// --- (triggerLootChoiceInternal, selectLootUpgradeInternal - SAME AS PREVIOUS FULL FILE) ---
-// --- (createFinalStatsSnapshot, getFormattedActiveAbilitiesForStats, getFormattedMouseAbilitiesForStats, prepareDisplayedUpgradesForStats, prepareAndShowPauseStats - SAME AS PREVIOUS FULL FILE) ---
-// --- (showDetailedHighScores, gameScreenCallbacks, isAnyPauseActiveInternal, applyMusicPlayStateWrapper, showStartScreenWithUpdatesInternal - SAME AS PREVIOUS FULL FILE) ---
-// --- (audioDomElementsForInit, initializeAudio call, getAbilityContextForPlayer, debugForceSpawnBoss, gameContextForEventListeners, setupEventListeners call, DOMContentLoaded listener - SAME AS PREVIOUS FULL FILE) ---
+// --- Draw Game ---
 function drawGame(){
     ctx.save();
     if (isScreenShaking && screenShakeTimer > 0 && !isAnyPauseActiveInternal() && !gameOver) {
@@ -799,8 +706,12 @@ function drawGame(){
     ctx.restore();
 }
 
+// --- Core Game Event Functions (Internal versions) ---
 function endGameInternal() {
-    gameOver = true; gameRunning = false; pauseAllGameIntervals(); applyMusicPlayStateWrapper(); playSound(gameOverSoundFX);
+    gameOver = true; gameRunning = false; pauseAllGameIntervals(); 
+    currentActiveScreenElement = gameOverScreen; // Set current screen
+    applyMusicPlayStateWrapper(); 
+    playSound(gameOverSoundFX);
     const finalStatsSnapshot = createFinalStatsSnapshot();
     prepareAndShowPauseStats("Game Over - Final Stats"); 
     if (pausePlayerStatsPanel) {
@@ -831,7 +742,9 @@ function togglePauseMenuInternal() {
     if (gameOver || isCountingDownToResume || gamePausedForEvolution || gamePausedForFreeUpgrade || gamePausedForLootChoice) return;
     gamePausedByEsc = !gamePausedByEsc;
     if (gamePausedByEsc) {
-        pauseAllGameIntervals(); prepareAndShowPauseStats("Paused - Current Status"); showScreen(pauseScreen, true, gameScreenCallbacks); 
+        pauseAllGameIntervals(); prepareAndShowPauseStats("Paused - Current Status"); 
+        currentActiveScreenElement = pauseScreen;
+        showScreen(pauseScreen, true, gameScreenCallbacks); 
         if(pausePlayerStatsPanel) {
             if (pausePlayerStatsPanel.parentElement !== document.body) document.body.appendChild(pausePlayerStatsPanel);
             if (uiHighScoreContainer && uiHighScoreContainer.offsetParent !== null) {
@@ -841,6 +754,7 @@ function togglePauseMenuInternal() {
         }
     } else {
         if(pausePlayerStatsPanel) pausePlayerStatsPanel.style.display = 'none';
+        currentActiveScreenElement = countdownOverlay; // Or null if countdown is just an overlay
         startResumeCountdownInternal();
     }
 }
@@ -848,13 +762,16 @@ function togglePauseMenuInternal() {
 function startResumeCountdownInternal() {
     if (pauseScreen.style.display === 'flex') pauseScreen.style.display = 'none'; if(pausePlayerStatsPanel) pausePlayerStatsPanel.style.display = 'none';
     gamePausedByEsc = true; isCountingDownToResume = true; let countVal = 3;
+    currentActiveScreenElement = countdownOverlay;
     if(countdownOverlay) { countdownOverlay.textContent = countVal.toString(); countdownOverlay.style.display = 'flex'; }
     if (resumeCountdownTimerId) clearInterval(resumeCountdownTimerId);
     resumeCountdownTimerId = setInterval(() => {
         countVal--; if (countdownOverlay) countdownOverlay.textContent = countVal > 0 ? countVal.toString() : '';
         if (countVal <= 0) {
             if(countdownOverlay) countdownOverlay.style.display = 'none'; clearInterval(resumeCountdownTimerId); resumeCountdownTimerId = null;
-            isCountingDownToResume = false; gamePausedByEsc = false; resumeAllGameIntervals(); applyMusicPlayStateWrapper();
+            isCountingDownToResume = false; gamePausedByEsc = false; 
+            currentActiveScreenElement = null; // Game screen is active
+            resumeAllGameIntervals(); applyMusicPlayStateWrapper();
             lastTime = performance.now(); if (!animationFrameId && !gameOver && gameRunning) animationFrameId = requestAnimationFrame(gameLoop);
         }
     }, 1000);
@@ -863,7 +780,9 @@ function startResumeCountdownInternal() {
 function triggerEvolutionInternal() {
     if(!player || isAnyPauseActiveInternal() || (bossManager && bossManager.isBossSequenceActive())) return;
     if (shrinkMeCooldown > 0) shrinkMeCooldown--;
-    pauseAllGameIntervals(); gamePausedForEvolution = true; applyMusicPlayStateWrapper(true); playSound(evolutionSound);
+    pauseAllGameIntervals(); gamePausedForEvolution = true; 
+    currentActiveScreenElement = evolutionScreen;
+    applyMusicPlayStateWrapper(); playSound(evolutionSound);
     const available = evolutionChoices.filter(c => !c.isMaxed(player)); 
     let choices = [];
     if(available.length > 0){ let shuf = [...available].sort(() => 0.5 - Math.random()); choices = shuf.slice(0, 3); }
@@ -875,7 +794,9 @@ function triggerEvolutionInternal() {
 function selectEvolutionInternal(choice) {
     if(!player) {console.error("Player not defined"); return;}
     if(choice.id==='noMoreEvolutions'){
-        gamePausedForEvolution=false; postPopupImmunityTimer=CONSTANTS.POST_POPUP_IMMUNITY_DURATION; showScreen(null, false, gameScreenCallbacks);
+        gamePausedForEvolution=false; postPopupImmunityTimer=CONSTANTS.POST_POPUP_IMMUNITY_DURATION; 
+        currentActiveScreenElement = null;
+        showScreen(null, false, gameScreenCallbacks);
         applyMusicPlayStateWrapper(); lastTime=performance.now(); if(!gameOver&&!animationFrameId && gameRunning)animationFrameId=requestAnimationFrame(gameLoop);
         uiUpdateActiveBuffIndicator(player, postPopupImmunityTimer, postDamageImmunityTimer); resumeAllGameIntervals(); return;
     }
@@ -883,6 +804,7 @@ function selectEvolutionInternal(choice) {
     lastEvolutionScore = player.evolutionIntervalModifier > 0 ? Math.floor(score / (CONSTANTS.EVOLUTION_SCORE_INTERVAL * player.evolutionIntervalModifier)) * (CONSTANTS.EVOLUTION_SCORE_INTERVAL * player.evolutionIntervalModifier) : score;
     survivalScoreThisCycle=0; if (choice.id !== 'smallerPlayer') currentPlayerRadiusGrowthFactor = currentEffectiveDefaultGrowthFactor;
     gamePausedForEvolution=false; evolutionPendingAfterBoss = false; postPopupImmunityTimer=CONSTANTS.POST_POPUP_IMMUNITY_DURATION;
+    currentActiveScreenElement = null;
     showScreen(null, false, gameScreenCallbacks); applyMusicPlayStateWrapper(); lastTime=performance.now();
     if(!gameOver&&!animationFrameId && gameRunning)animationFrameId=requestAnimationFrame(gameLoop);
     uiUpdateActiveBuffIndicator(player, postPopupImmunityTimer, postDamageImmunityTimer); resumeAllGameIntervals();
@@ -891,7 +813,9 @@ function selectEvolutionInternal(choice) {
 
 function triggerFreeUpgradeInternal() {
     if(!player || isAnyPauseActiveInternal() || (bossManager && bossManager.isBossSequenceActive()))return;
-    pauseAllGameIntervals(); gamePausedForFreeUpgrade = true; applyMusicPlayStateWrapper(true); playSound(upgradeSound);
+    pauseAllGameIntervals(); gamePausedForFreeUpgrade = true; 
+    currentActiveScreenElement = freeUpgradeScreen;
+    applyMusicPlayStateWrapper(); playSound(upgradeSound);
     let upg; const avail = freeUpgradeChoicesData.filter(c=>!c.isMaxed(player));
     if(avail.length>0) upg=avail[Math.floor(Math.random()*avail.length)]; else upg={id:'noMoreFreeUpgrades',text:"All free bonuses maxed!",apply:()=>"No more free bonuses!"};
     populateFreeUpgradeOptionUI(upg, handleFreeUpgradeCloseInternal);
@@ -900,14 +824,18 @@ function triggerFreeUpgradeInternal() {
 
 function handleFreeUpgradeCloseInternal(chosenUpgrade) {
     if(chosenUpgrade && chosenUpgrade.id!=='noMoreFreeUpgrades') chosenUpgrade.apply();
-    gamePausedForFreeUpgrade = false; postPopupImmunityTimer=CONSTANTS.POST_POPUP_IMMUNITY_DURATION; showScreen(null, false, gameScreenCallbacks);
+    gamePausedForFreeUpgrade = false; postPopupImmunityTimer=CONSTANTS.POST_POPUP_IMMUNITY_DURATION; 
+    currentActiveScreenElement = null;
+    showScreen(null, false, gameScreenCallbacks);
     applyMusicPlayStateWrapper(); lastTime=performance.now(); if(!gameOver&&!animationFrameId && gameRunning)animationFrameId=requestAnimationFrame(gameLoop);
     uiUpdateActiveBuffIndicator(player, postPopupImmunityTimer, postDamageImmunityTimer); resumeAllGameIntervals();
 }
 
 function triggerLootChoiceInternal(choices) {
     if (!player || choices.length === 0) { postPopupImmunityTimer = CONSTANTS.POST_POPUP_IMMUNITY_DURATION * 0.5; uiUpdateActiveBuffIndicator(player, postPopupImmunityTimer, postDamageImmunityTimer); resumeAllGameIntervals(); return; }
-    pauseAllGameIntervals(); gamePausedForLootChoice = true; applyMusicPlayStateWrapper(true);
+    pauseAllGameIntervals(); gamePausedForLootChoice = true; 
+    currentActiveScreenElement = lootChoiceScreen;
+    applyMusicPlayStateWrapper();
     populateLootOptionsUI( choices, player, selectLootUpgradeInternal, ALL_POSSIBLE_RAY_COLORS, getReadableColorNameFromUtils );
     showScreen(lootChoiceScreen, true, gameScreenCallbacks);
 }
@@ -938,10 +866,12 @@ function selectLootUpgradeInternal(chosenUpgrade) {
         }
      }
 
-     gamePausedForLootChoice = false; postPopupImmunityTimer = CONSTANTS.POST_POPUP_IMMUNITY_DURATION * 0.75; showScreen(null, false, gameScreenCallbacks);
+     gamePausedForLootChoice = false; postPopupImmunityTimer = CONSTANTS.POST_POPUP_IMMUNITY_DURATION * 0.75; 
+     currentActiveScreenElement = null;
+     showScreen(null, false, gameScreenCallbacks);
      applyMusicPlayStateWrapper(); lastTime = performance.now(); if (!gameOver && !animationFrameId && gameRunning) animationFrameId = requestAnimationFrame(gameLoop);
      uiUpdateActiveBuffIndicator(player, postPopupImmunityTimer, postDamageImmunityTimer); 
-     uiUpdateAbilityCooldownUI(player); // Update UI after acquiring ability
+     uiUpdateAbilityCooldownUI(player); 
 
     if (evolutionPendingAfterBoss && (!bossManager || !bossManager.isBossInQueue())) {
         triggerEvolutionInternal();
@@ -973,7 +903,7 @@ function createFinalStatsSnapshot() {
         gameplayTimeData: gameplayTimeElapsed,
     };
 }
-function getFormattedActiveAbilitiesForStats(p) { if (!p || !p.activeAbilities) return []; let fmt = []; for (const s in p.activeAbilities) { const a = p.activeAbilities[s]; if (a) { /* Check if ability exists in slot */ const d = bossLootPool.find(l => l.id === a.id && l.type === 'ability'); if (d) { let cd = (a.cooldownDuration / 1000).toFixed(1) + 's'; if (a.duration) cd += ` (Dur: ${(a.duration / 1000).toFixed(1)}s)`; fmt.push({name: d.name, slot: s, desc: cd});}}} return fmt; }
+function getFormattedActiveAbilitiesForStats(p) { if (!p || !p.activeAbilities) return []; let fmt = []; for (const s in p.activeAbilities) { const a = p.activeAbilities[s]; if (a) { const d = bossLootPool.find(l => l.id === a.id && l.type === 'ability'); if (d) { let cd = (a.cooldownDuration / 1000).toFixed(1) + 's'; if (a.duration) cd += ` (Dur: ${(a.duration / 1000).toFixed(1)}s)`; fmt.push({name: d.name, slot: s, desc: cd});}}} return fmt; }
 function getFormattedMouseAbilitiesForStats(p) { if(!p) return []; let abs = []; if (p.hasOmegaLaser) abs.push({name: "Omega Laser", desc: `${(CONSTANTS.OMEGA_LASER_COOLDOWN/1000)}s CD`}); if (p.hasShieldOvercharge) abs.push({name: "Shield Overcharge", desc: `${(CONSTANTS.SHIELD_OVERCHARGE_COOLDOWN/1000)}s CD`}); return abs; }
 function prepareDisplayedUpgradesForStats(p) {
     if (!p) return []; let list = [];
@@ -997,6 +927,7 @@ function prepareAndShowPauseStats(title) {
 function showDetailedHighScores() {
     const highScoresData = getHighScores();
     pauseAllGameIntervals();
+    currentActiveScreenElement = detailedHighScoresScreen;
     applyMusicPlayStateWrapper();
     displayDetailedHighScoresScreenUI(
         highScoresData,
@@ -1031,12 +962,41 @@ function showDetailedHighScores() {
 
 
 const gameScreenCallbacks = {
-    onPauseGame: (s) => { pauseAllGameIntervals(); if(s === evolutionScreen) gamePausedForEvolution = true; else if(s === freeUpgradeScreen) gamePausedForFreeUpgrade = true; else if(s === lootChoiceScreen) gamePausedForLootChoice = true; else if(s === pauseScreen) gamePausedByEsc = true; else if (s === detailedHighScoresScreen) { /* Game logic remains paused */ } applyMusicPlayStateWrapper(gamePausedForEvolution || gamePausedForFreeUpgrade || gamePausedForLootChoice);},
-    onResumeGame: () => { gamePausedForEvolution = false; gamePausedForFreeUpgrade = false; gamePausedForLootChoice = false; if (!gamePausedByEsc && !isCountingDownToResume) resumeAllGameIntervals(); lastTime = performance.now(); applyMusicPlayStateWrapper();},
-    onApplyMusicPlayState: () => applyMusicPlayStateWrapper(gamePausedForEvolution || gamePausedForFreeUpgrade || gamePausedForLootChoice)
+    onPauseGame: (screenElem) => {
+        currentActiveScreenElement = screenElem; 
+        pauseAllGameIntervals();
+        if(screenElem === evolutionScreen) gamePausedForEvolution = true;
+        else if(screenElem === freeUpgradeScreen) gamePausedForFreeUpgrade = true;
+        else if(screenElem === lootChoiceScreen) gamePausedForLootChoice = true;
+        else if(screenElem === pauseScreen) gamePausedByEsc = true;
+        else if (screenElem === detailedHighScoresScreen) { /* Handled */ }
+        applyMusicPlayStateWrapper();
+    },
+    onResumeGame: (screenElem) => { 
+        currentActiveScreenElement = screenElem; 
+        gamePausedForEvolution = false;
+        gamePausedForFreeUpgrade = false;
+        gamePausedForLootChoice = false;
+        if (!gamePausedByEsc && !isCountingDownToResume) resumeAllGameIntervals();
+        lastTime = performance.now();
+        applyMusicPlayStateWrapper();
+    },
+    onApplyMusicPlayState: (screenElem) => { 
+        currentActiveScreenElement = screenElem; 
+        applyMusicPlayStateWrapper();
+    }
 };
 function isAnyPauseActiveInternal() { return gamePausedForEvolution || gamePausedForFreeUpgrade || gamePausedByEsc || isCountingDownToResume || gamePausedForLootChoice; }
-function applyMusicPlayStateWrapper(isPausedForPopup = false) { applyMusicPlayState(gameOver, gameRunning, isAnyPauseActiveInternal(), isPausedForPopup); }
+function applyMusicPlayStateWrapper() { 
+    const isPausedForPopupLocal = gamePausedForEvolution || gamePausedForFreeUpgrade || gamePausedForLootChoice;
+    applyMusicPlayState(
+        gameOver,
+        gameRunning,
+        gamePausedByEsc || isCountingDownToResume, // True pause for gameplay
+        isPausedForPopupLocal,                 
+        currentActiveScreenElement                 
+    );
+}
 
 
 function showStartScreenWithUpdatesInternal() {
@@ -1052,8 +1012,10 @@ function showStartScreenWithUpdatesInternal() {
         }
         pausePlayerStatsPanel.style.display = 'none'; 
     }
-
-    updateAllHighScoreDisplays(); showScreen(startScreen, false, gameScreenCallbacks); applyMusicPlayStateWrapper();
+    currentActiveScreenElement = startScreen;
+    updateAllHighScoreDisplays(); 
+    showScreen(startScreen, false, gameScreenCallbacks); 
+    // applyMusicPlayStateWrapper(); // Called by showScreen's callback
 }
 
 const audioDomElementsForInit = {
@@ -1102,13 +1064,14 @@ const gameContextForEventListeners = {
     getActiveBuffNotificationsArray: () => activeBuffNotifications, 
     callbacks: {
         startGame: initGame,
-        showSettingsScreenFromStart: () => { setPreviousScreenForSettings(startScreen); showScreen(settingsScreen, false, gameScreenCallbacks); },
-        viewDetailedHighScores: showDetailedHighScores,
-        toggleSound: toggleSoundEnabled, updateMusicVolume, updateSfxVolume: updateSpecificSfxVolume,
-        goBackFromSettings: () => { const target = getPreviousScreenForSettings() || startScreen; showScreen(target, target === pauseScreen, gameScreenCallbacks); if (target === pauseScreen && pausePlayerStatsPanel) { prepareAndShowPauseStats("Paused - Current Status"); if (pausePlayerStatsPanel.parentElement !== document.body) document.body.appendChild(pausePlayerStatsPanel); if (uiHighScoreContainer && uiHighScoreContainer.offsetParent !== null) { const r = uiHighScoreContainer.getBoundingClientRect(); pausePlayerStatsPanel.style.top = (r.bottom + 10) + 'px';} else pausePlayerStatsPanel.style.top = '20px'; pausePlayerStatsPanel.style.display = 'block';} else if(pausePlayerStatsPanel && target !== detailedHighScoresScreen) pausePlayerStatsPanel.style.display = 'none';},
+        showSettingsScreenFromStart: () => { setPreviousScreenForSettings(startScreen); currentActiveScreenElement = settingsScreen; showScreen(settingsScreen, false, gameScreenCallbacks); },
+        viewDetailedHighScores: () => { currentActiveScreenElement = detailedHighScoresScreen; showDetailedHighScores(); },
+        toggleSound: () => { toggleSoundEnabled(); applyMusicPlayStateWrapper(); }, // Make sure to call applyMusicPlayState after toggle
+        updateMusicVolume, updateSfxVolume: updateSpecificSfxVolume,
+        goBackFromSettings: () => { const target = getPreviousScreenForSettings() || startScreen; currentActiveScreenElement = target; showScreen(target, target === pauseScreen, gameScreenCallbacks); if (target === pauseScreen && pausePlayerStatsPanel) { prepareAndShowPauseStats("Paused - Current Status"); if (pausePlayerStatsPanel.parentElement !== document.body) document.body.appendChild(pausePlayerStatsPanel); if (uiHighScoreContainer && uiHighScoreContainer.offsetParent !== null) { const r = uiHighScoreContainer.getBoundingClientRect(); pausePlayerStatsPanel.style.top = (r.bottom + 10) + 'px';} else pausePlayerStatsPanel.style.top = '20px'; pausePlayerStatsPanel.style.display = 'block';} else if(pausePlayerStatsPanel && target !== detailedHighScoresScreen) pausePlayerStatsPanel.style.display = 'none';},
         resumeGameFromPause: togglePauseMenuInternal,
         togglePauseMenu: togglePauseMenuInternal,
-        showSettingsScreenFromPause: () => { setPreviousScreenForSettings(pauseScreen); showScreen(settingsScreen, true, gameScreenCallbacks); if (pausePlayerStatsPanel) pausePlayerStatsPanel.style.display = 'none'; },
+        showSettingsScreenFromPause: () => { setPreviousScreenForSettings(pauseScreen); currentActiveScreenElement = settingsScreen; showScreen(settingsScreen, true, gameScreenCallbacks); if (pausePlayerStatsPanel) pausePlayerStatsPanel.style.display = 'none'; },
         goToMainMenuFromPause: showStartScreenWithUpdatesInternal,
         onWindowResize: () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; inputState.mouseX = canvas.width / 2; inputState.mouseY = canvas.height / 2; mouseX = inputState.mouseX; mouseY = inputState.mouseY; if(player&&gameRunning){player.x=Math.max(player.radius,Math.min(player.x,canvas.width-player.radius));player.y=Math.max(player.radius,Math.min(player.y,canvas.height-player.radius));} if(gameRunning && !gameOver && !isAnyPauseActiveInternal()) drawGame(); if ((gamePausedByEsc || gameOver || (detailedHighScoresScreen && detailedHighScoresScreen.style.display === 'flex')) && pausePlayerStatsPanel && pausePlayerStatsPanel.style.display === 'block') { if (pausePlayerStatsPanel.parentElement === document.body && uiHighScoreContainer && uiHighScoreContainer.offsetParent !== null && detailedHighScoresScreen.style.display !== 'flex') { const r = uiHighScoreContainer.getBoundingClientRect(); pausePlayerStatsPanel.style.top = (r.bottom + 10) + 'px'; }  else if (pausePlayerStatsPanel.parentElement === document.body && detailedHighScoresScreen.style.display !== 'flex') { pausePlayerStatsPanel.style.top = '20px';}}},
         debugSpawnBoss: debugForceSpawnBoss
@@ -1124,5 +1087,5 @@ document.addEventListener('DOMContentLoaded', () => {
         viewHighScoresBtn.parentNode.replaceChild(newBtn, viewHighScoresBtn);
         newBtn.addEventListener('click', () => gameContextForEventListeners.callbacks.viewDetailedHighScores());
     }
-    showStartScreenWithUpdatesInternal();
+    showStartScreenWithUpdatesInternal(); // This will set currentActiveScreenElement to startScreen
 });

@@ -10,31 +10,29 @@ let bgMusic, playerHitSound, targetHitSound, gameOverSoundFX, heartSound, shootS
 
 // --- Audio State ---
 let audioInitialized = false;
-let soundEnabled = true; // Will be loaded from localStorage
+let soundEnabled = true;
 
 // --- Volume Levels ---
-let currentMusicVolume = 0.1;
+let currentMusicVolume = 0.25; // << SET YOUR DESIRED DEFAULT HERE (e.g., 0.0 for muted, 0.05 for 5%)
 let shootSoundVolume = 0.25;
 let hitSoundVolume = 0.25;
 let pickupSoundVolume = 0.25;
 let uiSoundVolume = 0.25;
 
 // --- DOM Element References (queried internally or passed) ---
-// These will be assigned in initializeAudio or a dedicated DOM ready function
 let soundToggleButtonElem,
     musicVolumeSliderElem, musicVolumeValueElem,
     shootVolumeSliderElem, shootVolumeValueElem,
     hitVolumeSliderElem, hitVolumeValueElem,
     pickupVolumeSliderElem, pickupVolumeValueElem,
     uiVolumeSliderElem, uiVolumeValueElem,
-    bgMusicAudioElement; // For the <audio> tag
+    bgMusicAudioElement;
 
 // --- Functions ---
 
 export function initializeAudio(audioDomElements) {
-    if (audioInitialized) return;
+    // if (audioInitialized) return; // Can keep this to prevent re-initialization if called multiple times
 
-    // Assign passed DOM elements
     soundToggleButtonElem = audioDomElements.soundToggleButton;
     musicVolumeSliderElem = audioDomElements.musicVolumeSlider;
     musicVolumeValueElem = audioDomElements.musicVolumeValue;
@@ -46,13 +44,10 @@ export function initializeAudio(audioDomElements) {
     pickupVolumeValueElem = audioDomElements.pickupVolumeValue;
     uiVolumeSliderElem = audioDomElements.uiVolumeSlider;
     uiVolumeValueElem = audioDomElements.uiVolumeValue;
-    bgMusicAudioElement = audioDomElements.bgMusic; // The <audio> element itself
+    bgMusicAudioElement = audioDomElements.bgMusic;
 
     try {
-        // It's good practice to point to actual files now if you have them
-        // Assuming audio files are in the same directory as index.html or an 'assets/audio/' subfolder
-        // Adjust paths as necessary, e.g., 'assets/audio/player_hit.mp3'
-
+        // --- Create Audio Objects First ---
         playerHitSound = new Audio('assets/audio/player_hit.mp3');
         targetHitSound = new Audio('assets/audio/target_explode.mp3');
         gameOverSoundFX = new Audio('assets/audio/game_over_explosion.mp3');
@@ -69,8 +64,8 @@ export function initializeAudio(audioDomElements) {
         playerWellDeploySound = new Audio('assets/audio/player_well_deploy.mp3');
         playerWellDetonateSound = new Audio('assets/audio/player_well_detonate.mp3');
         lootPickupSound = new Audio('assets/audio/loot_pickup_shine.mp3');
-        abilityUseSound = new Audio('assets/audio/ability_use.mp3'); // Generic or make specific
-        abilityReadySound = new Audio('assets/audio/ability_ready.mp3'); // Generic or make specific
+        abilityUseSound = new Audio('assets/audio/ability_use.mp3');
+        abilityReadySound = new Audio('assets/audio/ability_ready.mp3');
         chaserSpawnSound = new Audio('assets/audio/chaser_spawn.mp3');
         reflectorSpawnSound = new Audio('assets/audio/reflector_spawn.mp3');
         singularitySpawnSound = new Audio('assets/audio/singularity_spawn.mp3');
@@ -79,19 +74,23 @@ export function initializeAudio(audioDomElements) {
         empBurstSound = new Audio('assets/audio/emp_burst_activate.mp3');
         omegaLaserSound = new Audio('assets/audio/omega_laser.mp3');
         shieldOverchargeSound = new Audio('assets/audio/shield_overcharge.mp3');
-
-        // The bgMusic is already an HTMLAudioElement, so we just use bgMusicAudioElement directly
         bgMusic = bgMusicAudioElement;
 
-
-        loadVolumeSettingsInternal(); // Load and apply initial volumes
-        loadSoundEnabledSettingInternal(); // Load sound enabled state
-
+        // --- Set audioInitialized to true AFTER audio objects are created but BEFORE volumes are applied ---
         audioInitialized = true;
+
+        // --- Load settings and apply them ---
+        // These functions will now correctly apply volumes because audioInitialized is true
+        loadVolumeSettingsInternal();
+        loadSoundEnabledSettingInternal(); // This also calls updateSoundButtonVisualInternal
+
+        // Initial music play state is typically handled by main.js after UI is ready
+        // or by the first call to applyMusicPlayState from main.js
+
     } catch (e) {
         console.error("Error creating Audio objects:", e);
+        audioInitialized = false; // Ensure it's false on error
     }
-    applyMusicPlayState(); // Apply initial music play state
 }
 
 export function playSound(soundEffectInstance, loop = false) {
@@ -109,11 +108,14 @@ export function stopSound(soundEffectInstance) {
 }
 
 export function toggleSoundEnabled() {
+    // This function will be called by an event listener in main.js or eventListeners.js
+    // It should then trigger a call to applyMusicPlayState from main.js
     if (!audioInitialized) return;
     soundEnabled = !soundEnabled;
     localStorage.setItem('lightBlasterSoundEnabled', JSON.stringify(soundEnabled));
     updateSoundButtonVisualInternal();
-    applyMusicPlayState();
+    // The actual starting/stopping of music should be handled by a call to applyMusicPlayState
+    // from the main game logic, which knows the current game state.
 }
 
 function loadSoundEnabledSettingInternal() {
@@ -127,16 +129,30 @@ function loadSoundEnabledSettingInternal() {
 function updateSoundButtonVisualInternal() {
     if (soundToggleButtonElem) {
         soundToggleButtonElem.textContent = soundEnabled ? 'ON' : 'OFF';
-        // soundToggleButtonElem.classList.toggle('active', soundEnabled); // If you have an 'active' class
     }
 }
 
-export function applyMusicPlayState(isGameOver = false, isGameRunning = false, isAnyPauseCurrentlyActive = false, isPausedForPopup = false) {
+export function applyMusicPlayState(
+    isGameOver = false,
+    isGameRunning = false,
+    isAnyPauseCurrentlyActive = false,
+    isPausedForPopup = false,
+    currentVisibleScreen = null
+) {
     if (!audioInitialized || !bgMusic) return;
 
     const trulyPausedForGameplay = isAnyPauseCurrentlyActive && !isPausedForPopup;
 
-    if (soundEnabled && !isGameOver && ((isGameRunning && !trulyPausedForGameplay) || isPausedForPopup)) {
+    const shouldPlayMusic = soundEnabled && !isGameOver &&
+        (
+            (isGameRunning && !trulyPausedForGameplay) ||
+            isPausedForPopup ||
+            (currentVisibleScreen && currentVisibleScreen.id === 'startScreen') ||
+            (currentVisibleScreen && currentVisibleScreen.id === 'settingsScreen') ||
+            (currentVisibleScreen && currentVisibleScreen.id === 'detailedHighScoresScreen')
+        );
+
+    if (shouldPlayMusic) {
         if (bgMusic.paused) {
             bgMusic.play().catch(e => console.warn("BG music play failed:", e));
         }
@@ -147,67 +163,74 @@ export function applyMusicPlayState(isGameOver = false, isGameRunning = false, i
 
 
 export function updateMusicVolume(volume) {
-    if (!audioInitialized) return;
     currentMusicVolume = parseFloat(volume);
-    if (bgMusic) bgMusic.volume = currentMusicVolume;
+    if (bgMusic && audioInitialized) { // Ensure bgMusic exists and audio is initialized
+         bgMusic.volume = currentMusicVolume;
+    }
     if (musicVolumeValueElem) musicVolumeValueElem.textContent = `${Math.round(currentMusicVolume * 100)}%`;
     localStorage.setItem('lightBlasterMusicVol', currentMusicVolume.toString());
 }
 
 export function updateSpecificSfxVolume(soundTypeKey, volume) {
-    if (!audioInitialized) return;
     const vol = parseFloat(volume);
-    let targetSoundObject = null;
     let storageKey = '';
     let displayElement = null;
+    let soundObjectsToUpdate = []; // Array to hold {sound: object, multiplier: optional_float}
 
     switch (soundTypeKey) {
         case 'shoot':
-            shootSoundVolume = vol; targetSoundObject = shootSound; storageKey = 'lightBlasterShootVol'; displayElement = shootVolumeValueElem;
-            if(omegaLaserSound) omegaLaserSound.volume = vol; // Group with shoot or UI
+            shootSoundVolume = vol;
+            if(shootSound) soundObjectsToUpdate.push({sound: shootSound});
+            if(omegaLaserSound) soundObjectsToUpdate.push({sound: omegaLaserSound});
+            storageKey = 'lightBlasterShootVol'; displayElement = shootVolumeValueElem;
             break;
         case 'hit':
             hitSoundVolume = vol;
-            // Apply to all hit sounds
-            if(playerHitSound) playerHitSound.volume = vol;
-            if(targetHitSound) targetHitSound.volume = vol;
-            if(chainReactionSound) chainReactionSound.volume = vol;
-            if(bossHitSound) bossHitSound.volume = vol;
+            if(playerHitSound) soundObjectsToUpdate.push({sound: playerHitSound});
+            if(targetHitSound) soundObjectsToUpdate.push({sound: targetHitSound});
+            if(chainReactionSound) soundObjectsToUpdate.push({sound: chainReactionSound});
+            if(bossHitSound) soundObjectsToUpdate.push({sound: bossHitSound});
             storageKey = 'lightBlasterHitVol'; displayElement = hitVolumeValueElem;
             break;
         case 'pickup':
             pickupSoundVolume = vol;
-            if(heartSound) heartSound.volume = vol;
-            if(bonusPickupSound) bonusPickupSound.volume = vol;
-            if(lootPickupSound) lootPickupSound.volume = vol;
+            if(heartSound) soundObjectsToUpdate.push({sound: heartSound});
+            if(bonusPickupSound) soundObjectsToUpdate.push({sound: bonusPickupSound});
+            if(lootPickupSound) soundObjectsToUpdate.push({sound: lootPickupSound});
             storageKey = 'lightBlasterPickupVol'; displayElement = pickupVolumeValueElem;
             break;
         case 'ui':
             uiSoundVolume = vol;
-            // Apply to all UI/Event sounds
-            if(evolutionSound) evolutionSound.volume = vol;
-            if(upgradeSound) upgradeSound.volume = vol;
-            if(newColorSound) newColorSound.volume = vol;
-            if(screenShakeSound) screenShakeSound.volume = vol;
-            if(gameOverSoundFX) gameOverSoundFX.volume = vol;
-            if(gravityWellChargeSound) gravityWellChargeSound.volume = vol * 0.7;
-            if(gravityWellExplodeSound) gravityWellExplodeSound.volume = vol;
-            if(playerWellDeploySound) playerWellDeploySound.volume = vol * 0.8;
-            if(playerWellDetonateSound) playerWellDetonateSound.volume = vol;
-            if(chaserSpawnSound) chaserSpawnSound.volume = vol;
-            if(reflectorSpawnSound) reflectorSpawnSound.volume = vol;
-            if(singularitySpawnSound) singularitySpawnSound.volume = vol;
-            if(teleportSound) teleportSound.volume = vol;
-            if(empBurstSound) empBurstSound.volume = vol;
-            if(abilityUseSound) abilityUseSound.volume = vol;
-            if(abilityReadySound) abilityReadySound.volume = vol;
-            if(shieldOverchargeSound) shieldOverchargeSound.volume = vol;
-            // OmegaLaser sound might fit here or shoot. Let's keep it separate or with shoot.
+            if(evolutionSound) soundObjectsToUpdate.push({sound: evolutionSound});
+            if(upgradeSound) soundObjectsToUpdate.push({sound: upgradeSound});
+            if(newColorSound) soundObjectsToUpdate.push({sound: newColorSound});
+            if(screenShakeSound) soundObjectsToUpdate.push({sound: screenShakeSound});
+            if(gameOverSoundFX) soundObjectsToUpdate.push({sound: gameOverSoundFX});
+            if(gravityWellChargeSound) soundObjectsToUpdate.push({sound: gravityWellChargeSound, multiplier: 0.7});
+            if(gravityWellExplodeSound) soundObjectsToUpdate.push({sound: gravityWellExplodeSound});
+            if(playerWellDeploySound) soundObjectsToUpdate.push({sound: playerWellDeploySound, multiplier: 0.8});
+            if(playerWellDetonateSound) soundObjectsToUpdate.push({sound: playerWellDetonateSound});
+            if(chaserSpawnSound) soundObjectsToUpdate.push({sound: chaserSpawnSound});
+            if(reflectorSpawnSound) soundObjectsToUpdate.push({sound: reflectorSpawnSound});
+            if(singularitySpawnSound) soundObjectsToUpdate.push({sound: singularitySpawnSound});
+            if(teleportSound) soundObjectsToUpdate.push({sound: teleportSound});
+            if(empBurstSound) soundObjectsToUpdate.push({sound: empBurstSound});
+            if(abilityUseSound) soundObjectsToUpdate.push({sound: abilityUseSound});
+            if(abilityReadySound) soundObjectsToUpdate.push({sound: abilityReadySound});
+            if(shieldOverchargeSound) soundObjectsToUpdate.push({sound: shieldOverchargeSound});
             storageKey = 'lightBlasterUiVol'; displayElement = uiVolumeValueElem;
             break;
         default:
             console.warn("Unknown soundTypeKey for volume update:", soundTypeKey);
             return;
+    }
+
+    if (audioInitialized) { // Only try to set volume if audio objects are created
+        soundObjectsToUpdate.forEach(item => {
+            if (item && item.sound) {
+                item.sound.volume = vol * (item.multiplier || 1.0);
+            }
+        });
     }
 
     if (displayElement) displayElement.textContent = `${Math.round(vol * 100)}%`;
@@ -216,36 +239,28 @@ export function updateSpecificSfxVolume(soundTypeKey, volume) {
 
 
 function loadVolumeSettingsInternal() {
-    currentMusicVolume = parseFloat(localStorage.getItem('lightBlasterMusicVol') || 0.1);
-    shootSoundVolume = parseFloat(localStorage.getItem('lightBlasterShootVol') || 0.25);
-    hitSoundVolume = parseFloat(localStorage.getItem('lightBlasterHitVol') || 0.25);
-    pickupSoundVolume = parseFloat(localStorage.getItem('lightBlasterPickupVol') || 0.25);
-    uiSoundVolume = parseFloat(localStorage.getItem('lightBlasterUiVol') || 0.25);
+    // Load from localStorage or use the hardcoded defaults
+    currentMusicVolume = parseFloat(localStorage.getItem('lightBlasterMusicVol') || currentMusicVolume); // Use existing default if not in localStorage
+    shootSoundVolume = parseFloat(localStorage.getItem('lightBlasterShootVol') || shootSoundVolume);
+    hitSoundVolume = parseFloat(localStorage.getItem('lightBlasterHitVol') || hitSoundVolume);
+    pickupSoundVolume = parseFloat(localStorage.getItem('lightBlasterPickupVol') || pickupSoundVolume);
+    uiSoundVolume = parseFloat(localStorage.getItem('lightBlasterUiVol') || uiSoundVolume);
 
+    // Update UI sliders
     if (musicVolumeSliderElem) musicVolumeSliderElem.value = currentMusicVolume.toString();
     if (musicVolumeValueElem) musicVolumeValueElem.textContent = `${Math.round(currentMusicVolume * 100)}%`;
-
     if (shootVolumeSliderElem) shootVolumeSliderElem.value = shootSoundVolume.toString();
     if (shootVolumeValueElem) shootVolumeValueElem.textContent = `${Math.round(shootSoundVolume * 100)}%`;
-
     if (hitVolumeSliderElem) hitVolumeSliderElem.value = hitSoundVolume.toString();
     if (hitVolumeValueElem) hitVolumeValueElem.textContent = `${Math.round(hitSoundVolume * 100)}%`;
-
     if (pickupVolumeSliderElem) pickupVolumeSliderElem.value = pickupSoundVolume.toString();
     if (pickupVolumeValueElem) pickupVolumeValueElem.textContent = `${Math.round(pickupSoundVolume * 100)}%`;
-
     if (uiVolumeSliderElem) uiVolumeSliderElem.value = uiSoundVolume.toString();
     if (uiVolumeValueElem) uiVolumeValueElem.textContent = `${Math.round(uiSoundVolume * 100)}%`;
 
-    // Apply initial volumes to audio objects after they are created
-    // This is now handled within initializeAudio after sound objects are created.
-    // We call this function, then apply these loaded volumes to the newly created Audio objects.
-    // The logic for applying to specific sound objects is now in updateSpecificSfxVolume,
-    // so initializeAudio will call that after loading.
-
-    // Re-applying after objects are created in initializeAudio
+    // Apply volumes to actual audio objects IF they are initialized
     if (audioInitialized) {
-        updateMusicVolume(currentMusicVolume); // Applies to bgMusic
+        updateMusicVolume(currentMusicVolume); // This will set bgMusic.volume
         updateSpecificSfxVolume('shoot', shootSoundVolume);
         updateSpecificSfxVolume('hit', hitSoundVolume);
         updateSpecificSfxVolume('pickup', pickupSoundVolume);
@@ -253,10 +268,6 @@ function loadVolumeSettingsInternal() {
     }
 }
 
-// --- Export specific sound instances if needed by other modules for direct play ---
-// It's often better to have specific play functions like playPlayerHitSound() if granularity is needed,
-// or pass the sound instance to the generic playSound() from the calling module.
-// For now, let's make a few key ones available if other modules import them.
 export {
     playerHitSound, targetHitSound, gameOverSoundFX, heartSound, shootSound,
     evolutionSound, upgradeSound, bonusPickupSound, newColorSound, screenShakeSound,
@@ -264,5 +275,5 @@ export {
     playerWellDetonateSound, lootPickupSound, abilityUseSound, abilityReadySound,
     chaserSpawnSound, reflectorSpawnSound, singularitySpawnSound, bossHitSound,
     teleportSound, empBurstSound, omegaLaserSound, shieldOverchargeSound,
-    bgMusic // Exporting bgMusic itself if direct control over it is needed elsewhere
+    bgMusic
 };

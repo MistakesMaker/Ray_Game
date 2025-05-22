@@ -1,7 +1,7 @@
 // js/ui.js
 import * as CONSTANTS from './constants.js';
 
-// --- DOM Element Exports --- (Same as before)
+// --- DOM Element Exports ---
 export const canvas = document.getElementById('gameCanvas');
 export const scoreDisplayElem = document.getElementById('scoreDisplay');
 export const healthDisplayElem = document.getElementById('healthDisplay');
@@ -42,12 +42,13 @@ const statsMouseAbilitiesDiv = document.getElementById('statsMouseAbilities');
 const statsBossTiersDiv = document.getElementById('statsBossTiers');
 
 
-// --- UI State --- (Same as before)
+// --- UI State ---
 let previousScreenForSettings = null;
 
-// --- UI Update Functions --- (Most are same as before)
+// --- UI Update Functions ---
 export function updateScoreDisplay(currentScore) { if (scoreDisplayElem) scoreDisplayElem.textContent = `Score: ${currentScore}`; }
 export function updateHealthDisplay(currentHp, maxHp) { if (healthDisplayElem) healthDisplayElem.textContent = `Health: ${currentHp}/${maxHp}`; }
+
 export function updateBuffIndicator(immuneColorsList = [], getReadableColorNameFunc) {
     if (!buffIndicatorContainer || !getReadableColorNameFunc) return;
     buffIndicatorContainer.innerHTML = '';
@@ -94,19 +95,19 @@ export function updateAbilityCooldownUI(playerInstance) {
     abilityDisplayOrder.forEach(desc => {
         const slotDiv = document.createElement('div');
         slotDiv.classList.add('ability-slot');
-        slotDiv.id = `ability-slot-${desc.id || desc.slot}`;
+        slotDiv.id = `ability-slot-${desc.id || desc.slot}`; 
 
         let isUnlocked = false;
         let isReady = false;
-        let isChargingOrActive = false;
+        let isChargingOrActive = false; 
         let currentTimer = 0;
-        let maxTimer = 0;
-        let actualIconText = desc.defaultIcon || '?'; // Start with default
+        let maxTimer = 0; 
+        let actualIconText = desc.defaultIcon || '?'; 
         let keybindText = desc.keybindText || desc.slot;
 
         if (desc.type === 'mouse') {
             isUnlocked = desc.check();
-            actualIconText = desc.iconText; // Mouse abilities have their icon defined directly
+            actualIconText = desc.iconText; 
             if (isUnlocked) {
                 isChargingOrActive = desc.isCharging();
                 if (isChargingOrActive) {
@@ -121,14 +122,13 @@ export function updateAbilityCooldownUI(playerInstance) {
             }
         } else if (desc.type === 'slot') {
             const ability = playerInstance.activeAbilities[desc.slot];
-            if (ability) { // Ability acquired for this slot
+            if (ability) { 
                 isUnlocked = true;
-                // Determine icon based on the acquired ability's ID
                 switch(ability.id) {
                     case 'empBurst': actualIconText = '💥'; break;
                     case 'miniGravityWell': actualIconText = '🔮'; break;
                     case 'teleport': actualIconText = '🌀'; break;
-                    default: actualIconText = '?'; // Fallback for unknown ability ID
+                    default: actualIconText = '?'; 
                 }
 
                 if (ability.id === 'miniGravityWell' && playerInstance.activeMiniWell && playerInstance.activeMiniWell.isActive) {
@@ -141,9 +141,9 @@ export function updateAbilityCooldownUI(playerInstance) {
                 } else {
                     isReady = true;
                 }
-            } else { // Slot exists but no ability acquired for it yet
+            } else { 
                 isUnlocked = false;
-                actualIconText = desc.defaultIcon; // Use the default icon for the slot when locked
+                actualIconText = desc.defaultIcon; 
             }
         }
 
@@ -151,9 +151,9 @@ export function updateAbilityCooldownUI(playerInstance) {
         keybindSpan.classList.add('keybind');
         keybindSpan.textContent = keybindText;
 
-        const iconDivElem = document.createElement('div');
+        const iconDivElem = document.createElement('div'); 
         iconDivElem.classList.add('icon');
-        iconDivElem.textContent = actualIconText; // Use the determined actualIconText
+        iconDivElem.textContent = actualIconText; 
 
         const cooldownOverlayDiv = document.createElement('div');
         cooldownOverlayDiv.classList.add('cooldown-overlay');
@@ -162,22 +162,22 @@ export function updateAbilityCooldownUI(playerInstance) {
         cooldownTimerSpan.classList.add('cooldown-timer');
 
         slotDiv.appendChild(keybindSpan);
-        slotDiv.appendChild(iconDivElem); // Append the actual icon first
+        slotDiv.appendChild(iconDivElem); 
         slotDiv.appendChild(cooldownOverlayDiv);
         slotDiv.appendChild(cooldownTimerSpan);
 
         if (!isUnlocked) {
             slotDiv.classList.add('locked');
-            iconDivElem.style.opacity = '0.3'; // Make the actual icon faint
+            iconDivElem.style.opacity = '0.3'; 
 
-            const lockIconDiv = document.createElement('div'); // Create a separate lock icon
-            lockIconDiv.classList.add('icon', 'lock-icon-overlay'); // Add a class for specific styling
+            const lockIconDiv = document.createElement('div'); 
+            lockIconDiv.classList.add('icon', 'lock-icon-overlay'); 
             lockIconDiv.textContent = '🔒';
-            lockIconDiv.style.position = 'absolute'; // Position it on top
-            lockIconDiv.style.zIndex = '4'; // Ensure it's above the faint ability icon
-            lockIconDiv.style.color = '#DDD'; // Color for the lock
-            lockIconDiv.style.opacity = '0.7'; // Make lock slightly transparent if desired
-            slotDiv.appendChild(lockIconDiv); // Add the lock icon
+            lockIconDiv.style.position = 'absolute'; 
+            lockIconDiv.style.zIndex = '4'; 
+            lockIconDiv.style.color = '#DDD'; 
+            lockIconDiv.style.opacity = '0.7'; 
+            slotDiv.appendChild(lockIconDiv); 
 
             cooldownOverlayDiv.style.height = '100%';
             cooldownOverlayDiv.style.backgroundColor = 'rgba(50,50,50,0.8)';
@@ -188,7 +188,7 @@ export function updateAbilityCooldownUI(playerInstance) {
                 cooldownOverlayDiv.style.height = `${(1 - (currentTimer / maxTimer)) * 100}%`;
                 cooldownTimerSpan.textContent = (currentTimer / 1000).toFixed(1) + 's';
             }
-        } else if (!isReady && currentTimer > 0) { // On cooldown
+        } else if (!isReady && currentTimer > 0) { 
             slotDiv.classList.add('on-cooldown');
             if (maxTimer > 0) {
                 const cooldownPercent = (currentTimer / maxTimer) * 100;
@@ -204,15 +204,7 @@ export function updateAbilityCooldownUI(playerInstance) {
     });
 }
 
-
-// --- (Screen Management - SAME AS PREVIOUS FULL FILE) ---
-// ...
-// --- (UI Population Functions for Evolution, Free Upgrade, Loot, GameOver, Detailed High Scores - SAME AS PREVIOUS FULL FILE) ---
-// ...
-// --- (updatePauseScreenStatsDisplay - SAME AS PREVIOUS FULL FILE) ---
-// ...
-// The rest of ui.js (showScreen, getPreviousScreenForSettings, setPreviousScreenForSettings, populateEvolutionOptionsUI, populateFreeUpgradeOptionUI, populateLootOptionsUI, displayGameOverScreenContent, displayDetailedHighScoresScreenUI, updatePauseScreenStatsDisplay) should remain the same as the previous full file version.
-// For brevity, I'm not repeating them here, assuming they are correct from the previous full file.
+// --- Screen Management ---
 const ALL_SCREENS_FOR_SHOW_SCREEN = [ startScreen, settingsScreen, gameOverScreen, evolutionScreen, freeUpgradeScreen, pauseScreen, countdownOverlay, lootChoiceScreen, detailedHighScoresScreen ];
 export function showScreen(screenElementToShow, cameFromPauseMenu = false, callbacks = {}) {
     ALL_SCREENS_FOR_SHOW_SCREEN.forEach(screen => {
@@ -231,9 +223,12 @@ export function showScreen(screenElementToShow, cameFromPauseMenu = false, callb
     }
 
 
-    let gameIsNowPaused = false;
-    if (screenElementToShow === null) {
+    let gameIsNowPaused = false; 
+    let canvasShouldBeVisible = false;
+
+    if (screenElementToShow === null) { 
         if (canvas) canvas.style.display = 'block';
+        canvasShouldBeVisible = true;
     } else {
         const showCanvasBehind = screenElementToShow === pauseScreen ||
                                  screenElementToShow === evolutionScreen ||
@@ -243,25 +238,31 @@ export function showScreen(screenElementToShow, cameFromPauseMenu = false, callb
                                  (screenElementToShow === settingsScreen && previousScreenForSettings === pauseScreen);
 
         if (canvas) canvas.style.display = showCanvasBehind ? 'block' : 'none';
+        canvasShouldBeVisible = showCanvasBehind;
+
         if (screenElementToShow) screenElementToShow.style.display = 'flex';
 
-        if (screenElementToShow === settingsScreen) {
-            // previousScreenForSettings is set by the caller (main.js) via setPreviousScreenForSettings
-        }
         if ([evolutionScreen, freeUpgradeScreen, lootChoiceScreen, startScreen, gameOverScreen, settingsScreen, pauseScreen, countdownOverlay, detailedHighScoresScreen].includes(screenElementToShow)) {
             gameIsNowPaused = true;
         }
     }
 
-    if (gameIsNowPaused && callbacks.onPauseGame) callbacks.onPauseGame(screenElementToShow);
-    else if (!gameIsNowPaused && callbacks.onResumeGame) callbacks.onResumeGame();
-    if (callbacks.onApplyMusicPlayState) callbacks.onApplyMusicPlayState();
+    if (gameIsNowPaused && callbacks.onPauseGame) {
+        callbacks.onPauseGame(screenElementToShow); 
+    } else if (!gameIsNowPaused && callbacks.onResumeGame) {
+        callbacks.onResumeGame(screenElementToShow); 
+    }
+
+    if (callbacks.onApplyMusicPlayState) {
+        callbacks.onApplyMusicPlayState(screenElementToShow); 
+    }
 
     return gameIsNowPaused;
 }
 export function getPreviousScreenForSettings() { return previousScreenForSettings; }
 export function setPreviousScreenForSettings(screenRef) { previousScreenForSettings = screenRef; }
 
+// --- UI Population Functions ---
 export function populateEvolutionOptionsUI(choices, playerInstance, evolutionSelectCallback, currentShrinkMeCooldown, getReadableColorNameFunc) {
     if (!evolutionOptionsContainer || !playerInstance) return;
     evolutionOptionsContainer.innerHTML = '';
