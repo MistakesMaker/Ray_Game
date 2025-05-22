@@ -182,6 +182,90 @@ function initFreeUpgradeChoicesInternal() {
 }
 function checkForNewColorUnlock() { if (score >= nextColorUnlockScore && nextUnlockableColorIndex < CONSTANTS.UNLOCKABLE_RAY_COLORS_LIST.length) { const newColor = CONSTANTS.UNLOCKABLE_RAY_COLORS_LIST[nextUnlockableColorIndex]; if (!currentRayColors.includes(newColor)) { currentRayColors.push(newColor); const colorName = getReadableColorNameFromUtils(newColor); activeBuffNotifications.push({ text: `New Ray Color: ${colorName}!`, timer: CONSTANTS.BUFF_NOTIFICATION_DURATION * 1.5 }); playSound(newColorSound); } nextUnlockableColorIndex++; nextColorUnlockScore += CONSTANTS.NEW_COLOR_UNLOCK_INTERVAL; }}
 
+// MODIFIED: Added definitions for pauseAllGameIntervals, resumeAllGameIntervals, and pausePickupSpawners
+function pausePickupSpawners() {
+    if (targetSpawnIntervalId) clearInterval(targetSpawnIntervalId); targetSpawnIntervalId = null;
+    if (heartSpawnIntervalId) clearInterval(heartSpawnIntervalId); heartSpawnIntervalId = null;
+    if (bonusPointSpawnIntervalId) clearInterval(bonusPointSpawnIntervalId); bonusPointSpawnIntervalId = null;
+}
+
+function pauseAllGameIntervals() {
+    if (shootIntervalId) clearInterval(shootIntervalId); shootIntervalId = null;
+    pausePickupSpawners();
+}
+
+function resumeAllGameIntervals() {
+    if (gameRunning && !isAnyPauseActiveInternal() && !gameOver) {
+        resumePickupSpawners(); // This will check if boss is active before starting pickup spawners
+        if (!shootIntervalId && player) {
+            updateShootInterval(); // This will set up the shoot interval based on currentShootInterval
+        }
+    }
+}
+// --- (Interval/Spawning, initGame, gameLoop, updateGame, drawGame, endGameInternal, togglePauseMenuInternal, startResumeCountdownInternal - SAME AS PREVIOUS FULL FILE with the ray.js callback fix) ---
+function resumePickupSpawners() {
+    if (gameRunning && !isAnyPauseActiveInternal() && !gameOver) {
+        if (!bossManager || !bossManager.isBossSequenceActive()) {
+            if (!targetSpawnIntervalId) targetSpawnIntervalId = setInterval(spawnTarget, CONSTANTS.TARGET_SPAWN_INTERVAL_MS);
+            if (!heartSpawnIntervalId) heartSpawnIntervalId = setInterval(spawnHeart, CONSTANTS.HEART_SPAWN_INTERVAL_MS);
+            if (!bonusPointSpawnIntervalId) bonusPointSpawnIntervalId = setInterval(spawnBonusPointObject, CONSTANTS.BONUS_POINT_SPAWN_INTERVAL_MS);
+        }
+    }
+}
+
+function updateShootInterval() {
+    if (!player || gameOver || isAnyPauseActiveInternal()) {
+        if(shootIntervalId) clearInterval(shootIntervalId);
+        shootIntervalId = null;
+        return;
+    }
+    let timeBasedReduction = CONSTANTS.SHOOT_INTERVAL_TIME_INITIAL_REDUCTION + (gameplayTimeElapsed * CONSTANTS.SHOOT_INTERVAL_TIME_SCALE_FACTOR);
+    currentShootInterval = Math.max(CONSTANTS.MIN_RAY_SHOOT_INTERVAL_BASE, CONSTANTS.BASE_RAY_SHOOT_INTERVAL - timeBasedReduction);
+    if (Math.abs(currentShootInterval - lastSetShootInterval) > 10 || (!shootIntervalId)) {
+        if (shootIntervalId) clearInterval(shootIntervalId);
+        shootIntervalId = setInterval(spawnRay, currentShootInterval);
+        lastSetShootInterval = currentShootInterval;
+    }
+}
+function spawnRay(){
+    if(!player||gameOver||isAnyPauseActiveInternal() || player.isFiringOmegaLaser ){ return; }
+    const baseAimAngle = player.aimAngle;
+    const numRaysToSpawn = 1 + player.scatterShotLevel;
+    const angleBetweenRays = (numRaysToSpawn > 1 && numRaysToSpawn <= 2) ? CONSTANTS.SCATTER_SHOT_ANGLE_OFFSET : (numRaysToSpawn > 2) ? CONSTANTS.SCATTER_SHOT_ANGLE_OFFSET / (numRaysToSpawn -1) : 0;
+    for (let k = 0; k < numRaysToSpawn; k++) {
+        let currentAimAngle = baseAimAngle;
+        if (numRaysToSpawn > 1) { const spreadFactor = (k - (numRaysToSpawn - 1) / 2.0); currentAimAngle += spreadFactor * angleBetweenRays; }
+        if (isScreenShaking && currentShakeType === 'bonus') { const inaccuracy = (Math.random() - 0.5) * CONSTANTS.PLAYER_RAY_INACCURACY_DURING_SHAKE * 2; currentAimAngle += inaccuracy; }
+        let rayToSpawn = getPooledRay();
+        if (!rayToSpawn) { console.warn("Ray pool exhausted in spawnRay"); continue; }
+        const dx=Math.cos(currentAimAngle),dy=Math.sin(currentAimAngle);
+        const c=currentRayColors[Math.floor(Math.random()*currentRayColors.length)];
+        const sD=player.radius+CONSTANTS.RAY_RADIUS+CONSTANTS.RAY_SPAWN_FORWARD_OFFSET;
+        const sX=player.x+dx*sD,sY=player.y+dy*sD;
+        rayToSpawn.reset( sX, sY, c, dx, dy, currentRaySpeedMultiplier, player, _currentRayMaxLifetime, false, false, 0, false );
+        rays.push(rayToSpawn);
+    }
+    playSound(shootSound);
+}
+function spawnTarget(){
+    if(gameOver || isAnyPauseActiveInternal() || (bossManager && bossManager.isBossSequenceActive()))return;
+    const r=CONSTANTS.TARGET_RADIUS;
+    let validPosition = false; let sX, sY; let attempts = 0;
+    while(!validPosition && attempts < 50) { sX=Math.random()*(canvas.width-2*r)+r; sY=Math.random()*(canvas.height-2*r)+r; if (player) { const distToPlayer = Math.sqrt((sX - player.x)**2 + (sY - player.y)**2); if (distToPlayer > player.radius + r + 75) validPosition = true; } else validPosition = true; attempts++; }
+    if(validPosition) targets.push(new Target(sX,sY,r,CONSTANTS.TARGET_COLOR));
+}
+function spawnHeart(){
+    if(gameOver || isAnyPauseActiveInternal() || hearts.length>0 || (bossManager && bossManager.isBossSequenceActive()))return;
+    const x=Math.random()*(canvas.width-2*CONSTANTS.HEART_VISUAL_RADIUS)+CONSTANTS.HEART_VISUAL_RADIUS; const y=Math.random()*(canvas.height-2*CONSTANTS.HEART_VISUAL_RADIUS)+CONSTANTS.HEART_VISUAL_RADIUS;
+    hearts.push(new Heart(x,y,CONSTANTS.HEART_VISUAL_RADIUS,CONSTANTS.HEART_COLLISION_RADIUS,CONSTANTS.HEART_COLOR));
+}
+function spawnBonusPointObject(){
+    if(gameOver || isAnyPauseActiveInternal() || (bonusPoints.length > 0) || (bossManager && bossManager.isBossSequenceActive())) return;
+    const r=CONSTANTS.BONUS_POINT_RADIUS;
+    let validPosition = false; let sX, sY; let attempts = 0;
+    while(!validPosition && attempts < 50) { sX=Math.random()*(canvas.width-2*r)+r;sY=Math.random()*(canvas.height-2*r)+r; if (player) {const distToPlayer = Math.sqrt((sX - player.x)**2 + (sY - player.y)**2); if (distToPlayer > player.radius + r + 75) validPosition = true;} else validPosition = true; attempts++;}
+    if (validPosition) bonusPoints.push(new BonusPoint(sX,sY,r,CONSTANTS.BONUS_POINT_COLOR));
+}
 
 // --- Game Initialization ---
 function initGame() {
@@ -195,17 +279,15 @@ function initGame() {
     isCountingDownToResume = false; gamePausedForLootChoice = false; evolutionPendingAfterBoss = false;
     shrinkMeCooldown = 0;
     lootDrops = []; decoys = []; bossDefeatEffects = [];
-    rays = []; // Clear existing rays
+    rays = [];
 
-    // Time and interval related resets
-    gameplayTimeElapsed = 0;
+    gameplayTimeElapsed = 0; // CRITICAL RESET
     shootIntervalUpdateTimer = 0;
     currentShootInterval = CONSTANTS.BASE_RAY_SHOOT_INTERVAL;
     lastSetShootInterval = CONSTANTS.BASE_RAY_SHOOT_INTERVAL;
     if (shootIntervalId) clearInterval(shootIntervalId);
     shootIntervalId = null;
 
-    // Gameplay progression variable resets
     currentRaySpeedMultiplier = 1.0;
     currentEffectiveDefaultGrowthFactor = CONSTANTS.DEFAULT_PLAYER_RADIUS_GROWTH_FACTOR;
     currentPlayerRadiusGrowthFactor = currentEffectiveDefaultGrowthFactor;
@@ -223,39 +305,31 @@ function initGame() {
     survivalScoreThisCycle = 0;
     survivalPointsTimer = 0;
 
-    // Player re-initialization
     player = new Player(canvas.width / 2, canvas.height / 2, CONSTANTS.PLAYER_SPEED_BASE);
-    // Player constructor handles most of its internal stat resets.
-    // Explicitly reset fixed abilities container:
     player.activeAbilities = { '1': null, '2': null, '3': null };
 
-    // Initialize game data structures
     initializeAllPossibleRayColors();
-    initializeRayPool(Ray); // Re-initializes the pool for fresh rays
-    initEvolutionChoicesInternal(); // This redefines the evolutionChoices array, resetting levels
+    initializeRayPool(Ray);
+    initEvolutionChoicesInternal();
     populateBossLootPoolInternal();
     initFreeUpgradeChoicesInternal();
 
-    // UI Updates
     uiUpdateHealthDisplay(player.hp, player.maxHp);
     uiUpdateBuffIndicator(player.immuneColorsList, getReadableColorNameFromUtils);
     uiUpdateSurvivalBonusIndicator(survivalUpgrades, CONSTANTS.MAX_SURVIVAL_UPGRADES);
     uiUpdateActiveBuffIndicator(player, postPopupImmunityTimer, postDamageImmunityTimer);
-    uiUpdateAbilityCooldownUI(player); // Reset ability UI
+    uiUpdateAbilityCooldownUI(player);
 
     if (pausePlayerStatsPanel) pausePlayerStatsPanel.style.display = 'none';
-
-    // Boss Manager Reset
     const bossManagerAudioContext = { playSound, audioChaserSpawnSound, audioReflectorSpawnSound, audioSingularitySpawnSound };
     bossManager = new BossManager(CONSTANTS.BOSS_SPAWN_START_SCORE, CONSTANTS.BOSS_SPAWN_SCORE_INTERVAL, bossManagerAudioContext);
-    // bossManager.reset(); // Already called within BossManager constructor effectively, but explicit call is fine.
+    // No need to call bossManager.reset() here, constructor handles initial state.
 
-    // Clear and restart game intervals
-    pauseAllGameIntervals(); // Clears target, heart, bonus point, and shoot intervals
-    resumeAllGameIntervals(); // Sets up new intervals based on reset values (shootInterval uses currentShootInterval)
+    pauseAllGameIntervals();
+    resumeAllGameIntervals();
 
     applyMusicPlayStateWrapper();
-    spawnTarget(); // Spawn initial target
+    spawnTarget();
     lastTime = performance.now();
     if (animationFrameId) cancelAnimationFrame(animationFrameId);
     animationFrameId = requestAnimationFrame(gameLoop);
@@ -329,14 +403,7 @@ function updateGame(deltaTime) {
         wellsToDetonate.forEach(well => {
             if (well && well.isActive) {
                 well.detonate({ targetX: mouseX, targetY: mouseY, player: player });
-                // Cooldown logic is handled within activateAbility when the well is detonated via key press
-                // If it expires naturally, the UI will update when the player next attempts to use it or when cooldowns are generally polled
                 if (player && player.activeAbilities && player.activeAbilities['2'] && player.activeMiniWell === null) {
-                    // This logic might be redundant if activateAbility covers it well.
-                    // It's to ensure UI updates if the well expires on its own and was tied to slot '2'.
-                    // player.activeAbilities['2'].cooldownTimer = player.activeAbilities['2'].cooldownDuration; // This would start cooldown on natural expiry
-                    // player.activeAbilities['2'].justBecameReady = false;
-                    // gameContextForEventListeners.callbacks.forceAbilityUIUpdate = true; // A way to signal UI needs update
                 }
             }
         });
@@ -480,6 +547,7 @@ function updateGame(deltaTime) {
                             };
                             const damageActuallyDealt = player.takeDamage(rayThatHitPlayer, ptdGameCtxForGravityBall, ptdDamageCtxForGravityBall);
                             if (damageActuallyDealt > 0) {
+                                // Gravity ball hits do NOT grant immunity.
                                 const bounceAngle = Math.atan2(player.y - rayThatHitPlayer.y, player.x - rayThatHitPlayer.x);
                                 player.velX = Math.cos(bounceAngle) * CONSTANTS.PLAYER_BOUNCE_FORCE_FROM_GRAVITY_BALL;
                                 player.velY = Math.sin(bounceAngle) * CONSTANTS.PLAYER_BOUNCE_FORCE_FROM_GRAVITY_BALL;
@@ -655,7 +723,7 @@ function endGameInternal() {
     currentActiveScreenElement = gameOverScreen; // Set current screen
     applyMusicPlayStateWrapper();
     playSound(gameOverSoundFX);
-    if (player && player.isFiringOmegaLaser) stopSound(omegaLaserSound); // MODIFIED: Stop Omega Laser sound on game over
+    if (player && player.isFiringOmegaLaser) stopSound(omegaLaserSound);
     const finalStatsSnapshot = createFinalStatsSnapshot();
     prepareAndShowPauseStats("Game Over - Final Stats");
     if (pausePlayerStatsPanel) {
@@ -949,7 +1017,7 @@ function showStartScreenWithUpdatesInternal() {
     evolutionPendingAfterBoss = false;
     if (animationFrameId) cancelAnimationFrame(animationFrameId); animationFrameId = null;
     pauseAllGameIntervals();
-    if (player && player.isFiringOmegaLaser) stopSound(omegaLaserSound); // MODIFIED: Stop Omega Laser sound
+    if (player && player.isFiringOmegaLaser) stopSound(omegaLaserSound);
     if (bossManager) bossManager.reset();
 
     if (pausePlayerStatsPanel) {
