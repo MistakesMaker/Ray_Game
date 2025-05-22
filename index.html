@@ -297,8 +297,12 @@
             box-shadow: none;
             margin: 0;
             border: none;
-            padding: 15px;
+            padding: 15px; /* Keep this padding */
             box-sizing: border-box;
+        }
+        /* MODIFICATION: Ensure the title within the detailed scores stats panel starts at the top */
+        #detailedStatsDisplayContainer > #pausePlayerStatsPanel .stats-header#statsPanelTitle {
+            margin-top: 0;
         }
         #detailedHighScoresScreen button#backToMainMenuFromScoresButton {
             margin-top: auto;
