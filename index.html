@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Light Blaster Omega II - Modular</title>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: 'Arial', sans-serif; overflow: hidden; }
+        #gameCanvas { display: none; background-color: #000000; } /* Initially hidden */
+        #topLeftUI { position: absolute; top: 20px; left: 20px; font-size: 24px; z-index: 10; text-shadow: 0 0 5px #000; }
+        #scoreDisplay { color: #0f0; font-weight: bold; }
+        #topRightUI { position: absolute; top: 20px; right: 20px; z-index: 10; text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
+        #healthDisplay { font-size: 24px; color: #ff4500; font-weight: bold; margin-bottom: 10px; text-shadow: 0 0 5px #000; }
+        #buffIndicatorContainer { display: flex; gap: 5px; margin-bottom: 10px; align-items: center; min-height: 22px; }
+        #buffIndicatorContainer span { color: #ccc; font-size: 16px; margin-right: 5px; }
+        .buffSwatch { width: 20px; height: 20px; border: 1px solid #fff; border-radius: 3px; }
+        #survivalBonusIndicator, #activeBuffIndicator { font-size: 14px; color: #00bcd4; margin-bottom: 5px; text-shadow: 0 0 3px #000;}
+        #highScoreContainer { font-size: 16px; background-color: rgba(0,0,0,0.4); padding: 8px 12px; border-radius: 5px; }
+        #highScoreContainer h3 { margin: 0 0 5px 0; color: #ff0; }
+        #highScoreContainer ol { list-style-type: none; padding: 0; margin: 0; }
+        #highScoreContainer li { margin-bottom: 3px; }
+
+        .messageScreenBase {
+            position: absolute; top: 50%; left: 50%;
+            background-color: rgba(0,0,0,0.9); padding: 20px 30px;
+            border-radius: 15px; text-align: center; z-index: 20;
+            box-shadow: 0 0 25px rgba(80,80,255,0.6); min-width: 320px;
+            transform: translate(-50%, -50%);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .messageScreenBase h2 { margin-top: 0; color: #55aaff; font-size: 28px; margin-bottom: 15px;}
+        .messageScreenBase p { margin-bottom: 15px; font-size: 16px; }
+        .messageScreenBase button { padding: 10px 20px; font-size: 18px; background-color: #0077cc; color: white; border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.3s, transform 0.1s; box-shadow: 0 4px #004488; margin: 5px; }
+        .messageScreenBase button:hover { background-color: #0055aa; }
+        .messageScreenBase button:active { background-color: #003377; transform: translateY(2px); box-shadow: 0 2px #004488; }
+        .messageScreenBase input[type="text"] { padding: 8px; font-size: 16px; margin-bottom: 10px; border-radius: 5px; border: 1px solid #ccc; width: 80%; }
+
+        .settingsSection { margin-bottom: 10px; display: flex; flex-direction: column; align-items: center;}
+        .settingsToggle p { margin: 5px 0; display: flex; align-items: center; justify-content: space-between; width: 280px; padding: 3px 0;}
+        .volumeSliderContainer div { display: flex; justify-content: space-between; align-items: center; width: 280px; margin-bottom: 8px; }
+        .volumeSliderContainer label { font-size: 16px; white-space: nowrap; margin-right: 10px; flex-basis: 120px; text-align: left;}
+        .volumeSliderContainer input[type="range"] { flex-grow: 1; max-width: 100px;}
+        .volumeSliderContainer span { min-width: 40px; text-align: right; font-size: 14px; }
+
+        #evolutionScreen, #freeUpgradeScreen {
+            background-color: rgba(10, 10, 30, 0.85);
+            box-shadow: 0 0 30px rgba(150, 150, 255, 0.7);
+            padding: 30px;
+            width: 80%;
+            max-width: 700px;
+            box-sizing: border-box;
+        }
+        #evolutionScreen h2, #freeUpgradeScreen h2 { color: #99ccff; font-size: 30px; margin-bottom: 20px; }
+        #evolutionOptionsContainer, #freeUpgradeOptionContainer {
+            display: flex;
+            justify-content: space-around;
+            align-items: stretch;
+            gap: 15px;
+            width:100%;
+        }
+        #evolutionScreen .evolutionOption,
+        #freeUpgradeScreen .freeUpgradeOption {
+            background-color: #282850;
+            border: 2px solid #555588;
+            padding: 15px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.2s, box-shadow 0.3s;
+            flex: 1; display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            min-height: 100px;
+            text-align: center;
+        }
+        #evolutionScreen .evolutionOption .evolution-details {
+            font-size: 12px;
+            color: #88aaff;
+            margin-top: 5px;
+        }
+
+        .evolutionOption[data-class="attack"] { box-shadow: 0 0 30px 10px rgba(255,60,60,0.9), 0 0 15px rgba(255,100,100,0.7) inset; border-color: #FF5555; }
+        .evolutionOption[data-class="attack"]:hover { background-color: #582828; transform: translateY(-3px) scale(1.02); box-shadow: 0 0 45px 12px rgba(255,50,50,1), 0 0 18px rgba(255,120,120,0.9) inset; }
+        .evolutionOption[data-class="tank"] { box-shadow: 0 0 30px 10px rgba(60,255,60,0.9), 0 0 10px rgba(80,255,80,0.7) inset; border-color: #55FF55; }
+        .evolutionOption[data-class="tank"]:hover { background-color: #285828; transform: translateY(-3px) scale(1.02); box-shadow: 0 0 45px 12px rgba(50,255,50,1), 0 0 18px rgba(100,255,100,0.9) inset; }
+        .evolutionOption[data-class="utility"] { box-shadow: 0 0 30px 10px rgba(180,60,255,0.9), 0 0 10px rgba(210,100,255,0.7) inset; border-color: #C077FF; }
+        .evolutionOption[data-class="utility"]:hover { background-color: #382058; transform: translateY(-3px) scale(1.02); box-shadow: 0 0 45px 12px rgba(190,80,255,1), 0 0 18px rgba(220,120,255,0.9) inset; }
+        #evolutionScreen .evolutionOption:hover,
+        #freeUpgradeScreen .freeUpgradeOption:hover {
+            background-color: #3a3a70;
+            transform: translateY(-3px) scale(1.02);
+        }
+        #evolutionScreen .evolutionOption.disabled,
+        #freeUpgradeScreen .freeUpgradeOption.disabled {
+            background-color: #404040; border-color: #606060;
+            cursor: not-allowed; opacity: 0.6;
+            box-shadow: none;
+        }
+        #evolutionScreen .evolutionOption.disabled:hover,
+        #freeUpgradeScreen .freeUpgradeOption.disabled:hover {
+            transform: none;
+            background-color: #404040;
+        }
+        #evolutionScreen .evolutionOption h3, #freeUpgradeScreen .freeUpgradeOption h3 { margin-top: 0; color: #ddeeff; font-size: 18px; }
+        #evolutionScreen .evolutionOption p, #freeUpgradeScreen .freeUpgradeOption p { font-size: 14px; color: #aabbcc; margin-bottom: 0;}
+
+        #countdownOverlay {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 120px;
+            font-weight: bold;
+            color: rgba(220, 230, 255, 0.85);
+            text-shadow: 0 0 10px #0af, 0 0 20px #0af, 0 0 30px #0af;
+            z-index: 100;
+            display: none;
+        }
+
+        #lootChoiceScreen {
+            background: radial-gradient(ellipse at center, rgba(40, 40, 80, 0.95) 0%, rgba(20, 20, 45, 0.98) 70%),
+                        linear-gradient(145deg, #1a1a2e, #16213e);
+            border: 3px solid #ffdd77;
+            box-shadow: 0 0 35px rgba(255, 220, 100, 0.8), 0 0 20px rgba(200, 200, 255, 0.6) inset, 0 0 50px rgba(160, 160, 255, 0.5);
+            color: #e0e0ff; max-width: 850px; padding: 35px 40px;
+        }
+        #lootChoiceScreen h2 { color: #ffcc66; text-shadow: 0 0 8px #ffcc66, 0 0 15px #ffaa00; font-size: 32px; margin-bottom: 10px; }
+        #lootChoiceScreen p { color: #c0c0ee; font-size: 18px; margin-bottom: 25px; }
+        #lootOptionsContainer { display: flex; justify-content: space-around; align-items: stretch; gap: 25px; width: 100%; margin-top: 20px; }
+        .lootOption { background-color: rgba(50, 50, 100, 0.85); border: 2px solid #9090cc; padding: 20px; border-radius: 12px; cursor: pointer; transition: background-color 0.3s, transform 0.2s, box-shadow 0.3s, border-color 0.3s; flex: 1; display: flex; flex-direction: column; align-items: center; text-align: center; min-height: 140px; box-shadow: 0 5px 15px rgba(0,0,0,0.4), 0 0 8px rgba(120, 120, 200, 0.4) inset; }
+        .lootOption:hover { background-color: #4a4a80; transform: translateY(-6px) scale(1.04); box-shadow: 0 8px 25px rgba(0,0,0,0.5), 0 0 20px rgba(200, 200, 255, 0.8), 0 0 12px rgba(220, 220, 255, 0.6) inset; border-color: #c0c0ff; }
+        .lootOption h3 { margin-top: 0; margin-bottom: 12px; color: #ddeeff; font-size: 20px; text-shadow: 0 0 3px #000; }
+        .lootOption p { font-size: 15px; color: #aabbdd; margin-bottom: 8px; flex-grow: 1; }
+        .lootOption .optionType { font-size: 13px; color: #99aabb; font-style: italic; margin-top: auto; background-color: rgba(0,0,0,0.2); padding: 3px 8px; border-radius: 4px; }
+
+        #abilityCooldownUI { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; z-index: 15; }
+        .ability-slot { width: 60px; height: 60px; background-color: rgba(30, 30, 50, 0.7); border: 2px solid #606090; border-radius: 8px; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; box-shadow: 0 0 8px rgba(100, 100, 150, 0.5); transition: background-color 0.2s, border-color 0.2s; }
+        .ability-slot.ready { border-color: #a0a0ff; background-color: rgba(50, 50, 80, 0.8); box-shadow: 0 0 12px rgba(160, 160, 255, 0.7); }
+        .ability-slot.on-cooldown { border-color: #505070; background-color: rgba(20, 20, 30, 0.6); }
+        .ability-slot.charging { border-color: #FFD700; background-color: rgba(80, 70, 30, 0.8); box-shadow: 0 0 12px rgba(255,215,0, 0.7); }
+        .ability-slot.locked { /* Style for locked/unacquired abilities */
+            background-color: rgba(40, 40, 40, 0.5);
+            border-color: #444;
+            cursor: default;
+        }
+        .ability-slot.locked .icon {
+            opacity: 0.2;
+            color: #888;
+        }
+        .ability-slot .icon.lock-icon-overlay { /* Styles for the lock icon itself */
+            position: absolute;
+            z-index: 4; /* Ensure it's on top */
+            color: #DDD; /* Or a more prominent lock color */
+            opacity: 0.7; /* Slightly transparent lock */
+            font-size: 26px; /* Adjust size if needed */
+            /* No need to set opacity to 0.2 here, as it's for the lock icon itself */
+        }
+
+        .ability-slot.locked .keybind {
+            color: #888;
+        }
+        .ability-slot.locked .cooldown-overlay {
+            background-color: rgba(20, 20, 20, 0.7);
+        }
+        .ability-slot .keybind { position: absolute; top: 2px; left: 4px; font-size: 12px; font-weight: bold; color: #ccc; text-shadow: 1px 1px 2px #000; z-index: 3; }
+        .ability-slot .icon { font-size: 28px; color: #ddd; opacity: 0.8; transition: opacity 0.2s; z-index: 1; }
+        .ability-slot.on-cooldown .icon { opacity: 0.4; }
+        .ability-slot.charging .icon { opacity: 1; color: #fff0b3; }
+        .ability-slot .cooldown-overlay { position: absolute; bottom: 0; left: 0; width: 100%; height: 0%; background-color: rgba(0, 0, 0, 0.75); transition: height 0.1s linear; z-index: 2; }
+        .ability-slot .cooldown-timer { position: absolute; bottom: 4px; left: 0; width: 100%; text-align: center; font-size: 14px; font-weight: bold; color: #fff; text-shadow: 1px 1px 3px #000; z-index: 3; pointer-events: none; opacity: 0; transition: opacity 0.2s; }
+        .ability-slot.on-cooldown .cooldown-timer, .ability-slot.charging .cooldown-timer { opacity: 1; }
+        .ability-slot .ability-name { display: none; }
+
+        #evolutionTooltip { display: none; position: absolute; background-color: rgba(20, 20, 50, 0.9); color: #ddeeff; border: 1px solid #55aaff; border-radius: 5px; padding: 8px 12px; font-size: 13px; max-width: 250px; text-align: left; pointer-events: none; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+
+        #pausePlayerStatsPanel {
+            position: absolute;
+            right: 20px;
+            width: 280px;
+            background-color: rgba(10, 10, 20, 0.85);
+            border: 1px solid #404060;
+            border-radius: 8px;
+            padding: 15px;
+            color: #ccc;
+            font-size: 12px;
+            max-height: 65vh;
+            overflow-y: auto;
+            z-index: 22;
+            box-shadow: 0 0 15px rgba(80,80,255,0.3);
+            display: none;
+            scrollbar-width: thin;
+            scrollbar-color: #55aaff #2c2c3e;
+            box-sizing: border-box;
+        }
+        #pausePlayerStatsPanel::-webkit-scrollbar { width: 8px; }
+        #pausePlayerStatsPanel::-webkit-scrollbar-track { background: #2c2c3e; border-radius: 4px; }
+        #pausePlayerStatsPanel::-webkit-scrollbar-thumb { background-color: #55aaff; border-radius: 4px; border: 2px solid #2c2c3e; }
+        #pausePlayerStatsPanel .stats-header { color: #ffcc66; margin-top: 0; margin-bottom: 8px; padding-bottom: 5px; border-bottom: 1px solid #555; font-size: 14px; }
+        #pausePlayerStatsPanel .stats-header:not(:first-child) { margin-top: 15px; }
+        #pausePlayerStatsPanel .stats-section p,
+        #pausePlayerStatsPanel .stats-section li { display: flex; justify-content: space-between; margin-bottom: 4px; padding: 3px 0; font-size: 11px; border-bottom: 1px dashed #333; }
+        #pausePlayerStatsPanel .stats-section p:last-child,
+        #pausePlayerStatsPanel .stats-section li:last-child { border-bottom: none; }
+        #pausePlayerStatsPanel .stat-label { font-weight: bold; color: #add8e6; margin-right: 8px; }
+        #pausePlayerStatsPanel .stat-value { color: #e0e0ff; text-align: right; white-space: nowrap; }
+        #pausePlayerStatsPanel .stats-immunities { display: flex; flex-wrap: wrap; gap: 4px; padding-top: 5px; }
+        #pausePlayerStatsPanel .immunity-swatch-pause { width: 18px; height: 18px; border: 1px solid #777; border-radius: 3px; }
+
+        #detailedHighScoresScreen {
+            flex-direction: column;
+            align-items: center;
+            width: 90%;
+            max-width: 1000px;
+            height: 85vh;
+            padding-top: 20px;
+            padding-bottom: 20px;
+            box-sizing: border-box;
+        }
+        #detailedHighScoresScreen h2 {
+            margin-bottom: 15px;
+            flex-shrink: 0;
+        }
+        #detailedScoresListContainer {
+            width: 100%;
+            display: flex;
+            flex-direction: row;
+            gap: 20px;
+            flex-grow: 1;
+            overflow: hidden;
+            padding: 0 10px;
+            margin-bottom: 15px;
+            box-sizing: border-box;
+            min-height: 0;
+        }
+        #detailedScoresList {
+            list-style-type: none;
+            padding: 10px;
+            margin: 0;
+            width: 300px;
+            flex-shrink: 0;
+            height: 100%;
+            overflow-y: auto;
+            border: 1px solid #445577;
+            background-color: rgba(20,20,40,0.7);
+            border-radius: 8px;
+            box-sizing: border-box;
+        }
+        #detailedScoresList li {
+            padding: 8px 12px;
+            margin-bottom: 5px;
+            background-color: #2a2a5a;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            border: 1px solid transparent;
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        #detailedScoresList li:hover {
+            background-color: #3a3a7a;
+        }
+        #detailedScoresList li.selected-score {
+            background-color: #4a4a9a;
+            border-color: #77aaff;
+            font-weight: bold;
+        }
+        #detailedStatsDisplayContainer {
+            flex-grow: 1;
+            height: 100%;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            border: 1px solid #303050;
+            border-radius: 8px;
+            background-color: rgba(10, 10, 20, 0.85);
+            box-sizing: border-box;
+        }
+        #detailedStatsDisplayContainer > #pausePlayerStatsPanel {
+            position: relative;
+            display: block;
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            right: auto;
+            top: auto;
+            transform: none;
+            box-shadow: none;
+            margin: 0;
+            border: none;
+            padding: 15px;
+            box-sizing: border-box;
+        }
+        #detailedHighScoresScreen button#backToMainMenuFromScoresButton {
+            margin-top: auto;
+            flex-shrink: 0;
+        }
+
+    </style>
+</head>
+<body>
+    <div id="topLeftUI"><div id="scoreDisplay">Score: 0</div></div>
+    <div id="topRightUI">
+        <div id="healthDisplay">Health: 100/100</div>
+        <div id="buffIndicatorContainer"></div>
+        <div id="survivalBonusIndicator"></div>
+        <div id="activeBuffIndicator"></div>
+        <div id="highScoreContainer">
+            <h3>High Scores</h3>
+            <ol id="highScoreList"></ol>
+        </div>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="startScreen" class="messageScreenBase">
+        <h2>Light Blaster Omega II</h2>
+        <p>Arrows/WASD: Move, Mouse: Aim & Shoot. Defeat Bosses for Upgrades! 1/2/3: Use Abilities.</p>
+        <button id="startGameButton">Start Game</button>
+        <button id="settingsButton">Settings</button>
+        <button id="viewHighScoresButton">High Scores</button>
+        <div id="startScreenHighScores" style="margin-top:20px; font-size: 0.9em;"></div>
+    </div>
+
+    <div id="settingsScreen" class="messageScreenBase">
+        <h2>Settings</h2>
+        <div class="settingsSection"> <div class="settingsToggle"><p>Sound Effects: <button id="soundToggleButton">ON</button></p></div> </div>
+        <div class="settingsSection">
+            <div class="volumeSliderContainer"> <div><label for="musicVolumeSlider">Music:</label><input type="range" id="musicVolumeSlider" min="0" max="1" step="0.01" value="0.1"><span id="musicVolumeValue">10%</span></div> </div>
+            <div class="volumeSliderContainer"> <div><label for="shootVolumeSlider">Shoot SFX:</label><input type="range" id="shootVolumeSlider" min="0" max="1" step="0.01" value="0.25"><span id="shootVolumeValue">25%</span></div> </div>
+            <div class="volumeSliderContainer"> <div><label for="hitVolumeSlider">Hit SFX:</label><input type="range" id="hitVolumeSlider" min="0" max="1" step="0.01" value="0.25"><span id="hitVolumeValue">25%</span></div> </div>
+            <div class="volumeSliderContainer"> <div><label for="pickupVolumeSlider">Pickup SFX:</label><input type="range" id="pickupVolumeSlider" min="0" max="1" step="0.01" value="0.25"><span id="pickupVolumeValue">25%</span></div> </div>
+            <div class="volumeSliderContainer"> <div><label for="uiVolumeSlider">UI/Event SFX:</label><input type="range" id="uiVolumeSlider" min="0" max="1" step="0.01" value="0.25"><span id="uiVolumeValue">25%</span></div> </div>
+        </div>
+        <button id="backButtonSettings">Back</button>
+    </div>
+
+    <div id="pauseScreen" class="messageScreenBase">
+        <h2>Paused</h2>
+        <button id="resumeGameButton">Resume</button>
+        <button id="pauseSettingsButton">Settings</button>
+        <button id="pauseMainMenuButton">Main Menu</button>
+    </div>
+
+    <div id="pausePlayerStatsPanel">
+        <h4 class="stats-header" id="statsPanelTitle">Player Status</h4>
+        <div id="statsCore" class="stats-section"></div>
+        <h4 class="stats-header">Evolutions & Gear</h4>
+        <ul id="statsUpgradesList" class="stats-section" style="list-style-type: none; padding: 0; margin: 0;"></ul>
+        <h4 class="stats-header">Immunities</h4>
+        <div id="statsImmunitiesContainer" class="stats-section stats-immunities"></div>
+        <h4 class="stats-header">Active Abilities</h4>
+        <div id="statsAbilities" class="stats-section"></div>
+        <h4 class="stats-header">Mouse Abilities</h4>
+        <div id="statsMouseAbilities" class="stats-section"></div>
+        <h4 class="stats-header">Boss Encounters</h4>
+        <div id="statsBossTiers" class="stats-section"></div>
+    </div>
+
+    <div id="countdownOverlay">3</div>
+    <div id="gameOverScreen" class="messageScreenBase"></div>
+
+    <div id="evolutionScreen" class="messageScreenBase"><h2>Choose Your Evolution!</h2><div id="evolutionOptionsContainer"></div></div>
+    <div id="freeUpgradeScreen" class="messageScreenBase"><h2>Bonus Upgrade!</h2><div id="freeUpgradeOptionContainer"></div><button id="closeFreeUpgradeButton">Continue</button></div>
+    <div id="lootChoiceScreen" class="messageScreenBase">
+        <h2>Salvaged Technology!</h2>
+        <p>Choose one permanent upgrade:</p>
+        <div id="lootOptionsContainer"></div>
+    </div>
+
+    <div id="detailedHighScoresScreen" class="messageScreenBase" style="display: none;">
+        <h2>Hall of Fame</h2>
+        <div id="detailedScoresListContainer">
+            <ol id="detailedScoresList"></ol>
+            <div id="detailedStatsDisplayContainer">
+                <!-- #pausePlayerStatsPanel gets appended here by ui.js when a score is clicked -->
+            </div>
+        </div>
+        <button id="backToMainMenuFromScoresButton" style="margin-top: 20px;">Back to Main Menu</button>
+    </div>
+
+    <div id="abilityCooldownUI"></div>
+    <div id="evolutionTooltip"></div>
+    <audio id="bgMusic" src="space_ambient.mp3" loop></audio>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
