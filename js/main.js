@@ -111,6 +111,8 @@ function addHighScore(name, scoreValue, finalStatsSnapshot) {
 function updateAllHighScoreDisplays() { const currentHighScores = getHighScores(); if (highScoreListDisplay) displayHighScores(highScoreListDisplay, currentHighScores.slice(0,5)); if (startScreenHighScoresDiv) displayHighScores(startScreenHighScoresDiv, currentHighScores.slice(0,5)); }
 function initializeAllPossibleRayColors() { if (CONSTANTS.INITIAL_RAY_COLORS && CONSTANTS.UNLOCKABLE_RAY_COLORS_LIST) { ALL_POSSIBLE_RAY_COLORS = [...CONSTANTS.INITIAL_RAY_COLORS, ...CONSTANTS.UNLOCKABLE_RAY_COLORS_LIST]; } else { console.error("ERROR: Ray color constants not available!"); ALL_POSSIBLE_RAY_COLORS = []; }}
 function initEvolutionChoicesInternal() {
+    // This function effectively resets evolutionChoices because it reassigns the array.
+    // The 'level' property of each choice object will be reset to 0 as defined here.
     evolutionChoices = [
         {id:'colorImmunity', classType: 'tank', text:"Chameleon Plating", level:0, maxLevel: ALL_POSSIBLE_RAY_COLORS.length - CONSTANTS.INITIAL_RAY_COLORS.length, detailedDescription: "Gain immunity to a new random ray color each time this is chosen. Protects against rays of that specific color.", isMaxed:function(p){return !p||p.immuneColorsList.length>=ALL_POSSIBLE_RAY_COLORS.length || this.level >= this.maxLevel;}, apply:function(){if(!player)return"";const a=ALL_POSSIBLE_RAY_COLORS.filter(c=>!player.immuneColorsList.includes(c));if(a.length>0){const r=a[Math.floor(Math.random()*a.length)];player.immuneColorsList.push(r);uiUpdateBuffIndicator(player.immuneColorsList, getReadableColorNameFromUtils); this.level++; return`Now immune to <span style="color:${r};text-shadow:0 0 3px black;font-weight:bold;">${getReadableColorNameFromUtils(r)}</span> rays!`;}return"No new colors left!";}, getEffectString: function() { return `Immune to ${player?player.immuneColorsList.length:0} colors`;}},
         {id:'smallerPlayer', classType: 'tank', text:"Evasive Maneuver", level:0, detailedDescription: "Become smaller, making you harder to hit. Also reduces how much your size increases with score.", isMaxed:function(p){ if (!p) return true; return shrinkMeCooldown > 0; }, apply:function(){if(!player)return"";player.baseRadius=Math.max(CONSTANTS.MIN_PLAYER_BASE_RADIUS,player.baseRadius/2);player.radius=player.baseRadius;currentPlayerRadiusGrowthFactor=0;currentEffectiveDefaultGrowthFactor=Math.max(0.001,currentEffectiveDefaultGrowthFactor/2);shrinkMeCooldown=3; this.level++;return"Base size & growth halved! (Next 2 Evos CD)";}, getEffectString: function() { return `Size reduced!`;}},
@@ -181,143 +183,79 @@ function initFreeUpgradeChoicesInternal() {
 function checkForNewColorUnlock() { if (score >= nextColorUnlockScore && nextUnlockableColorIndex < CONSTANTS.UNLOCKABLE_RAY_COLORS_LIST.length) { const newColor = CONSTANTS.UNLOCKABLE_RAY_COLORS_LIST[nextUnlockableColorIndex]; if (!currentRayColors.includes(newColor)) { currentRayColors.push(newColor); const colorName = getReadableColorNameFromUtils(newColor); activeBuffNotifications.push({ text: `New Ray Color: ${colorName}!`, timer: CONSTANTS.BUFF_NOTIFICATION_DURATION * 1.5 }); playSound(newColorSound); } nextUnlockableColorIndex++; nextColorUnlockScore += CONSTANTS.NEW_COLOR_UNLOCK_INTERVAL; }}
 
 
-// --- (Interval/Spawning, initGame, gameLoop, updateGame, drawGame, endGameInternal, togglePauseMenuInternal, startResumeCountdownInternal - SAME AS PREVIOUS FULL FILE with the ray.js callback fix) ---
-// ... (Interval and Spawning Logic - SAME AS PREVIOUS FULL FILE) ...
-function pausePickupSpawners() {
-    if (targetSpawnIntervalId) clearInterval(targetSpawnIntervalId); targetSpawnIntervalId = null;
-    if (heartSpawnIntervalId) clearInterval(heartSpawnIntervalId); heartSpawnIntervalId = null;
-    if (bonusPointSpawnIntervalId) clearInterval(bonusPointSpawnIntervalId); bonusPointSpawnIntervalId = null;
-}
-function resumePickupSpawners() {
-    if (gameRunning && !isAnyPauseActiveInternal() && !gameOver) {
-        if (!bossManager || !bossManager.isBossSequenceActive()) {
-            if (!targetSpawnIntervalId) targetSpawnIntervalId = setInterval(spawnTarget, CONSTANTS.TARGET_SPAWN_INTERVAL_MS);
-            if (!heartSpawnIntervalId) heartSpawnIntervalId = setInterval(spawnHeart, CONSTANTS.HEART_SPAWN_INTERVAL_MS);
-            if (!bonusPointSpawnIntervalId) bonusPointSpawnIntervalId = setInterval(spawnBonusPointObject, CONSTANTS.BONUS_POINT_SPAWN_INTERVAL_MS);
-        }
-    }
-}
-function pauseAllGameIntervals() {
-    if (shootIntervalId) clearInterval(shootIntervalId); shootIntervalId = null;
-    pausePickupSpawners();
-}
-function resumeAllGameIntervals() {
-    if (gameRunning && !isAnyPauseActiveInternal() && !gameOver) {
-        resumePickupSpawners();
-        if (!shootIntervalId && player) {
-            updateShootInterval();
-        }
-    }
-}
-function updateShootInterval() {
-    if (!player || gameOver || isAnyPauseActiveInternal()) {
-        if(shootIntervalId) clearInterval(shootIntervalId);
-        shootIntervalId = null;
-        return;
-    }
-    let timeBasedReduction = CONSTANTS.SHOOT_INTERVAL_TIME_INITIAL_REDUCTION + (gameplayTimeElapsed * CONSTANTS.SHOOT_INTERVAL_TIME_SCALE_FACTOR);
-    currentShootInterval = Math.max(CONSTANTS.MIN_RAY_SHOOT_INTERVAL_BASE, CONSTANTS.BASE_RAY_SHOOT_INTERVAL - timeBasedReduction);
-    if (Math.abs(currentShootInterval - lastSetShootInterval) > 10 || (!shootIntervalId)) {
-        if (shootIntervalId) clearInterval(shootIntervalId);
-        shootIntervalId = setInterval(spawnRay, currentShootInterval);
-        lastSetShootInterval = currentShootInterval;
-    }
-}
-function spawnRay(){
-    if(!player||gameOver||isAnyPauseActiveInternal() || player.isFiringOmegaLaser ){ return; }
-    const baseAimAngle = player.aimAngle;
-    const numRaysToSpawn = 1 + player.scatterShotLevel;
-    const angleBetweenRays = (numRaysToSpawn > 1 && numRaysToSpawn <= 2) ? CONSTANTS.SCATTER_SHOT_ANGLE_OFFSET : (numRaysToSpawn > 2) ? CONSTANTS.SCATTER_SHOT_ANGLE_OFFSET / (numRaysToSpawn -1) : 0;
-    for (let k = 0; k < numRaysToSpawn; k++) {
-        let currentAimAngle = baseAimAngle;
-        if (numRaysToSpawn > 1) { const spreadFactor = (k - (numRaysToSpawn - 1) / 2.0); currentAimAngle += spreadFactor * angleBetweenRays; }
-        if (isScreenShaking && currentShakeType === 'bonus') { const inaccuracy = (Math.random() - 0.5) * CONSTANTS.PLAYER_RAY_INACCURACY_DURING_SHAKE * 2; currentAimAngle += inaccuracy; }
-        let rayToSpawn = getPooledRay();
-        if (!rayToSpawn) { console.warn("Ray pool exhausted in spawnRay"); continue; }
-        const dx=Math.cos(currentAimAngle),dy=Math.sin(currentAimAngle);
-        const c=currentRayColors[Math.floor(Math.random()*currentRayColors.length)];
-        const sD=player.radius+CONSTANTS.RAY_RADIUS+CONSTANTS.RAY_SPAWN_FORWARD_OFFSET;
-        const sX=player.x+dx*sD,sY=player.y+dy*sD;
-        rayToSpawn.reset( sX, sY, c, dx, dy, currentRaySpeedMultiplier, player, _currentRayMaxLifetime, false, false, 0, false );
-        rays.push(rayToSpawn);
-    }
-    playSound(shootSound);
-}
-function spawnTarget(){
-    if(gameOver || isAnyPauseActiveInternal() || (bossManager && bossManager.isBossSequenceActive()))return;
-    const r=CONSTANTS.TARGET_RADIUS;
-    let validPosition = false; let sX, sY; let attempts = 0;
-    while(!validPosition && attempts < 50) { sX=Math.random()*(canvas.width-2*r)+r; sY=Math.random()*(canvas.height-2*r)+r; if (player) { const distToPlayer = Math.sqrt((sX - player.x)**2 + (sY - player.y)**2); if (distToPlayer > player.radius + r + 75) validPosition = true; } else validPosition = true; attempts++; }
-    if(validPosition) targets.push(new Target(sX,sY,r,CONSTANTS.TARGET_COLOR));
-}
-function spawnHeart(){
-    if(gameOver || isAnyPauseActiveInternal() || hearts.length>0 || (bossManager && bossManager.isBossSequenceActive()))return;
-    const x=Math.random()*(canvas.width-2*CONSTANTS.HEART_VISUAL_RADIUS)+CONSTANTS.HEART_VISUAL_RADIUS; const y=Math.random()*(canvas.height-2*CONSTANTS.HEART_VISUAL_RADIUS)+CONSTANTS.HEART_VISUAL_RADIUS;
-    hearts.push(new Heart(x,y,CONSTANTS.HEART_VISUAL_RADIUS,CONSTANTS.HEART_COLLISION_RADIUS,CONSTANTS.HEART_COLOR));
-}
-function spawnBonusPointObject(){
-    if(gameOver || isAnyPauseActiveInternal() || (bonusPoints.length > 0) || (bossManager && bossManager.isBossSequenceActive())) return;
-    const r=CONSTANTS.BONUS_POINT_RADIUS;
-    let validPosition = false; let sX, sY; let attempts = 0;
-    while(!validPosition && attempts < 50) { sX=Math.random()*(canvas.width-2*r)+r;sY=Math.random()*(canvas.height-2*r)+r; if (player) {const distToPlayer = Math.sqrt((sX - player.x)**2 + (sY - player.y)**2); if (distToPlayer > player.radius + r + 75) validPosition = true;} else validPosition = true; attempts++;}
-    if (validPosition) bonusPoints.push(new BonusPoint(sX,sY,r,CONSTANTS.BONUS_POINT_COLOR));
-}
-
 // --- Game Initialization ---
 function initGame() {
     gameRunning = true; gameOver = false;
-    currentActiveScreenElement = null; // Game screen is active
+    currentActiveScreenElement = null;
     showScreen(null, false, gameScreenCallbacks);
-    score = 0; updateScoreDisplay(score); lastEvolutionScore = 0; // MODIFIED: Reset lastEvolutionScore
+    score = 0; updateScoreDisplay(score);
+    lastEvolutionScore = 0;
+
     gamePausedForEvolution = false; gamePausedForFreeUpgrade = false; gamePausedByEsc = false;
     isCountingDownToResume = false; gamePausedForLootChoice = false; evolutionPendingAfterBoss = false;
-    shrinkMeCooldown = 0; lootDrops = []; decoys = []; bossDefeatEffects = [];
-    gameplayTimeElapsed = 0; shootIntervalUpdateTimer = 0;
-    currentRaySpeedMultiplier = 1.0; // MODIFIED: Reset ray speed multiplier
-    currentEffectiveDefaultGrowthFactor = CONSTANTS.DEFAULT_PLAYER_RADIUS_GROWTH_FACTOR; // MODIFIED: Reset growth factor
-    currentPlayerRadiusGrowthFactor = currentEffectiveDefaultGrowthFactor; // MODIFIED: Reset growth factor
+    shrinkMeCooldown = 0;
+    lootDrops = []; decoys = []; bossDefeatEffects = [];
+    rays = []; // Clear existing rays
+
+    // Time and interval related resets
+    gameplayTimeElapsed = 0;
+    shootIntervalUpdateTimer = 0;
+    currentShootInterval = CONSTANTS.BASE_RAY_SHOOT_INTERVAL;
+    lastSetShootInterval = CONSTANTS.BASE_RAY_SHOOT_INTERVAL;
+    if (shootIntervalId) clearInterval(shootIntervalId);
+    shootIntervalId = null;
+
+    // Gameplay progression variable resets
+    currentRaySpeedMultiplier = 1.0;
+    currentEffectiveDefaultGrowthFactor = CONSTANTS.DEFAULT_PLAYER_RADIUS_GROWTH_FACTOR;
+    currentPlayerRadiusGrowthFactor = currentEffectiveDefaultGrowthFactor;
+    _currentRayMaxLifetime = CONSTANTS.BASE_RAY_MAX_LIFETIME;
+
     currentRayColors = [...CONSTANTS.INITIAL_RAY_COLORS];
-    nextColorUnlockScore = CONSTANTS.NEW_COLOR_UNLOCK_INTERVAL; nextUnlockableColorIndex = 0;
-    rays = [];
-    _currentRayMaxLifetime = CONSTANTS.BASE_RAY_MAX_LIFETIME; // MODIFIED: Reset ray lifetime
+    nextColorUnlockScore = CONSTANTS.NEW_COLOR_UNLOCK_INTERVAL;
+    nextUnlockableColorIndex = 0;
+
     postPopupImmunityTimer = 0; postDamageImmunityTimer = 0;
     targets = []; hearts = []; bonusPoints = []; activeBuffNotifications = [];
-    survivalUpgrades = 0; currentSurvivalPointsInterval = CONSTANTS.BASE_SURVIVAL_POINTS_INTERVAL;
-    survivalScoreThisCycle = 0; survivalPointsTimer = 0;
 
-    // Player related resets
+    survivalUpgrades = 0;
+    currentSurvivalPointsInterval = CONSTANTS.BASE_SURVIVAL_POINTS_INTERVAL;
+    survivalScoreThisCycle = 0;
+    survivalPointsTimer = 0;
+
+    // Player re-initialization
     player = new Player(canvas.width / 2, canvas.height / 2, CONSTANTS.PLAYER_SPEED_BASE);
-    player.activeAbilities = { '1': null, '2': null, '3': null }; // Explicitly reset fixed abilities
-    // Player constructor already resets most stats like rayDamageBonus, hpRegenBonusFromEvolution, etc.
+    // Player constructor handles most of its internal stat resets.
+    // Explicitly reset fixed abilities container:
+    player.activeAbilities = { '1': null, '2': null, '3': null };
 
+    // Initialize game data structures
     initializeAllPossibleRayColors();
-    initializeRayPool(Ray); // Pool is re-initialized, existing rays become inactive or are cleared.
-    initEvolutionChoicesInternal(); // Re-initialize evolution choices to reset their levels
+    initializeRayPool(Ray); // Re-initializes the pool for fresh rays
+    initEvolutionChoicesInternal(); // This redefines the evolutionChoices array, resetting levels
     populateBossLootPoolInternal();
     initFreeUpgradeChoicesInternal();
 
+    // UI Updates
     uiUpdateHealthDisplay(player.hp, player.maxHp);
     uiUpdateBuffIndicator(player.immuneColorsList, getReadableColorNameFromUtils);
     uiUpdateSurvivalBonusIndicator(survivalUpgrades, CONSTANTS.MAX_SURVIVAL_UPGRADES);
     uiUpdateActiveBuffIndicator(player, postPopupImmunityTimer, postDamageImmunityTimer);
-    uiUpdateAbilityCooldownUI(player);
+    uiUpdateAbilityCooldownUI(player); // Reset ability UI
 
     if (pausePlayerStatsPanel) pausePlayerStatsPanel.style.display = 'none';
+
+    // Boss Manager Reset
     const bossManagerAudioContext = { playSound, audioChaserSpawnSound, audioReflectorSpawnSound, audioSingularitySpawnSound };
     bossManager = new BossManager(CONSTANTS.BOSS_SPAWN_START_SCORE, CONSTANTS.BOSS_SPAWN_SCORE_INTERVAL, bossManagerAudioContext);
-    bossManager.reset(); // MODIFIED: Explicitly reset boss manager state
+    // bossManager.reset(); // Already called within BossManager constructor effectively, but explicit call is fine.
 
-    // Shoot interval reset
-    currentShootInterval = CONSTANTS.BASE_RAY_SHOOT_INTERVAL; // MODIFIED
-    lastSetShootInterval = CONSTANTS.BASE_RAY_SHOOT_INTERVAL; // MODIFIED
-    if (shootIntervalId) clearInterval(shootIntervalId); // MODIFIED
-    shootIntervalId = null; // MODIFIED
-
-    pauseAllGameIntervals(); // This will clear existing intervals
-    resumeAllGameIntervals(); // This will set up new intervals based on reset values
+    // Clear and restart game intervals
+    pauseAllGameIntervals(); // Clears target, heart, bonus point, and shoot intervals
+    resumeAllGameIntervals(); // Sets up new intervals based on reset values (shootInterval uses currentShootInterval)
 
     applyMusicPlayStateWrapper();
-    spawnTarget();
+    spawnTarget(); // Spawn initial target
     lastTime = performance.now();
     if (animationFrameId) cancelAnimationFrame(animationFrameId);
     animationFrameId = requestAnimationFrame(gameLoop);
@@ -491,7 +429,7 @@ function updateGame(deltaTime) {
                             };
                             const damageTaken = player.takeDamage( null,  currentTakeDamageGameContext, currentTakeDamageDamageContext );
                             if (damageTaken > 0) {
-                                postDamageImmunityTimer = CONSTANTS.POST_DAMAGE_IMMUNITY_DURATION; // Standard immunity for direct boss collision
+                                postDamageImmunityTimer = CONSTANTS.POST_DAMAGE_IMMUNITY_DURATION;
                                 const bounceAngle = Math.atan2(player.y - collidedBoss.y, player.x - collidedBoss.x);
                                 player.velX = Math.cos(bounceAngle) * CONSTANTS.PLAYER_BOUNCE_FORCE_FROM_BOSS;
                                 player.velY = Math.sin(bounceAngle) * CONSTANTS.PLAYER_BOUNCE_FORCE_FROM_BOSS;
@@ -527,7 +465,7 @@ function updateGame(deltaTime) {
                     playerPostPopupImmunityTimer: postPopupImmunityTimer,
                     screenShakeParams: {isScreenShaking, screenShakeTimer, currentShakeMagnitude, currentShakeType, hitShakeDx, hitShakeDy},
                     playerTakeDamageFromRayCallback: (rayThatHitPlayer) => {
-                        if (player && rayThatHitPlayer.isGravityWellRay) { // This callback is specific to player hit by the boss's GRAVITY BALL itself.
+                        if (player && rayThatHitPlayer.isGravityWellRay) {
                             const ptdGameCtxForGravityBall = {
                                 postPopupImmunityTimer: postPopupImmunityTimer,
                                 postDamageImmunityTimer: postDamageImmunityTimer,
@@ -542,7 +480,6 @@ function updateGame(deltaTime) {
                             };
                             const damageActuallyDealt = player.takeDamage(rayThatHitPlayer, ptdGameCtxForGravityBall, ptdDamageCtxForGravityBall);
                             if (damageActuallyDealt > 0) {
-                                // Gravity ball hits do NOT grant immunity.
                                 const bounceAngle = Math.atan2(player.y - rayThatHitPlayer.y, player.x - rayThatHitPlayer.x);
                                 player.velX = Math.cos(bounceAngle) * CONSTANTS.PLAYER_BOUNCE_FORCE_FROM_GRAVITY_BALL;
                                 player.velY = Math.sin(bounceAngle) * CONSTANTS.PLAYER_BOUNCE_FORCE_FROM_GRAVITY_BALL;
@@ -610,7 +547,6 @@ function updateGame(deltaTime) {
              const r=rays[i];
              if (!r || !r.isActive || !player) continue;
 
-             // Skip if it's the GravityWellBoss's main projectile, as its collision with player is handled by playerTakeDamageFromRayCallback in r.update()
              if (r.isGravityWellRay) continue;
 
              const skipRayPlayerCollision = r.spawnGraceTimer > 0 || r.state !== 'moving' || (player.teleporting && player.teleportEffectTimer > 0) || r.isForming;
@@ -719,6 +655,7 @@ function endGameInternal() {
     currentActiveScreenElement = gameOverScreen; // Set current screen
     applyMusicPlayStateWrapper();
     playSound(gameOverSoundFX);
+    if (player && player.isFiringOmegaLaser) stopSound(omegaLaserSound); // MODIFIED: Stop Omega Laser sound on game over
     const finalStatsSnapshot = createFinalStatsSnapshot();
     prepareAndShowPauseStats("Game Over - Final Stats");
     if (pausePlayerStatsPanel) {
@@ -1011,7 +948,9 @@ function showStartScreenWithUpdatesInternal() {
     gamePausedForEvolution = false; gamePausedForFreeUpgrade = false; gamePausedForLootChoice = false;
     evolutionPendingAfterBoss = false;
     if (animationFrameId) cancelAnimationFrame(animationFrameId); animationFrameId = null;
-    pauseAllGameIntervals(); if (bossManager) bossManager.reset();
+    pauseAllGameIntervals();
+    if (player && player.isFiringOmegaLaser) stopSound(omegaLaserSound); // MODIFIED: Stop Omega Laser sound
+    if (bossManager) bossManager.reset();
 
     if (pausePlayerStatsPanel) {
         if (pausePlayerStatsPanel.parentElement !== document.body) {
@@ -1022,7 +961,6 @@ function showStartScreenWithUpdatesInternal() {
     currentActiveScreenElement = startScreen;
     updateAllHighScoreDisplays();
     showScreen(startScreen, false, gameScreenCallbacks);
-    // applyMusicPlayStateWrapper(); // Called by showScreen's callback
 }
 
 const audioDomElementsForInit = {
