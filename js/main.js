@@ -115,7 +115,7 @@ function initEvolutionChoicesInternal() {
         {id:'colorImmunity', classType: 'tank', text:"Chameleon Plating", level:0, maxLevel: ALL_POSSIBLE_RAY_COLORS.length - CONSTANTS.INITIAL_RAY_COLORS.length, detailedDescription: "Gain immunity to a new random ray color each time this is chosen. Protects against rays of that specific color.", isMaxed:function(p){return !p||p.immuneColorsList.length>=ALL_POSSIBLE_RAY_COLORS.length || this.level >= this.maxLevel;}, apply:function(){if(!player)return"";const a=ALL_POSSIBLE_RAY_COLORS.filter(c=>!player.immuneColorsList.includes(c));if(a.length>0){const r=a[Math.floor(Math.random()*a.length)];player.immuneColorsList.push(r);uiUpdateBuffIndicator(player.immuneColorsList, getReadableColorNameFromUtils); this.level++; return`Now immune to <span style="color:${r};text-shadow:0 0 3px black;font-weight:bold;">${getReadableColorNameFromUtils(r)}</span> rays!`;}return"No new colors left!";}, getEffectString: function() { return `Immune to ${player?player.immuneColorsList.length:0} colors`;}},
         {id:'smallerPlayer', classType: 'tank', text:"Evasive Maneuver", level:0, detailedDescription: "Become smaller, making you harder to hit. Also reduces how much your size increases with score.", isMaxed:function(p){ if (!p) return true; return shrinkMeCooldown > 0; }, apply:function(){if(!player)return"";player.baseRadius=Math.max(CONSTANTS.MIN_PLAYER_BASE_RADIUS,player.baseRadius/2);player.radius=player.baseRadius;currentPlayerRadiusGrowthFactor=0;currentEffectiveDefaultGrowthFactor=Math.max(0.001,currentEffectiveDefaultGrowthFactor/2);shrinkMeCooldown=3; this.level++;return"Base size & growth halved! (Next 2 Evos CD)";}, getEffectString: function() { return `Size reduced!`;}},
         {id:'reinforcedHull', classType: 'tank', text:"Reinforced Hull", level:0, maxLevel:Math.round(CONSTANTS.MAX_DAMAGE_REDUCTION/CONSTANTS.DAMAGE_REDUCTION_PER_LEVEL), detailedDescription: `Reduces all incoming damage by ${CONSTANTS.DAMAGE_REDUCTION_PER_LEVEL*100}% per level. Max ${CONSTANTS.MAX_DAMAGE_REDUCTION*100}%.`, isMaxed:function(p){return p && p.damageReductionFactor >= CONSTANTS.MAX_DAMAGE_REDUCTION || this.level >= this.maxLevel;}, apply:function(){if(!player) return""; player.damageReductionFactor = Math.min(CONSTANTS.MAX_DAMAGE_REDUCTION, player.damageReductionFactor + CONSTANTS.DAMAGE_REDUCTION_PER_LEVEL); this.level++; return `Damage reduction now ${Math.round(player.damageReductionFactor * 100)}%!`;}, getEffectString: function() { return `${Math.round((player?player.damageReductionFactor:0) * 100)}% Dmg Reduction`;}},
-        {id:'vitalitySurge', classType: 'tank', text:"Vitality Surge", level:0, maxLevel: 999, detailedDescription: `Increases passive health regeneration by ${CONSTANTS.HP_REGEN_BONUS_PER_LEVEL_EVOLUTION} HP per tick.`, isMaxed:function(p){return false;}, apply:function(){if(!player) return""; player.hpRegenBonusFromEvolution += CONSTANTS.HP_REGEN_BONUS_PER_LEVEL_EVOLUTION; this.level++; return `Passive HP regen now +${player.hpRegenBonusFromEvolution} HP per tick!`;}, getEffectString: function() { return `+${player?player.hpRegenBonusFromEvolution:0} HP/tick Regen`;}}, // MODIFIED maxLevel and isMaxed
+        {id:'vitalitySurge', classType: 'tank', text:"Vitality Surge", level:0, maxLevel: 999, detailedDescription: `Increases passive health regeneration by ${CONSTANTS.HP_REGEN_BONUS_PER_LEVEL_EVOLUTION} HP per tick.`, isMaxed:function(p){return false;}, apply:function(){if(!player) return""; player.hpRegenBonusFromEvolution += CONSTANTS.HP_REGEN_BONUS_PER_LEVEL_EVOLUTION; this.level++; return `Passive HP regen now +${player.hpRegenBonusFromEvolution} HP per tick!`;}, getEffectString: function() { return `+${player?player.hpRegenBonusFromEvolution:0} HP/tick Regen`;}},
         {id:'slowRays', classType: 'utility', text:"Field Disruption", level:0, detailedDescription: `Permanently slows all environmental rays by an additional ${((1-CONSTANTS.SLOW_RAYS_REDUCTION_FACTOR)*100).toFixed(0)}% of their current speed each level. Diminishing returns apply.`, isMaxed:function(p){ return currentRaySpeedMultiplier <= CONSTANTS.MIN_RAY_SPEED_MULTIPLIER_AFTER_SLOW * 1.01;}, apply:function(){currentRaySpeedMultiplier=Math.max(CONSTANTS.MIN_RAY_SPEED_MULTIPLIER_AFTER_SLOW, currentRaySpeedMultiplier * CONSTANTS.SLOW_RAYS_REDUCTION_FACTOR);this.level++;return `Environmental ray speed multiplier reduced! (${currentRaySpeedMultiplier.toFixed(2)}x)`;}, getEffectString: function() { return `Env. Ray Speed: ${currentRaySpeedMultiplier.toFixed(2)}x`;}},
         {id:'systemOvercharge', classType: 'utility', text:"System Overcharge", level:0, maxLevel:4, detailedDescription: "Reduces the score needed between evolutions by 7.5% per level. Max 30% reduction.", isMaxed:function(p){return p && p.evolutionIntervalModifier <= 0.70 || this.level >= this.maxLevel;}, apply:function(){if(!player) return""; player.evolutionIntervalModifier = Math.max(0.70, player.evolutionIntervalModifier - 0.075); this.level++; return `Evolution interval now ${Math.round(player.evolutionIntervalModifier * 100)}%!`;}, getEffectString: function() { return `Evo Interval: ${player?Math.round(player.evolutionIntervalModifier*100):100}%`;}},
         {id:'enhancedRegen', classType: 'utility', text:"Enhanced Regeneration", level:0, maxLevel:Math.round(CONSTANTS.MAX_HP_PICKUP_BONUS/CONSTANTS.HP_PICKUP_BONUS_PER_LEVEL), detailedDescription: `HP pickups restore an additional ${CONSTANTS.HP_PICKUP_BONUS_PER_LEVEL} health per level.`, isMaxed:function(p){return p && p.hpPickupBonus >= CONSTANTS.MAX_HP_PICKUP_BONUS || this.level >= this.maxLevel;}, apply:function(){if(!player) return""; player.hpPickupBonus += CONSTANTS.HP_PICKUP_BONUS_PER_LEVEL; this.level++; return `HP pickups +${player.hpPickupBonus} HP!`;}, getEffectString: function() { return `HP Pickups +${player?player.hpPickupBonus:0} HP`;}},
@@ -268,29 +268,31 @@ function initGame() {
     gameRunning = true; gameOver = false;
     currentActiveScreenElement = null; // Game screen is active
     showScreen(null, false, gameScreenCallbacks);
-    score = 0; updateScoreDisplay(score);
+    score = 0; updateScoreDisplay(score); lastEvolutionScore = 0; // MODIFIED: Reset lastEvolutionScore
     gamePausedForEvolution = false; gamePausedForFreeUpgrade = false; gamePausedByEsc = false;
     isCountingDownToResume = false; gamePausedForLootChoice = false; evolutionPendingAfterBoss = false;
     shrinkMeCooldown = 0; lootDrops = []; decoys = []; bossDefeatEffects = [];
-    gameplayTimeElapsed = 0; shootIntervalUpdateTimer = 0; currentRaySpeedMultiplier = 1.0;
-    currentEffectiveDefaultGrowthFactor = CONSTANTS.DEFAULT_PLAYER_RADIUS_GROWTH_FACTOR;
-    currentPlayerRadiusGrowthFactor = currentEffectiveDefaultGrowthFactor;
+    gameplayTimeElapsed = 0; shootIntervalUpdateTimer = 0;
+    currentRaySpeedMultiplier = 1.0; // MODIFIED: Reset ray speed multiplier
+    currentEffectiveDefaultGrowthFactor = CONSTANTS.DEFAULT_PLAYER_RADIUS_GROWTH_FACTOR; // MODIFIED: Reset growth factor
+    currentPlayerRadiusGrowthFactor = currentEffectiveDefaultGrowthFactor; // MODIFIED: Reset growth factor
     currentRayColors = [...CONSTANTS.INITIAL_RAY_COLORS];
     nextColorUnlockScore = CONSTANTS.NEW_COLOR_UNLOCK_INTERVAL; nextUnlockableColorIndex = 0;
     rays = [];
-    _currentRayMaxLifetime = CONSTANTS.BASE_RAY_MAX_LIFETIME;
+    _currentRayMaxLifetime = CONSTANTS.BASE_RAY_MAX_LIFETIME; // MODIFIED: Reset ray lifetime
     postPopupImmunityTimer = 0; postDamageImmunityTimer = 0;
     targets = []; hearts = []; bonusPoints = []; activeBuffNotifications = [];
     survivalUpgrades = 0; currentSurvivalPointsInterval = CONSTANTS.BASE_SURVIVAL_POINTS_INTERVAL;
     survivalScoreThisCycle = 0; survivalPointsTimer = 0;
 
+    // Player related resets
     player = new Player(canvas.width / 2, canvas.height / 2, CONSTANTS.PLAYER_SPEED_BASE);
-    // Player constructor sets most defaults, but explicit reset for fixed abilities:
-    player.activeAbilities = { '1': null, '2': null, '3': null };
+    player.activeAbilities = { '1': null, '2': null, '3': null }; // Explicitly reset fixed abilities
+    // Player constructor already resets most stats like rayDamageBonus, hpRegenBonusFromEvolution, etc.
 
     initializeAllPossibleRayColors();
-    initializeRayPool(Ray);
-    initEvolutionChoicesInternal();
+    initializeRayPool(Ray); // Pool is re-initialized, existing rays become inactive or are cleared.
+    initEvolutionChoicesInternal(); // Re-initialize evolution choices to reset their levels
     populateBossLootPoolInternal();
     initFreeUpgradeChoicesInternal();
 
@@ -303,13 +305,16 @@ function initGame() {
     if (pausePlayerStatsPanel) pausePlayerStatsPanel.style.display = 'none';
     const bossManagerAudioContext = { playSound, audioChaserSpawnSound, audioReflectorSpawnSound, audioSingularitySpawnSound };
     bossManager = new BossManager(CONSTANTS.BOSS_SPAWN_START_SCORE, CONSTANTS.BOSS_SPAWN_SCORE_INTERVAL, bossManagerAudioContext);
+    bossManager.reset(); // MODIFIED: Explicitly reset boss manager state
 
-    currentShootInterval = CONSTANTS.BASE_RAY_SHOOT_INTERVAL;
-    lastSetShootInterval = CONSTANTS.BASE_RAY_SHOOT_INTERVAL;
-    shootIntervalId = null;
+    // Shoot interval reset
+    currentShootInterval = CONSTANTS.BASE_RAY_SHOOT_INTERVAL; // MODIFIED
+    lastSetShootInterval = CONSTANTS.BASE_RAY_SHOOT_INTERVAL; // MODIFIED
+    if (shootIntervalId) clearInterval(shootIntervalId); // MODIFIED
+    shootIntervalId = null; // MODIFIED
 
-    pauseAllGameIntervals();
-    resumeAllGameIntervals();
+    pauseAllGameIntervals(); // This will clear existing intervals
+    resumeAllGameIntervals(); // This will set up new intervals based on reset values
 
     applyMusicPlayStateWrapper();
     spawnTarget();
@@ -486,7 +491,7 @@ function updateGame(deltaTime) {
                             };
                             const damageTaken = player.takeDamage( null,  currentTakeDamageGameContext, currentTakeDamageDamageContext );
                             if (damageTaken > 0) {
-                                postDamageImmunityTimer = CONSTANTS.POST_DAMAGE_IMMUNITY_DURATION;
+                                postDamageImmunityTimer = CONSTANTS.POST_DAMAGE_IMMUNITY_DURATION; // Standard immunity for direct boss collision
                                 const bounceAngle = Math.atan2(player.y - collidedBoss.y, player.x - collidedBoss.x);
                                 player.velX = Math.cos(bounceAngle) * CONSTANTS.PLAYER_BOUNCE_FORCE_FROM_BOSS;
                                 player.velY = Math.sin(bounceAngle) * CONSTANTS.PLAYER_BOUNCE_FORCE_FROM_BOSS;
@@ -522,7 +527,7 @@ function updateGame(deltaTime) {
                     playerPostPopupImmunityTimer: postPopupImmunityTimer,
                     screenShakeParams: {isScreenShaking, screenShakeTimer, currentShakeMagnitude, currentShakeType, hitShakeDx, hitShakeDy},
                     playerTakeDamageFromRayCallback: (rayThatHitPlayer) => {
-                        if (player && rayThatHitPlayer.isGravityWellRay) {
+                        if (player && rayThatHitPlayer.isGravityWellRay) { // This callback is specific to player hit by the boss's GRAVITY BALL itself.
                             const ptdGameCtxForGravityBall = {
                                 postPopupImmunityTimer: postPopupImmunityTimer,
                                 postDamageImmunityTimer: postDamageImmunityTimer,
@@ -537,7 +542,7 @@ function updateGame(deltaTime) {
                             };
                             const damageActuallyDealt = player.takeDamage(rayThatHitPlayer, ptdGameCtxForGravityBall, ptdDamageCtxForGravityBall);
                             if (damageActuallyDealt > 0) {
-                                postDamageImmunityTimer = CONSTANTS.POST_DAMAGE_IMMUNITY_DURATION;
+                                // Gravity ball hits do NOT grant immunity.
                                 const bounceAngle = Math.atan2(player.y - rayThatHitPlayer.y, player.x - rayThatHitPlayer.x);
                                 player.velX = Math.cos(bounceAngle) * CONSTANTS.PLAYER_BOUNCE_FORCE_FROM_GRAVITY_BALL;
                                 player.velY = Math.sin(bounceAngle) * CONSTANTS.PLAYER_BOUNCE_FORCE_FROM_GRAVITY_BALL;
@@ -605,6 +610,7 @@ function updateGame(deltaTime) {
              const r=rays[i];
              if (!r || !r.isActive || !player) continue;
 
+             // Skip if it's the GravityWellBoss's main projectile, as its collision with player is handled by playerTakeDamageFromRayCallback in r.update()
              if (r.isGravityWellRay) continue;
 
              const skipRayPlayerCollision = r.spawnGraceTimer > 0 || r.state !== 'moving' || (player.teleporting && player.teleportEffectTimer > 0) || r.isForming;
@@ -638,6 +644,7 @@ function updateGame(deltaTime) {
                     if (!isImmuneToThisColor) { damageDealt = player.takeDamage(r, ptdGameCtxForRay, ptdDamageCtxForRay); }
                     r.isActive = false;
                 }
+
                 if (damageDealt > 0) {
                     postDamageImmunityTimer = CONSTANTS.POST_DAMAGE_IMMUNITY_DURATION;
                 }
