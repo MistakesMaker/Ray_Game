@@ -110,9 +110,40 @@ function addHighScore(name, scoreValue, finalStatsSnapshot) {
 }
 function updateAllHighScoreDisplays() { const currentHighScores = getHighScores(); if (highScoreListDisplay) displayHighScores(highScoreListDisplay, currentHighScores.slice(0,5)); if (startScreenHighScoresDiv) displayHighScores(startScreenHighScoresDiv, currentHighScores.slice(0,5)); }
 function initializeAllPossibleRayColors() { if (CONSTANTS.INITIAL_RAY_COLORS && CONSTANTS.UNLOCKABLE_RAY_COLORS_LIST) { ALL_POSSIBLE_RAY_COLORS = [...CONSTANTS.INITIAL_RAY_COLORS, ...CONSTANTS.UNLOCKABLE_RAY_COLORS_LIST]; } else { console.error("ERROR: Ray color constants not available!"); ALL_POSSIBLE_RAY_COLORS = []; }}
+
+// MOVED Interval Management Functions Higher Up
+function pausePickupSpawners() {
+    if (targetSpawnIntervalId) clearInterval(targetSpawnIntervalId); targetSpawnIntervalId = null;
+    if (heartSpawnIntervalId) clearInterval(heartSpawnIntervalId); heartSpawnIntervalId = null;
+    if (bonusPointSpawnIntervalId) clearInterval(bonusPointSpawnIntervalId); bonusPointSpawnIntervalId = null;
+}
+
+function pauseAllGameIntervals() {
+    if (shootIntervalId) clearInterval(shootIntervalId); shootIntervalId = null;
+    pausePickupSpawners();
+}
+
+function resumePickupSpawners() {
+    if (gameRunning && !isAnyPauseActiveInternal() && !gameOver) {
+        if (!bossManager || !bossManager.isBossSequenceActive()) {
+            if (!targetSpawnIntervalId) targetSpawnIntervalId = setInterval(spawnTarget, CONSTANTS.TARGET_SPAWN_INTERVAL_MS);
+            if (!heartSpawnIntervalId) heartSpawnIntervalId = setInterval(spawnHeart, CONSTANTS.HEART_SPAWN_INTERVAL_MS);
+            if (!bonusPointSpawnIntervalId) bonusPointSpawnIntervalId = setInterval(spawnBonusPointObject, CONSTANTS.BONUS_POINT_SPAWN_INTERVAL_MS);
+        }
+    }
+}
+
+function resumeAllGameIntervals() {
+    if (gameRunning && !isAnyPauseActiveInternal() && !gameOver) {
+        resumePickupSpawners();
+        if (!shootIntervalId && player) { // Check if player exists before trying to update shoot interval
+            updateShootInterval();
+        }
+    }
+}
+// END MOVED Interval Management Functions
+
 function initEvolutionChoicesInternal() {
-    // This function effectively resets evolutionChoices because it reassigns the array.
-    // The 'level' property of each choice object will be reset to 0 as defined here.
     evolutionChoices = [
         {id:'colorImmunity', classType: 'tank', text:"Chameleon Plating", level:0, maxLevel: ALL_POSSIBLE_RAY_COLORS.length - CONSTANTS.INITIAL_RAY_COLORS.length, detailedDescription: "Gain immunity to a new random ray color each time this is chosen. Protects against rays of that specific color.", isMaxed:function(p){return !p||p.immuneColorsList.length>=ALL_POSSIBLE_RAY_COLORS.length || this.level >= this.maxLevel;}, apply:function(){if(!player)return"";const a=ALL_POSSIBLE_RAY_COLORS.filter(c=>!player.immuneColorsList.includes(c));if(a.length>0){const r=a[Math.floor(Math.random()*a.length)];player.immuneColorsList.push(r);uiUpdateBuffIndicator(player.immuneColorsList, getReadableColorNameFromUtils); this.level++; return`Now immune to <span style="color:${r};text-shadow:0 0 3px black;font-weight:bold;">${getReadableColorNameFromUtils(r)}</span> rays!`;}return"No new colors left!";}, getEffectString: function() { return `Immune to ${player?player.immuneColorsList.length:0} colors`;}},
         {id:'smallerPlayer', classType: 'tank', text:"Evasive Maneuver", level:0, detailedDescription: "Become smaller, making you harder to hit. Also reduces how much your size increases with score.", isMaxed:function(p){ if (!p) return true; return shrinkMeCooldown > 0; }, apply:function(){if(!player)return"";player.baseRadius=Math.max(CONSTANTS.MIN_PLAYER_BASE_RADIUS,player.baseRadius/2);player.radius=player.baseRadius;currentPlayerRadiusGrowthFactor=0;currentEffectiveDefaultGrowthFactor=Math.max(0.001,currentEffectiveDefaultGrowthFactor/2);shrinkMeCooldown=3; this.level++;return"Base size & growth halved! (Next 2 Evos CD)";}, getEffectString: function() { return `Size reduced!`;}},
@@ -182,36 +213,6 @@ function initFreeUpgradeChoicesInternal() {
 }
 function checkForNewColorUnlock() { if (score >= nextColorUnlockScore && nextUnlockableColorIndex < CONSTANTS.UNLOCKABLE_RAY_COLORS_LIST.length) { const newColor = CONSTANTS.UNLOCKABLE_RAY_COLORS_LIST[nextUnlockableColorIndex]; if (!currentRayColors.includes(newColor)) { currentRayColors.push(newColor); const colorName = getReadableColorNameFromUtils(newColor); activeBuffNotifications.push({ text: `New Ray Color: ${colorName}!`, timer: CONSTANTS.BUFF_NOTIFICATION_DURATION * 1.5 }); playSound(newColorSound); } nextUnlockableColorIndex++; nextColorUnlockScore += CONSTANTS.NEW_COLOR_UNLOCK_INTERVAL; }}
 
-// MODIFIED: Added definitions for pauseAllGameIntervals, resumeAllGameIntervals, and pausePickupSpawners
-function pausePickupSpawners() {
-    if (targetSpawnIntervalId) clearInterval(targetSpawnIntervalId); targetSpawnIntervalId = null;
-    if (heartSpawnIntervalId) clearInterval(heartSpawnIntervalId); heartSpawnIntervalId = null;
-    if (bonusPointSpawnIntervalId) clearInterval(bonusPointSpawnIntervalId); bonusPointSpawnIntervalId = null;
-}
-
-function pauseAllGameIntervals() {
-    if (shootIntervalId) clearInterval(shootIntervalId); shootIntervalId = null;
-    pausePickupSpawners();
-}
-
-function resumeAllGameIntervals() {
-    if (gameRunning && !isAnyPauseActiveInternal() && !gameOver) {
-        resumePickupSpawners(); // This will check if boss is active before starting pickup spawners
-        if (!shootIntervalId && player) {
-            updateShootInterval(); // This will set up the shoot interval based on currentShootInterval
-        }
-    }
-}
-// --- (Interval/Spawning, initGame, gameLoop, updateGame, drawGame, endGameInternal, togglePauseMenuInternal, startResumeCountdownInternal - SAME AS PREVIOUS FULL FILE with the ray.js callback fix) ---
-function resumePickupSpawners() {
-    if (gameRunning && !isAnyPauseActiveInternal() && !gameOver) {
-        if (!bossManager || !bossManager.isBossSequenceActive()) {
-            if (!targetSpawnIntervalId) targetSpawnIntervalId = setInterval(spawnTarget, CONSTANTS.TARGET_SPAWN_INTERVAL_MS);
-            if (!heartSpawnIntervalId) heartSpawnIntervalId = setInterval(spawnHeart, CONSTANTS.HEART_SPAWN_INTERVAL_MS);
-            if (!bonusPointSpawnIntervalId) bonusPointSpawnIntervalId = setInterval(spawnBonusPointObject, CONSTANTS.BONUS_POINT_SPAWN_INTERVAL_MS);
-        }
-    }
-}
 
 function updateShootInterval() {
     if (!player || gameOver || isAnyPauseActiveInternal()) {
@@ -281,7 +282,7 @@ function initGame() {
     lootDrops = []; decoys = []; bossDefeatEffects = [];
     rays = [];
 
-    gameplayTimeElapsed = 0; // CRITICAL RESET
+    gameplayTimeElapsed = 0;
     shootIntervalUpdateTimer = 0;
     currentShootInterval = CONSTANTS.BASE_RAY_SHOOT_INTERVAL;
     lastSetShootInterval = CONSTANTS.BASE_RAY_SHOOT_INTERVAL;
@@ -323,7 +324,6 @@ function initGame() {
     if (pausePlayerStatsPanel) pausePlayerStatsPanel.style.display = 'none';
     const bossManagerAudioContext = { playSound, audioChaserSpawnSound, audioReflectorSpawnSound, audioSingularitySpawnSound };
     bossManager = new BossManager(CONSTANTS.BOSS_SPAWN_START_SCORE, CONSTANTS.BOSS_SPAWN_SCORE_INTERVAL, bossManagerAudioContext);
-    // No need to call bossManager.reset() here, constructor handles initial state.
 
     pauseAllGameIntervals();
     resumeAllGameIntervals();
@@ -1016,8 +1016,8 @@ function showStartScreenWithUpdatesInternal() {
     gamePausedForEvolution = false; gamePausedForFreeUpgrade = false; gamePausedForLootChoice = false;
     evolutionPendingAfterBoss = false;
     if (animationFrameId) cancelAnimationFrame(animationFrameId); animationFrameId = null;
-    pauseAllGameIntervals();
-    if (player && player.isFiringOmegaLaser) stopSound(omegaLaserSound);
+    pauseAllGameIntervals(); // Ensures all intervals are cleared
+    if (player && player.isFiringOmegaLaser) stopSound(omegaLaserSound); // Stop omega laser if active
     if (bossManager) bossManager.reset();
 
     if (pausePlayerStatsPanel) {
@@ -1079,7 +1079,7 @@ const gameContextForEventListeners = {
         startGame: initGame,
         showSettingsScreenFromStart: () => { setPreviousScreenForSettings(startScreen); currentActiveScreenElement = settingsScreen; showScreen(settingsScreen, false, gameScreenCallbacks); },
         viewDetailedHighScores: () => { currentActiveScreenElement = detailedHighScoresScreen; showDetailedHighScores(); },
-        toggleSound: () => { toggleSoundEnabled(); applyMusicPlayStateWrapper(); }, // Make sure to call applyMusicPlayState after toggle
+        toggleSound: () => { toggleSoundEnabled(); applyMusicPlayStateWrapper(); },
         updateMusicVolume, updateSfxVolume: updateSpecificSfxVolume,
         goBackFromSettings: () => { const target = getPreviousScreenForSettings() || startScreen; currentActiveScreenElement = target; showScreen(target, target === pauseScreen, gameScreenCallbacks); if (target === pauseScreen && pausePlayerStatsPanel) { prepareAndShowPauseStats("Paused - Current Status"); if (pausePlayerStatsPanel.parentElement !== document.body) document.body.appendChild(pausePlayerStatsPanel); if (uiHighScoreContainer && uiHighScoreContainer.offsetParent !== null) { const r = uiHighScoreContainer.getBoundingClientRect(); pausePlayerStatsPanel.style.top = (r.bottom + 10) + 'px';} else pausePlayerStatsPanel.style.top = '20px'; pausePlayerStatsPanel.style.display = 'block';} else if(pausePlayerStatsPanel && target !== detailedHighScoresScreen) pausePlayerStatsPanel.style.display = 'none';},
         resumeGameFromPause: togglePauseMenuInternal,
@@ -1100,5 +1100,5 @@ document.addEventListener('DOMContentLoaded', () => {
         viewHighScoresBtn.parentNode.replaceChild(newBtn, viewHighScoresBtn);
         newBtn.addEventListener('click', () => gameContextForEventListeners.callbacks.viewDetailedHighScores());
     }
-    showStartScreenWithUpdatesInternal(); // This will set currentActiveScreenElement to startScreen
+    showStartScreenWithUpdatesInternal();
 });
