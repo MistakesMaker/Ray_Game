@@ -17,7 +17,7 @@ import { checkCollision, hexToRgb, lightenColor, isLineSegmentIntersectingCircle
 import {
     playSound, stopSound,
     playerHitSound, shieldOverchargeSound, omegaLaserSound, teleportSound, empBurstSound,
-    playerWellDeploySound, playerWellDetonateSound
+    playerWellDeploySound, playerWellDetonateSound // Ensure playerWellDetonateSound is imported
 } from './audio.js';
 import { PlayerGravityWell } from './ray.js';
 
@@ -38,10 +38,10 @@ export class Player {
         this.hpRegenTimer = 0; this.baseHpRegenAmount = 1;
         this.hpRegenBonusFromEvolution = 0;
         this.acquiredBossUpgrades = [];
-        this.activeAbilities = { // Initialize with null or placeholder for predefined slots
-            '1': null, // EMP Burst
-            '2': null, // Mini Gravity Well
-            '3': null  // Teleport
+        this.activeAbilities = { 
+            '1': null, 
+            '2': null, 
+            '3': null  
         };
         this.visualModifiers = {};
         this.bleedOnHit = false; this.momentumDamageBonus = 0;
@@ -78,6 +78,7 @@ export class Player {
         this.currentSpeed = initialPlayerSpeed;
     }
 
+    // --- drawHpBar and draw methods remain unchanged from the last full version ---
     drawHpBar(ctx) {
         if (!this || typeof this.hp === 'undefined' || typeof this.maxHp === 'undefined' || typeof this.radius === 'undefined' || isNaN(this.radius)) {
             return;
@@ -223,7 +224,7 @@ export class Player {
         let abilityIndicatorAngle = -Math.PI/2 - 0.3; const angleStep = 0.3;
         for(const slot in this.activeAbilities){
             const ability=this.activeAbilities[slot];
-            if (ability) { // Only draw if ability is acquired
+            if (ability) { 
                 ctx.beginPath(); const ix=Math.cos(abilityIndicatorAngle)*(this.radius+4); const iy=Math.sin(abilityIndicatorAngle)*(this.radius+4);
                 ctx.arc(ix,iy,4,0,Math.PI*2); ctx.fillStyle=ability.cooldownTimer<=0?'#80FF80':'#FF8080'; ctx.fill();
                 ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.stroke(); abilityIndicatorAngle-=angleStep;
@@ -255,7 +256,7 @@ export class Player {
 
         let numericAbilityUIUpdateNeeded = false;
         for (const slot in this.activeAbilities) {
-            if (this.activeAbilities[slot] && this.activeAbilities[slot].cooldownTimer > 0) { 
+             if (this.activeAbilities[slot] && this.activeAbilities[slot].cooldownTimer > 0) {
                 this.activeAbilities[slot].cooldownTimer -= dt;
                 numericAbilityUIUpdateNeeded = true;
                 if (this.activeAbilities[slot].cooldownTimer <= 0) {
@@ -288,7 +289,7 @@ export class Player {
         if (this.hasOmegaLaser) {
             if (this.isFiringOmegaLaser) {
                 this.currentSpeed = this.originalPlayerSpeed / 2;
-                this.omegaLaserAngle = Math.atan2(mouseY - this.y, mouseX - this.x); // Continuous aiming
+                this.omegaLaserAngle = Math.atan2(mouseY - this.y, mouseX - this.x);
 
                 this.omegaLaserTimer -= dt;
                 this.omegaLaserCurrentTickTimer -= dt;
@@ -317,9 +318,9 @@ export class Player {
         }
         
         const forceUIUpdate = gameContext && gameContext.forceAbilityUIUpdate;
-        if (numericAbilityUIUpdateNeeded || mouseAbilityUIUpdateNeeded || forceUIUpdate) { 
+        if (numericAbilityUIUpdateNeeded || mouseAbilityUIUpdateNeeded || forceUIUpdate) {
             if (updateAbilityCooldownCallback) updateAbilityCooldownCallback(this);
-            if(forceUIUpdate && gameContext) gameContext.forceAbilityUIUpdate = false; 
+            if(forceUIUpdate && gameContext) gameContext.forceAbilityUIUpdate = false;
         }
 
 
@@ -365,7 +366,7 @@ export class Player {
         this.x = Math.max(this.radius, Math.min(this.x, canvasWidth - this.radius));
         this.y = Math.max(this.radius, Math.min(this.y, canvasHeight - this.radius));
 
-        if (!this.isFiringOmegaLaser) { 
+        if (!this.isFiringOmegaLaser) {
             this.aimAngle = Math.atan2(mouseY - this.y, mouseX - this.x);
         }
 
@@ -384,37 +385,38 @@ export class Player {
         const postDamageTimerFromCtx = gameContext.postDamageImmunityTimer || 0;
 
         if (this.isShieldOvercharging) {
-            if (hittingRay) { 
+            if (hittingRay) {
                 const isOwnFreshRay = !hittingRay.isBossProjectile &&
                                     !hittingRay.isCorruptedByGravityWell &&
                                     !hittingRay.isCorruptedByPlayerWell &&
-                                    hittingRay.spawnGraceTimer > (RAY_SPAWN_GRACE_PERIOD - 100); 
+                                    hittingRay.spawnGraceTimer > (RAY_SPAWN_GRACE_PERIOD - 100);
 
-                if (!isOwnFreshRay) { 
-                    hittingRay.isActive = false; 
+                if (!isOwnFreshRay) {
+                    hittingRay.isActive = false;
                     this.gainHealth(SHIELD_OVERCHARGE_HEAL_PER_RAY, gameContext.updateHealthDisplayCallback);
                 } else {
                     hittingRay.isActive = false;
                 }
             }
-            return 0; 
+            return 0;
         }
 
         if (postPopupTimerFromCtx > 0 || postDamageTimerFromCtx > 0 || (this.teleporting && this.teleportEffectTimer > 0)) {
             if (hittingRay && !hittingRay.isBossProjectile && !hittingRay.isCorruptedByGravityWell && !hittingRay.isCorruptedByPlayerWell) {
                 hittingRay.isActive = false;
             }
-            return 0; 
+            return 0;
         }
 
 
         this.timesHit++;
         this.timeSinceLastHit = 0; this.hpRegenTimer = 0;
-        
-        let damageToTake = RAY_DAMAGE_TO_PLAYER; 
-        if (hittingRay && typeof hittingRay.damageValue === 'number') { 
+
+        let damageToTake = RAY_DAMAGE_TO_PLAYER;
+        if (hittingRay && typeof hittingRay.damageValue === 'number') {
             damageToTake = hittingRay.damageValue;
-        } else if (!hittingRay) { 
+        } else if (!hittingRay) {
+            // Default damage applies if not a ray or ray has no specific damageValue
         }
 
 
@@ -438,7 +440,7 @@ export class Player {
                 const impactAngle = Math.atan2(hittingRay.dy, hittingRay.dx);
                 screenShakeParams.hitShakeDx = -Math.cos(impactAngle);
                 screenShakeParams.hitShakeDy = -Math.sin(impactAngle);
-            } else { 
+            } else {
                 screenShakeParams.hitShakeDx = (Math.random() - 0.5) * 2;
                 screenShakeParams.hitShakeDy = (Math.random() - 0.5) * 2;
                 const mag = Math.sqrt(screenShakeParams.hitShakeDx**2 + screenShakeParams.hitShakeDy**2);
@@ -451,7 +453,7 @@ export class Player {
         if (this.hp <= 0) {
             if (gameContext.endGameCallback) gameContext.endGameCallback();
         }
-        return damageToTake; 
+        return damageToTake;
     }
 
     gainHealth(amount, updateHealthDisplayCallback) {
@@ -467,26 +469,54 @@ export class Player {
         if (isAnyPauseActiveCallback && isAnyPauseActiveCallback()) return;
 
         const slotStr = String(slot);
-        const ability = this.activeAbilities[slotStr]; 
+        const ability = this.activeAbilities[slotStr];
 
-        if (ability && ability.cooldownTimer <= 0) { 
-            if (ability.id === 'miniGravityWell') {
+        if (!ability) return; 
+
+        if (ability.id === 'miniGravityWell') {
+            if (this.activeMiniWell && this.activeMiniWell.isActive) {
+                this.activeMiniWell.detonate({ targetX: mouseX, targetY: mouseY, player: this });
+                // The PlayerGravityWell's detonate method sets this.activeMiniWell = null on the player
+                ability.cooldownTimer = ability.cooldownDuration;
+                ability.justBecameReady = false;
+            } else if (ability.cooldownTimer <= 0) {
+                // Deploy new well
                 this.deployMiniGravityWell(ability.duration, decoysArray, mouseX, mouseY);
-                // Cooldown should be set after successful use
-                // Assuming deployMiniGravityWell always "succeeds" for now in terms of starting cooldown
-                ability.cooldownTimer = ability.cooldownDuration;
-                ability.justBecameReady = false;
-            } else { 
-                switch (ability.id) {
-                    case 'teleport': this.doTeleport(bossDefeatEffectsArray, mouseX, mouseY, canvasWidth, canvasHeight); break;
-                    case 'empBurst': this.triggerEmpBurst(bossDefeatEffectsArray, allRays, screenShakeParams, canvasWidth, canvasHeight); break;
+                if (this.activeMiniWell) { // Successfully deployed
+                    ability.cooldownTimer = ability.cooldownDuration;
+                    ability.justBecameReady = false;
                 }
-                ability.cooldownTimer = ability.cooldownDuration;
-                ability.justBecameReady = false;
             }
-            if (updateAbilityCooldownCallback) updateAbilityCooldownCallback(this);
+        } else if (ability.cooldownTimer <= 0) { // For other abilities (Teleport, EMP)
+            switch (ability.id) {
+                case 'teleport':
+                    this.doTeleport(bossDefeatEffectsArray, mouseX, mouseY, canvasWidth, canvasHeight);
+                    ability.cooldownTimer = ability.cooldownDuration;
+                    ability.justBecameReady = false;
+                    break;
+                case 'empBurst':
+                    this.triggerEmpBurst(bossDefeatEffectsArray, allRays, screenShakeParams, canvasWidth, canvasHeight);
+                    ability.cooldownTimer = ability.cooldownDuration;
+                    ability.justBecameReady = false;
+                    break;
+            }
         }
+
+        if (updateAbilityCooldownCallback) updateAbilityCooldownCallback(this);
     }
+
+    deployMiniGravityWell(duration, decoysArray, mouseX, mouseY) {
+        // This method is now ONLY for DEPLOYING a NEW well if one isn't active.
+        if (this.activeMiniWell && this.activeMiniWell.isActive) {
+            // This log helps catch if logic flow is wrong. activateAbility should handle detonation.
+            console.warn("deployMiniGravityWell called while a well is already active.");
+            return; 
+        }
+        this.activeMiniWell = new PlayerGravityWell(mouseX, mouseY, duration);
+        if (decoysArray) decoysArray.push(this.activeMiniWell);
+        playSound(playerWellDeploySound);
+    }
+
 
     doTeleport(bossDefeatEffectsArray, mouseX, mouseY, canvasWidth, canvasHeight) {
         if (this.teleporting && this.teleportEffectTimer > 0) return;
@@ -522,18 +552,6 @@ export class Player {
             screenShakeParams.hitShakeDx = 0; screenShakeParams.hitShakeDy = 0;
         }
         playSound(empBurstSound);
-    }
-
-    deployMiniGravityWell(duration, decoysArray, mouseX, mouseY) {
-        if (this.activeMiniWell && this.activeMiniWell.isActive) {
-             this.activeMiniWell.detonate({ targetX: mouseX, targetY: mouseY, player: this });
-             // The ability in activeAbilities['2'] will have its cooldown set by activateAbility
-        } else {
-            this.activeMiniWell = new PlayerGravityWell(mouseX, mouseY, duration);
-            if (decoysArray) decoysArray.push(this.activeMiniWell);
-            playSound(playerWellDeploySound);
-            // The ability in activeAbilities['2'] will have its cooldown set by activateAbility
-        }
     }
 
     activateShieldOvercharge(activeBuffNotificationsArray) {
