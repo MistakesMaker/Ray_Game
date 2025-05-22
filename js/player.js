@@ -38,10 +38,10 @@ export class Player {
         this.hpRegenTimer = 0; this.baseHpRegenAmount = 1;
         this.hpRegenBonusFromEvolution = 0;
         this.acquiredBossUpgrades = [];
-        this.activeAbilities = { 
-            '1': null, 
-            '2': null, 
-            '3': null  
+        this.activeAbilities = {
+            '1': null,
+            '2': null,
+            '3': null
         };
         this.visualModifiers = {};
         this.bleedOnHit = false; this.momentumDamageBonus = 0;
@@ -124,29 +124,29 @@ export class Player {
             let shieldRadius = this.radius + 5;
             let shieldAlpha = 0.3;
             let shieldLineWidth = 3;
-            let shieldColor = `rgba(150,150,255,${shieldAlpha})`; 
+            let shieldColor = `rgba(150,150,255,${shieldAlpha})`;
 
             if (this.isShieldOvercharging) {
-                shieldRadius = this.radius + 8; 
-                shieldAlpha = 0.6 + Math.abs(Math.sin(now / 80)) * 0.3; 
-                shieldLineWidth = 5; 
+                shieldRadius = this.radius + 8;
+                shieldAlpha = 0.6 + Math.abs(Math.sin(now / 80)) * 0.3;
+                shieldLineWidth = 5;
                 const r = 180 + Math.floor(Math.sin(now / 100) * 50);
                 const g = 180 + Math.floor(Math.sin(now / 120) * 50);
                 const b = 255;
                 shieldColor = `rgba(${r},${g},${b},${shieldAlpha})`;
 
                 ctx.save();
-                ctx.globalAlpha = shieldAlpha * 0.5; 
+                ctx.globalAlpha = shieldAlpha * 0.5;
                 const innerGlowRadius = this.radius + 2;
                 const innerGradient = ctx.createRadialGradient(0,0, 0, 0,0, innerGlowRadius);
                 innerGradient.addColorStop(0, `rgba(${r},${g},${b}, 0.6)`);
-                innerGradient.addColorStop(1, `rgba(${r},${g},${b}, 0)`); 
+                innerGradient.addColorStop(1, `rgba(${r},${g},${b}, 0)`);
                 ctx.fillStyle = innerGradient;
                 ctx.arc(0,0, innerGlowRadius, 0, Math.PI*2);
                 ctx.fill();
                 ctx.restore();
 
-            } else { 
+            } else {
                 shieldAlpha = Math.max(
                     (postPopupTimerFromCtx / POST_POPUP_IMMUNITY_DURATION) * 0.4,
                     (postDamageTimerFromCtx / POST_DAMAGE_IMMUNITY_DURATION) * 0.6
@@ -224,7 +224,7 @@ export class Player {
         let abilityIndicatorAngle = -Math.PI/2 - 0.3; const angleStep = 0.3;
         for(const slot in this.activeAbilities){
             const ability=this.activeAbilities[slot];
-            if (ability) { 
+            if (ability) {
                 ctx.beginPath(); const ix=Math.cos(abilityIndicatorAngle)*(this.radius+4); const iy=Math.sin(abilityIndicatorAngle)*(this.radius+4);
                 ctx.arc(ix,iy,4,0,Math.PI*2); ctx.fillStyle=ability.cooldownTimer<=0?'#80FF80':'#FF8080'; ctx.fill();
                 ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.stroke(); abilityIndicatorAngle-=angleStep;
@@ -316,7 +316,7 @@ export class Player {
                 }
             }
         }
-        
+
         const forceUIUpdate = gameContext && gameContext.forceAbilityUIUpdate;
         if (numericAbilityUIUpdateNeeded || mouseAbilityUIUpdateNeeded || forceUIUpdate) {
             if (updateAbilityCooldownCallback) updateAbilityCooldownCallback(this);
@@ -371,7 +371,9 @@ export class Player {
         }
 
         this.timeSinceLastHit += dt;
-        if (this.hp > 0 && this.hp < this.maxHp && this.timeSinceLastHit >= HP_REGEN_NO_DAMAGE_THRESHOLD) {
+        // MODIFIED HP REGENERATION LOGIC:
+        // The condition "&& this.timeSinceLastHit >= HP_REGEN_NO_DAMAGE_THRESHOLD" has been removed.
+        if (this.hp > 0 && this.hp < this.maxHp) {
             this.hpRegenTimer += dt;
             if (this.hpRegenTimer >= HP_REGEN_INTERVAL) {
                 this.hpRegenTimer -= HP_REGEN_INTERVAL;
@@ -410,7 +412,8 @@ export class Player {
 
 
         this.timesHit++;
-        this.timeSinceLastHit = 0; this.hpRegenTimer = 0;
+        this.timeSinceLastHit = 0; // This is still useful for other mechanics or stats if needed
+        // this.hpRegenTimer = 0; // Resetting regen timer on hit might still be desired by some, but not for continuous regen. Kept for now.
 
         let damageToTake = RAY_DAMAGE_TO_PLAYER;
         if (hittingRay && typeof hittingRay.damageValue === 'number') {
@@ -471,7 +474,7 @@ export class Player {
         const slotStr = String(slot);
         const ability = this.activeAbilities[slotStr];
 
-        if (!ability) return; 
+        if (!ability) return;
 
         if (ability.id === 'miniGravityWell') {
             if (this.activeMiniWell && this.activeMiniWell.isActive) {
@@ -510,7 +513,7 @@ export class Player {
         if (this.activeMiniWell && this.activeMiniWell.isActive) {
             // This log helps catch if logic flow is wrong. activateAbility should handle detonation.
             console.warn("deployMiniGravityWell called while a well is already active.");
-            return; 
+            return;
         }
         this.activeMiniWell = new PlayerGravityWell(mouseX, mouseY, duration);
         if (decoysArray) decoysArray.push(this.activeMiniWell);
@@ -539,7 +542,7 @@ export class Player {
         if (allRays) {
             for (let i = allRays.length - 1; i >= 0; i--) {
                 const ray = allRays[i];
-                if (ray && !ray.isGravityWellRay) { 
+                if (ray && !ray.isGravityWellRay) {
                     ray.isActive = false;
                 }
             }
@@ -548,7 +551,7 @@ export class Player {
             screenShakeParams.isScreenShaking = true;
             screenShakeParams.screenShakeTimer = 400;
             screenShakeParams.currentShakeMagnitude = 8;
-            screenShakeParams.currentShakeType = 'playerHit'; 
+            screenShakeParams.currentShakeType = 'playerHit';
             screenShakeParams.hitShakeDx = 0; screenShakeParams.hitShakeDy = 0;
         }
         playSound(empBurstSound);
@@ -557,7 +560,7 @@ export class Player {
     activateShieldOvercharge(activeBuffNotificationsArray) {
         if (this.hasShieldOvercharge && !this.isShieldOvercharging && this.shieldOverchargeCooldownTimer <= 0) {
             this.isShieldOvercharging = true;
-            this.shieldOverchargeTimer = SHIELD_OVERCHARGE_DURATION; 
+            this.shieldOverchargeTimer = SHIELD_OVERCHARGE_DURATION;
             this.shieldOverchargeCooldownTimer = this.shieldOverchargeCooldown;
             playSound(shieldOverchargeSound);
             if(activeBuffNotificationsArray) activeBuffNotificationsArray.push({ text: `Shield Overcharge Active! Healing!`, timer: SHIELD_OVERCHARGE_DURATION });
@@ -569,9 +572,9 @@ export class Player {
             this.isFiringOmegaLaser = true;
             this.omegaLaserTimer = this.omegaLaserDuration;
             this.omegaLaserCooldownTimer = this.omegaLaserCooldown;
-            this.omegaLaserCurrentTickTimer = 0; 
-            this.omegaLaserAngle = this.aimAngle; 
-            playSound(omegaLaserSound, true); 
+            this.omegaLaserCurrentTickTimer = 0;
+            this.omegaLaserAngle = this.aimAngle;
+            playSound(omegaLaserSound, true);
             if(activeBuffNotificationsArray) activeBuffNotificationsArray.push({ text: `Omega Laser Firing!`, timer: this.omegaLaserDuration });
         }
     }
@@ -586,9 +589,9 @@ export class Player {
             for (let i = targetsArray.length - 1; i >= 0; i--) {
                 const target = targetsArray[i];
                 if (target && isLineSegmentIntersectingCircle(beamStartX, beamStartY, beamEndX, beamEndY, target.x, target.y, target.radius + this.omegaLaserWidth / 2)) {
-                    targetsArray.splice(i, 1); 
-                    this.totalDamageDealt += 10; 
-                    if (laserDamageContext && laserDamageContext.updateScoreCallback) laserDamageContext.updateScoreCallback(10); 
+                    targetsArray.splice(i, 1);
+                    this.totalDamageDealt += 10;
+                    if (laserDamageContext && laserDamageContext.updateScoreCallback) laserDamageContext.updateScoreCallback(10);
                 }
             }
         }
