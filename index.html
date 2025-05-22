@@ -173,6 +173,11 @@
         .ability-slot.on-cooldown .cooldown-timer, .ability-slot.charging .cooldown-timer { opacity: 1; }
         .ability-slot .ability-name { display: none; }
 
+        /* MODIFIED: Added margin-left to create a gap before the numeric abilities */
+        #abilityCooldownUI > .ability-slot:nth-child(3) {
+            margin-left: 25px; /* Adds 25px to the existing 15px flex-gap for a total of 40px */
+        }
+
         #evolutionTooltip { display: none; position: absolute; background-color: rgba(20, 20, 50, 0.9); color: #ddeeff; border: 1px solid #55aaff; border-radius: 5px; padding: 8px 12px; font-size: 13px; max-width: 250px; text-align: left; pointer-events: none; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
 
         #pausePlayerStatsPanel {
@@ -389,4 +394,3 @@
 <script type="module" src="js/main.js"></script>
 </body>
 </html>
-<!-- -->
