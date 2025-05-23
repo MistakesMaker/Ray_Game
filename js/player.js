@@ -39,24 +39,30 @@ export class Player {
         this.evolutionIntervalModifier = 1.0; this.rayDamageBonus = 0;
         this.hasTargetPierce = false; this.chainReactionChance = 0.0;
         this.scatterShotLevel = 0; this.ownRaySpeedMultiplier = 1.0;
-        this.damageReductionFactor = 0.0; this.hpPickupBonus = 0;
+        
+        // ---- MODIFICATION for Reinforced Hull ----
+        // this.damageReductionFactor = 0.0; // Old property, can be removed or kept if other systems use it
+        this.damageTakenMultiplier = 1.0; // New: Player takes 100% of damage initially
+        // ---- END MODIFICATION ----
+
+        this.hpPickupBonus = 0;
         this.abilityDamageMultiplier = 1.0;
         this.temporalEchoChance = 0.0;
         this.temporalEchoFixedReduction = 2000;
 
         // Kinetic Conversion Properties
-        this.kineticCharge = 0;                            // Current charge (0-100)
-        this.baseKineticChargeRate = 1;                    // Base charge rate if evo is not taken (or level 0)
-        this.kineticChargeRatePerLevel = 0.25;             // Additional charge rate per level of Kinetic Conversion evo
-        this.kineticDecayRate = 2.0;                       // Units per second when not moving fast
-        this.kineticChargeSpeedThresholdFactor = 0.70;     // Player must be moving at this factor of currentSpeed
-        this.kineticConversionLevel = 0;                   // How many times Kinetic Conversion evo has been picked
-        this.initialKineticDamageBonus = 0.30;             // Damage bonus from the first pick (30%) at full charge
-        this.additionalKineticDamageBonusPerLevel = 0.20;  // Additional bonus per pick AFTER the first (20%) at full charge
-        this.kineticChargeConsumption = 100;               // Consume up to this much charge for max effect
+        this.kineticCharge = 0;                            
+        this.baseKineticChargeRate = 1.0; // You changed this from 0.25              
+        this.kineticChargeRatePerLevel = 0.25;            
+        this.kineticDecayRate = 2.0;                       
+        this.kineticChargeSpeedThresholdFactor = 0.70;     
+        this.kineticConversionLevel = 0;                   
+        this.initialKineticDamageBonus = 0.30;             
+        this.additionalKineticDamageBonusPerLevel = 0.20;  
+        this.kineticChargeConsumption = 100;               
 
-        this.currentOmegaLaserKineticBoost = 1.0;    // Temp boost for current Omega Laser firing
-        this.currentGravityWellKineticBoost = 1.0; // Temp boost for next Gravity Well launch
+        this.currentOmegaLaserKineticBoost = 1.0;    
+        this.currentGravityWellKineticBoost = 1.0; 
 
 
         this.timeSinceLastHit = Number.MAX_SAFE_INTEGER;
@@ -70,7 +76,7 @@ export class Player {
         };
         this.visualModifiers = {};
         this.bleedOnHit = false; this.momentumDamageBonus = 0;
-        this.bossDamageReduction = 0;
+        this.bossDamageReduction = 0.0; // Ensure this is initialized (was in your code, just confirming)
         this.teleporting = false; this.teleportEffectTimer = 0;
         this.activeMiniWell = null;
         this.phaseStabilizerAnimTimer = Math.random() * 5000;
@@ -103,6 +109,7 @@ export class Player {
         this.currentSpeed = initialPlayerSpeed;
     }
 
+    // ... (drawHpBar and draw methods remain the same) ...
     drawHpBar(ctx) {
         if (!this || typeof this.hp === 'undefined' || typeof this.maxHp === 'undefined' || typeof this.radius === 'undefined' || isNaN(this.radius)) {
             return;
@@ -264,7 +271,7 @@ export class Player {
 
         ctx.restore();
     }
-
+    
     update(gameContext) {
         const { dt, keys, mouseX, mouseY, canvasWidth, canvasHeight, targets, activeBosses,
                 currentGrowthFactor, 
@@ -397,11 +404,8 @@ export class Player {
             if (this.kineticConversionLevel > 0) {
                 maxPotencyAtFullCharge = this.initialKineticDamageBonus + (Math.max(0, this.kineticConversionLevel - 1) * this.additionalKineticDamageBonusPerLevel);
             }
-            // ---- START OF FIX ----
-            // Add a log here to confirm this specific call from player.update
             // console.log(`[Debug PLAYER_UPDATE_KINETIC_UI] Calling updateKineticChargeUI. Player Level: ${this.kineticConversionLevel}, Visible Arg: ${this.kineticConversionLevel > 0}`);
             ui.updateKineticChargeUI(this.kineticCharge, this.kineticChargeConsumption, maxPotencyAtFullCharge, this.kineticConversionLevel > 0);
-            // ---- END OF FIX ----
         }
 
 
@@ -485,11 +489,17 @@ export class Player {
         } else if (!hittingRay) {
         }
 
+        // ---- MODIFICATION for Reinforced Hull ----
+        // Apply general damage multiplier first
+        damageToTake *= this.damageTakenMultiplier;
 
-        if (this.damageReductionFactor > 0) damageToTake *= (1 - this.damageReductionFactor);
+        // Then apply specific boss damage reduction if applicable (e.g. from Ablative Sublayer gear)
+        // This ensures the gear stacks multiplicatively with the general reduction.
         if (hittingRay && hittingRay.isBossProjectile && this.visualModifiers.ablativeSublayer) {
             damageToTake *= (1 - (this.bossDamageReduction || 0));
         }
+        // ---- END MODIFICATION ----
+
         damageToTake = Math.max(1, Math.round(damageToTake));
 
         this.hp -= damageToTake;
@@ -529,16 +539,16 @@ export class Player {
 
     consumeKineticChargeForDamageBoost() {
         if (this.kineticCharge <= 0 || this.kineticConversionLevel <= 0) {
-            return 1.0; // No boost if no charge or no levels in the evolution
+            return 1.0; 
         }
 
         let chargeToConsume = Math.min(this.kineticCharge, this.kineticChargeConsumption);
-        let effectScale = chargeToConsume / this.kineticChargeConsumption; // Proportional effect based on charge spent
+        let effectScale = chargeToConsume / this.kineticChargeConsumption; 
 
         let maxPossiblePotencyBonus;
         if (this.kineticConversionLevel === 1) {
             maxPossiblePotencyBonus = this.initialKineticDamageBonus;
-        } else { // For levels > 1
+        } else { 
             maxPossiblePotencyBonus = this.initialKineticDamageBonus +
                                       ((this.kineticConversionLevel - 1) * this.additionalKineticDamageBonusPerLevel);
         }

@@ -111,8 +111,8 @@ export const BOSS_HEALTH_BAR_COLOR_BG = '#555';
 export const BOSS_HEALTH_BAR_COLOR_FG = '#FF0000';
 export const BOSS_HEALTH_BAR_OFFSET_Y = 30;
 export const BOSS_WARNING_DURATION = 2500;
-export const BOSS_SPAWN_START_SCORE = 300; // Added from main.js context
-export const BOSS_SPAWN_SCORE_INTERVAL = 300; // Added from main.js context
+export const BOSS_SPAWN_START_SCORE = 300; 
+export const BOSS_SPAWN_SCORE_INTERVAL = 300; 
 export const MAX_TOTAL_ACTIVE_RAYS_BEFORE_BOSS_THROTTLE = 75;
 export const MAX_BOSSES_IN_WAVE_CAP = 1000; 
 
@@ -128,8 +128,9 @@ export const MAX_CHAIN_REACTION_CHANCE = 0.25;
 export const CHAIN_REACTION_RADIUS = 80;
 export const CHAIN_REACTION_EXPLOSION_DURATION = 300;
 export const CHAIN_REACTION_EXPLOSION_COLOR = 'rgba(255, 165, 0, opacity)';
-export const MAX_DAMAGE_REDUCTION = 0.4;
-export const DAMAGE_REDUCTION_PER_LEVEL = 0.10;
+// export const MAX_DAMAGE_REDUCTION = 0.4; // Old constant, can be removed if not used elsewhere
+// export const DAMAGE_REDUCTION_PER_LEVEL = 0.10; // Old constant
+export const REINFORCED_HULL_EFFECTIVENESS_PER_LEVEL = 0.10; // New constant for 10% effectiveness per level
 export const MAX_HP_PICKUP_BONUS = 15;
 export const HP_PICKUP_BONUS_PER_LEVEL = 10;
 export const MAX_HP_REGEN_BONUS_EVOLUTION = 2;
@@ -147,7 +148,7 @@ export const OMEGA_LASER_RANGE = 2000;
 export const OMEGA_LASER_WIDTH = 15;
 export const SHIELD_OVERCHARGE_DURATION = 5000;
 export const SHIELD_OVERCHARGE_COOLDOWN = 25000;
-export const SHIELD_OVERCHARGE_HEAL_PER_RAY = 2; // NEW - Health gained per ray
+export const SHIELD_OVERCHARGE_HEAL_PER_RAY = 2; 
 
 // Misc
 export const INITIAL_RAY_POOL_SIZE = 300;

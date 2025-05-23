@@ -15,14 +15,14 @@ import {
     reflectorSpawnSound as audioReflectorSpawnSound,
     singularitySpawnSound as audioSingularitySpawnSound,
 } from './audio.js';
-import { // Importing specific functions from ui.js
+import { 
     canvas as gameCanvasElement,
     scoreDisplayElem, healthDisplayElem, highScoreListDisplay, startScreenHighScoresDiv,
     startScreen, settingsScreen, gameOverScreen, evolutionScreen, evolutionOptionsContainer,
     freeUpgradeScreen, freeUpgradeOptionContainer, closeFreeUpgradeButton,
     lootChoiceScreen, lootOptionsContainer, abilityCooldownUI, evolutionTooltip,
     countdownOverlay, pauseScreen, pausePlayerStatsPanel,
-    detailedHighScoresScreen, kineticChargeUIElement, // Added kineticChargeUIElement for initGame check
+    detailedHighScoresScreen, kineticChargeUIElement, 
     updateScoreDisplay, updateHealthDisplay as uiUpdateHealthDisplay,
     updateBuffIndicator as uiUpdateBuffIndicator,
     updateSurvivalBonusIndicator as uiUpdateSurvivalBonusIndicator,
@@ -186,7 +186,32 @@ function initEvolutionChoicesInternal() {
             },
             getEffectString: function() { return `Effective size reduced (this cycle)!`; }
         },
-        {id:'reinforcedHull', classType: 'tank', text:"Reinforced Hull", level:0, maxLevel:Math.round(CONSTANTS.MAX_DAMAGE_REDUCTION/CONSTANTS.DAMAGE_REDUCTION_PER_LEVEL), detailedDescription: `Reduces all incoming damage by ${CONSTANTS.DAMAGE_REDUCTION_PER_LEVEL*100}% per level. Max ${CONSTANTS.MAX_DAMAGE_REDUCTION*100}%.`, isMaxed:function(p){return p && p.damageReductionFactor >= CONSTANTS.MAX_DAMAGE_REDUCTION || this.level >= this.maxLevel;}, apply:function(){if(!player) return""; player.damageReductionFactor = Math.min(CONSTANTS.MAX_DAMAGE_REDUCTION, player.damageReductionFactor + CONSTANTS.DAMAGE_REDUCTION_PER_LEVEL); this.level++; return `Damage reduction now ${Math.round(player.damageReductionFactor * 100)}%!`;}, getEffectString: function() { return `${Math.round((player?player.damageReductionFactor:0) * 100)}% Dmg Reduction`;}},
+        // ---- START OF MODIFICATION for Reinforced Hull ----
+        {
+            id:'reinforcedHull', 
+            classType: 'tank', 
+            text:"Reinforced Hull", 
+            level:0, 
+            maxLevel: 999, // Effectively infinite, can always be taken
+            detailedDescription: `Each level reduces damage taken by a further ${CONSTANTS.REINFORCED_HULL_EFFECTIVENESS_PER_LEVEL*100}%. Diminishing returns apply.`, 
+            isMaxed: function(p){ // Practically, it never "maxes" in terms of blocking selection
+                return p && p.damageTakenMultiplier < 0.01; // Arbitrary small number if you want a "soft max" display
+            }, 
+            apply:function(){
+                if(!player) return ""; 
+                player.damageTakenMultiplier *= (1 - CONSTANTS.REINFORCED_HULL_EFFECTIVENESS_PER_LEVEL);
+                // Ensure it doesn't go below a very small number to avoid zero or negative multipliers
+                player.damageTakenMultiplier = Math.max(0.001, player.damageTakenMultiplier); 
+                this.level++; 
+                const currentReductionPercent = (1 - player.damageTakenMultiplier) * 100;
+                return `Total damage reduction now ${currentReductionPercent.toFixed(1)}%!`;
+            }, 
+            getEffectString: function() { 
+                const reductionPercent = player ? (1 - player.damageTakenMultiplier) * 100 : 0;
+                return `${reductionPercent.toFixed(1)}% Dmg Reduction`;
+            }
+        },
+        // ---- END OF MODIFICATION for Reinforced Hull ----
         {id:'vitalitySurge', classType: 'tank', text:"Vitality Surge", level:0, maxLevel: 999, detailedDescription: `Increases passive health regeneration by ${CONSTANTS.HP_REGEN_BONUS_PER_LEVEL_EVOLUTION} HP per tick.`, isMaxed:function(p){return false;}, apply:function(){if(!player) return""; player.hpRegenBonusFromEvolution += CONSTANTS.HP_REGEN_BONUS_PER_LEVEL_EVOLUTION; this.level++; return `Passive HP regen now +${player.hpRegenBonusFromEvolution} HP per tick!`;}, getEffectString: function() { return `+${player?player.hpRegenBonusFromEvolution:0} HP/tick Regen`;}},
         {
             id: 'kineticConversion',
@@ -210,10 +235,10 @@ function initEvolutionChoicesInternal() {
                 }
 
                 if (kineticChargeUIElement) { 
-                    console.log("[Debug KINETIC_EVO_APPLY] APPLYING Kinetic Conversion. Player Level:", player.kineticConversionLevel, "Calling updateKineticChargeUI.");
+                    // console.log("[Debug KINETIC_EVO_APPLY] APPLYING Kinetic Conversion. Player Level:", player.kineticConversionLevel, "Calling updateKineticChargeUI.");
                     updateKineticChargeUI(player.kineticCharge, player.kineticChargeConsumption, maxPotencyBonusAtFullCharge, true);
                 } else {
-                    console.warn("[Debug KINETIC_EVO_APPLY] kineticChargeUIElement is NULL. Cannot update UI from apply method.");
+                    // console.warn("[Debug KINETIC_EVO_APPLY] kineticChargeUIElement is NULL. Cannot update UI from apply method.");
                 }
                 
                 const currentMaxPotencyBonusForReturnString = player.initialKineticDamageBonus + (Math.max(0, player.kineticConversionLevel - 1) * player.additionalKineticDamageBonusPerLevel);
@@ -230,29 +255,26 @@ function initEvolutionChoicesInternal() {
                 return `Max Dmg: +${(maxPotencyBonus * 100).toFixed(0)}%, Rate: ${chargeRate.toFixed(2)}/s`;
             }
         },
-        // ---- START OF MODIFICATION for System Overcharge ----
         {
             id:'systemOvercharge', 
             classType: 'utility', 
             text:"System Overcharge", 
             level:0, 
-            maxLevel: 1, // Can only be taken once
+            maxLevel: 1, 
             detailedDescription: "Reduces the score needed between evolutions by a massive 30% (one-time upgrade).", 
-            isMaxed: function(p){ // Check if player already has it or if this.level (from the choice object) is >= 1
+            isMaxed: function(p){ 
                 return (p && p.evolutionIntervalModifier <= 0.70) || this.level >= this.maxLevel;
             }, 
             apply: function(){
                 if(!player) return""; 
-                player.evolutionIntervalModifier = 0.70; // Directly set to 30% reduction
-                this.level++; // Mark this choice as taken
+                player.evolutionIntervalModifier = 0.70; 
+                this.level++; 
                 return `Evolution interval permanently reduced by 30%! (Now 70%)`;
             }, 
             getEffectString: function() { 
-                // If the player object exists and has the modifier, show 70%, otherwise assume 100%
                 return `Evo Interval: ${ (player && player.evolutionIntervalModifier <= 0.70) ? '70%' : '100%' }`;
             }
         },
-        // ---- END OF MODIFICATION for System Overcharge ----
         {
             id: 'temporalEcho',
             classType: 'utility',
@@ -1192,18 +1214,29 @@ function getFormattedMouseAbilitiesForStats(p) { if(!p) return []; let abs = [];
 function prepareDisplayedUpgradesForStats(p) {
     if (!p) return []; let list = [];
     evolutionChoices.forEach(e => {
-        let currentEvoLevel = e.level || 0; // Use the level from the static evolutionChoices array
-        if (e.id === 'kineticConversion' && p.kineticConversionLevelSnapshot !== undefined) { // For saved high scores
+        let currentEvoLevel = e.level || 0; 
+        if (e.id === 'kineticConversion' && p.kineticConversionLevelSnapshot !== undefined) { 
             currentEvoLevel = p.kineticConversionLevelSnapshot;
-        } else if (e.id === 'kineticConversion' && player) { // For live game, use player's tracked level
+        } else if (e.id === 'kineticConversion' && player) { 
             currentEvoLevel = player.kineticConversionLevel;
         }
+         // For Reinforced Hull, we use player.damageTakenMultiplier to derive the displayed value
+        if (e.id === 'reinforcedHull' && player) {
+            // The 'level' on reinforcedHull choice object still tracks how many times it's taken.
+            // But the description will be based on player.damageTakenMultiplier.
+             if (player.damageTakenMultiplier < 1.0) { // Only list if some reduction is active
+                currentEvoLevel = e.level; // Or however you want to represent "levels taken"
+             } else {
+                currentEvoLevel = 0; // Don't display if no reduction yet
+             }
+        }
+
 
         if (currentEvoLevel > 0) {
             let desc = "";
             if (e.id === 'colorImmunity') desc = `${p.immuneColorsList.length} colors`;
             else if (e.id === 'smallerPlayer') desc = `Lvl ${currentEvoLevel} (Effective Size)`;
-            else if (e.id === 'reinforcedHull') desc = `${Math.round(p.damageReductionFactor * 100)}%`;
+            else if (e.id === 'reinforcedHull') desc = `${((1 - p.damageTakenMultiplier) * 100).toFixed(1)}%`; // Display based on multiplier
             else if (e.id === 'vitalitySurge') desc = `+${p.hpRegenBonusFromEvolution} HP/tick`;
             else if (e.id === 'kineticConversion') {
                 const maxPotency = p.initialKineticDamageBonus + (Math.max(0,currentEvoLevel - 1) * p.additionalKineticDamageBonusPerLevel);
@@ -1218,10 +1251,10 @@ function prepareDisplayedUpgradesForStats(p) {
             else if (e.id === 'maxHpIncrease') desc = `+${currentEvoLevel * 10} Max HP`;
             else if (e.id === 'abilityCooldownReduction') desc = `Applied ${currentEvoLevel}x`;
             else if (e.getEffectString) {
-                 const originalLevel = e.level; // Backup level on choice object
-                 e.level = currentEvoLevel;    // Temporarily set for getEffectString if it uses this.level
+                 const originalLevel = e.level; 
+                 e.level = currentEvoLevel;    
                  desc = e.getEffectString();
-                 e.level = originalLevel;      // Restore
+                 e.level = originalLevel;      
             }
             if (desc) list.push({ name: e.text.replace(/\s\(Lvl.*/, ''), description: desc });
         }
