@@ -216,10 +216,10 @@ export function updateAbilityCooldownUI(playerInstance) {
 console.log("[Debug UI_JS_FUNC_DEF] Defining updateKineticChargeUI function now.");
 
 export function updateKineticChargeUI(currentCharge, maxCharge, currentMaxPotencyBonus, playerHasKineticConversionEvolution) {
-    console.log(`[Debug KINETIC_UI_ENTERED] updateKineticChargeUI ENTERED. Visible: ${playerHasKineticConversionEvolution}, Charge: ${currentCharge}/${maxCharge}`);
+    // console.log(`[Debug KINETIC_UI_ENTERED] updateKineticChargeUI ENTERED. Visible: ${playerHasKineticConversionEvolution}, Charge: ${currentCharge}/${maxCharge}`);
     
     if (!kineticChargeUIElement || !kineticChargeBarFillElement || !kineticChargeTextElement) {
-        console.error("[Debug KINETIC_UI] CRITICAL: One or more Kinetic Charge UI DOM elements are NULL. Aborting UI update.");
+        // console.error("[Debug KINETIC_UI] CRITICAL: One or more Kinetic Charge UI DOM elements are NULL. Aborting UI update.");
         return;
     }
 
@@ -235,22 +235,20 @@ export function updateKineticChargeUI(currentCharge, maxCharge, currentMaxPotenc
 
     let barColor = 'rgba(0, 60, 120, 0.8)';
     if (chargePercentage > 89.9) {
-        console.log("[Debug SPARKLE] Charge percentage > 89.9. Current:", chargePercentage); // ADDED THIS LOG
+        // console.log("[Debug SPARKLE] Charge percentage > 89.9. Current:", chargePercentage); 
         barColor = 'rgba(255, 100, 0, 1.0)';
         if (!kineticChargeBarFillElement.classList.contains('sparkling')) {
-            console.log("[Debug SPARKLE] Adding 'sparkling' class."); // ADDED THIS LOG
+            // console.log("[Debug SPARKLE] Adding 'sparkling' class."); 
             kineticChargeBarFillElement.classList.add('sparkling');
             kineticChargeBarFillElement.style.setProperty('--sparkle1-x', `${Math.random()*80 + 10}%`);
             kineticChargeBarFillElement.style.setProperty('--sparkle1-y', `${Math.random()*60 + 20}%`);
             kineticChargeBarFillElement.style.setProperty('--sparkle2-x', `${Math.random()*80 + 10}%`);
             kineticChargeBarFillElement.style.setProperty('--sparkle2-y', `${Math.random()*60 + 20}%`);
         }
-    } else { // Removed specific chargePercentage checks for removing class, simplify to an else
+    } else { 
         if (kineticChargeBarFillElement.classList.contains('sparkling')) {
-            // console.log("[Debug SPARKLE] Removing 'sparkling' class. Charge:", chargePercentage); // Optional log
             kineticChargeBarFillElement.classList.remove('sparkling');
         }
-        // Determine bar color based on ranges if not sparkling
         if (chargePercentage > 70) {
             barColor = 'rgba(255, 180, 0, 0.9)';
         } else if (chargePercentage > 30) {
@@ -342,12 +340,15 @@ export function populateEvolutionOptionsUI(choices, playerInstance, evolutionSel
         if (choice.id === 'kineticConversion' && playerInstance.kineticConversionLevel !== undefined) {
             currentLevelForDisplay = playerInstance.kineticConversionLevel;
         }
-
-        if (choice.maxLevel !== undefined && choice.maxLevel > 0 && choice.maxLevel < 500) {
+        // For Reinforced Hull, levels might not be displayed if it's based on multiplier directly
+        if (choice.id === 'reinforcedHull') {
+            // No (Lvl X/Y) needed if it's infinitely stackable with diminishing returns
+        } else if (choice.maxLevel !== undefined && choice.maxLevel > 0 && choice.maxLevel < 500) {
             displayText += ` (Lvl ${currentLevelForDisplay}/${choice.maxLevel})`;
         } else if (currentLevelForDisplay > 0 && choice.maxLevel === 999) { 
              displayText += ` (Lvl ${currentLevelForDisplay})`;
         }
+
 
         if (choice.getEffectString && typeof choice.getEffectString === 'function') {
             let effectString;
@@ -547,20 +548,17 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, getReadableColorNam
     const formatNum = (val, digits = 1) => (typeof val === 'number' && !isNaN(val) ? val.toFixed(digits) : 'N/A');
     const formatInt = (val) => (typeof val === 'number' && !isNaN(val) ? val.toString() : 'N/A');
 
+    // ---- START OF MODIFICATION for Core Stats Display ----
     coreHTML += `<p><span class="stat-label">Max HP:</span><span class="stat-value">${formatInt(playerData.maxHp)}</span></p>`;
-    coreHTML += `<p><span class="stat-label">Speed:</span><span class="stat-value">${formatNum(playerData.currentSpeed)}</span></p>`;
-    coreHTML += `<p><span class="stat-label">Base Radius:</span><span class="stat-value">${formatNum(playerData.baseRadius)}</span></p>`;
-    coreHTML += `<p><span class="stat-label">Final Radius:</span><span class="stat-value">${formatNum(playerData.finalRadius)}</span></p>`;
-    coreHTML += `<p><span class="stat-label">Score Size Factor:</span><span class="stat-value">${formatNum(playerData.scoreSizeFactor, 3)}</span></p>`;
-    if (playerData.scoreOffsetForSizing !== undefined && playerData.scoreOffsetForSizing > 0) {
-        coreHTML += `<p><span class="stat-label">Size Score Offset:</span><span class="stat-value">${formatNum(playerData.scoreOffsetForSizing, 0)}</span></p>`;
-    }
-    if (playerData.scoreBasedSizeActual !== undefined) { // For debugging Evasive
-         coreHTML += `<p><span class="stat-label">Score Size Comp:</span><span class="stat-value">${formatNum(playerData.scoreBasedSizeActual, 2)}</span></p>`;
-    }
+    // Speed removed
+    // Base Radius removed
+    coreHTML += `<p><span class="stat-label">Player Size:</span><span class="stat-value">${formatNum(playerData.finalRadius)}</span></p>`; // Renamed from Final Radius
+    // Score Size Factor removed
+    // Score Size Comp removed
     coreHTML += `<p><span class="stat-label">Times Hit:</span><span class="stat-value">${formatInt(playerData.timesHit)}</span></p>`;
     if (gameplayTimeData !== undefined) { const mins = Math.floor(gameplayTimeData / 60000); const secs = Math.floor((gameplayTimeData % 60000) / 1000); coreHTML += `<p><span class="stat-label">Time Played:</span><span class="stat-value">${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}</span></p>`; }
     coreHTML += `<p><span class="stat-label">Damage Dealt:</span><span class="stat-value">${playerData.totalDamageDealt ? playerData.totalDamageDealt.toLocaleString() : 0}</span></p>`;
+    // ---- END OF MODIFICATION for Core Stats Display ----
     statsCoreDiv.innerHTML = coreHTML;
 
     statsUpgradesUl.innerHTML = '';
