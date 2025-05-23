@@ -25,13 +25,12 @@ import { PlayerGravityWell } from './ray.js';
 export class Player {
     constructor(x, y, initialPlayerSpeed) {
         this.x = x; this.y = y;
-        this.initialBaseRadius = PLAYER_BASE_RADIUS; // True start, e.g. 12
-        this.bonusBaseRadius = 0;                    // From upgrades like Fortified Core, if they change base visual
-        this.baseRadius = this.initialBaseRadius + this.bonusBaseRadius; // Current effective base before score
-
-        this.scoreBasedSize = 0;             // Stores the calculated size component from score: (effectiveScore * growthFactor)
-        this.scoreOffsetForSizing = 0;       // How much of the total game 'score' is ignored for sizing
-        this.radius = this.baseRadius;       // Initial actual radius
+        this.initialBaseRadius = PLAYER_BASE_RADIUS;
+        this.bonusBaseRadius = 0;
+        this.baseRadius = this.initialBaseRadius + this.bonusBaseRadius;
+        this.scoreBasedSize = 0;
+        this.scoreOffsetForSizing = 0;
+        this.radius = this.baseRadius;
 
         this.hp = PLAYER_MAX_HP; this.maxHp = PLAYER_MAX_HP; this.aimAngle = 0;
         this.immuneColorsList = [];
@@ -41,7 +40,9 @@ export class Player {
         this.hasTargetPierce = false; this.chainReactionChance = 0.0;
         this.scatterShotLevel = 0; this.ownRaySpeedMultiplier = 1.0;
         this.damageReductionFactor = 0.0; this.hpPickupBonus = 0;
-        this.bossStunChanceBonus = 0.0;
+        // this.bossStunChanceBonus = 0.0; // REMOVED - Replaced by ability damage
+        this.abilityDamageMultiplier = 1.0; // MODIFIED: New property for ability damage
+
         this.timeSinceLastHit = Number.MAX_SAFE_INTEGER;
         this.hpRegenTimer = 0; this.baseHpRegenAmount = 1;
         this.hpRegenBonusFromEvolution = 0;
@@ -77,7 +78,7 @@ export class Player {
         this.omegaLaserCooldownTimer = 0;
         this.omegaLaserCooldown = OMEGA_LASER_COOLDOWN;
         this.omegaLaserAngle = 0;
-        this.omegaLaserDamagePerTick = OMEGA_LASER_DAMAGE_PER_TICK;
+        this.omegaLaserDamagePerTick = OMEGA_LASER_DAMAGE_PER_TICK; // Base damage per tick
         this.omegaLaserTickInterval = OMEGA_LASER_TICK_INTERVAL;
         this.omegaLaserCurrentTickTimer = 0;
         this.omegaLaserRange = OMEGA_LASER_RANGE;
@@ -251,6 +252,7 @@ export class Player {
     update(gameContext) {
         const { dt, keys, mouseX, mouseY, canvasWidth, canvasHeight, targets, activeBosses,
                 currentGrowthFactor, // This is currentPlayerRadiusGrowthFactor from main.js
+                currentEffectiveDefaultGrowthFactor, // Game's standard growth rate, passed from main.js
                 updateHealthDisplayCallback, updateAbilityCooldownCallback,
                 isAnyPauseActiveCallback, decoysArray, bossDefeatEffectsArray, allRays,
                 screenShakeParams, activeBuffNotificationsArray, score
@@ -370,19 +372,19 @@ export class Player {
 
         this.x = nX; this.y = nY;
 
-        // MODIFIED: Radius Calculation Logic
-        this.baseRadius = this.initialBaseRadius + this.bonusBaseRadius; // Update effective base (e.g. if Fortified Core modifies bonusBaseRadius)
-        let effectiveScoreForRadiusCalc = Math.max(0, score - this.scoreOffsetForSizing);
+        // Radius Calculation based on new properties
+        this.baseRadius = this.initialBaseRadius + this.bonusBaseRadius; // This is the true starting base + direct additions
+        let effectiveScoreForSizing = Math.max(0, score - this.scoreOffsetForSizing);
 
-        if (currentGrowthFactor > 0) { // currentGrowthFactor is currentPlayerRadiusGrowthFactor from main.js
-            // If growth is active (not paused by Evasive Maneuver this cycle)
-            this.scoreBasedSize = effectiveScoreForRadiusCalc * currentGrowthFactor;
+        if (currentGrowthFactor > 0) {
+            // If growth is active this cycle (e.g., not Evasive Maneuver cycle),
+            // update scoreBasedSize based on current effective score and active growth factor.
+            this.scoreBasedSize = effectiveScoreForSizing * currentGrowthFactor;
         } else {
-            // If currentGrowthFactor is 0 (e.g. Evasive Maneuver is active for this cycle),
-            // this.scoreBasedSize should have already been set by Evasive's apply() method
-            // to the fixed, halved value based on the score *at that moment*.
-            // It should not change further with new score this cycle.
-            // The value of this.scoreBasedSize set in Evasive.apply() will be used.
+            // If currentGrowthFactor is 0 (e.g., Evasive Maneuver active this cycle),
+            // player.scoreBasedSize was already set by Evasive's apply() to the desired fixed value.
+            // It should not change further based on score *this cycle*.
+            // So, this.scoreBasedSize remains what Evasive.apply() set it to.
         }
         this.radius = this.baseRadius + this.scoreBasedSize;
         this.radius = Math.max(MIN_PLAYER_BASE_RADIUS, this.radius);
@@ -603,12 +605,15 @@ export class Player {
         const beamEndX = this.x + Math.cos(this.omegaLaserAngle) * (this.radius + this.omegaLaserRange);
         const beamEndY = this.y + Math.sin(this.omegaLaserAngle) * (this.radius + this.omegaLaserRange);
 
+        // MODIFIED: Apply abilityDamageMultiplier
+        const damagePerTick = this.omegaLaserDamagePerTick * this.abilityDamageMultiplier;
+
         if (targetsArray) {
             for (let i = targetsArray.length - 1; i >= 0; i--) {
                 const target = targetsArray[i];
                 if (target && isLineSegmentIntersectingCircle(beamStartX, beamStartY, beamEndX, beamEndY, target.x, target.y, target.radius + this.omegaLaserWidth / 2)) {
                     targetsArray.splice(i, 1);
-                    this.totalDamageDealt += 10;
+                    this.totalDamageDealt += 10 * this.abilityDamageMultiplier; // Assuming base score/damage for target is 10
                     if (laserDamageContext && laserDamageContext.updateScoreCallback) laserDamageContext.updateScoreCallback(10);
                 }
             }
@@ -618,9 +623,9 @@ export class Player {
             activeBossesArray.forEach(boss => {
                 if (boss && isLineSegmentIntersectingCircle(beamStartX, beamStartY, beamEndX, beamEndY, boss.x, boss.y, boss.radius + this.omegaLaserWidth / 2)) {
                     if (typeof boss.takeDamage === 'function') {
-                        boss.takeDamage(this.omegaLaserDamagePerTick, null, this, {});
+                        boss.takeDamage(damagePerTick, null, this, {}); // Pass null for ray as it's a beam
                     }
-                    this.totalDamageDealt += this.omegaLaserDamagePerTick;
+                    this.totalDamageDealt += damagePerTick;
                 }
             });
         }
