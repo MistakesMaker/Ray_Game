@@ -156,7 +156,6 @@ function initEvolutionChoicesInternal() {
             },
             apply: function() {
                 if (!player) return "";
-                // console.log(`Evasive Apply START - Score: ${score}, Offset: ${player.scoreOffsetForSizing}, Player Radius: ${player.radius}, Player BaseRadius: ${player.baseRadius}, Player scoreBasedSize: ${player.scoreBasedSize}, currentEffectiveDefaultGrowthFactor: ${currentEffectiveDefaultGrowthFactor}`);
 
                 let effectiveScoreBeforeThisPick = Math.max(0, score - player.scoreOffsetForSizing);
                 let currentScoreBasedSize = effectiveScoreBeforeThisPick * currentEffectiveDefaultGrowthFactor;
@@ -177,7 +176,6 @@ function initEvolutionChoicesInternal() {
                 player.baseRadius = player.initialBaseRadius + player.bonusBaseRadius;
                 player.radius = player.baseRadius + player.scoreBasedSize;
                 player.radius = Math.max(CONSTANTS.MIN_PLAYER_BASE_RADIUS, player.radius);
-                // console.log(`Evasive Apply END - New Offset: ${player.scoreOffsetForSizing}, New player.scoreBasedSize: ${player.scoreBasedSize}, New player.radius: ${player.radius}, currentPlayerRadiusGrowthFactor is now 0`);
 
                 shrinkMeCooldown = 3;
                 this.level++;
@@ -191,7 +189,25 @@ function initEvolutionChoicesInternal() {
         {id:'systemOvercharge', classType: 'utility', text:"System Overcharge", level:0, maxLevel:4, detailedDescription: "Reduces the score needed between evolutions by 7.5% per level. Max 30% reduction.", isMaxed:function(p){return p && p.evolutionIntervalModifier <= 0.70 || this.level >= this.maxLevel;}, apply:function(){if(!player) return""; player.evolutionIntervalModifier = Math.max(0.70, player.evolutionIntervalModifier - 0.075); this.level++; return `Evolution interval now ${Math.round(player.evolutionIntervalModifier * 100)}%!`;}, getEffectString: function() { return `Evo Interval: ${player?Math.round(player.evolutionIntervalModifier*100):100}%`;}},
         {id:'enhancedRegen', classType: 'utility', text:"Enhanced Regeneration", level:0, maxLevel:Math.round(CONSTANTS.MAX_HP_PICKUP_BONUS/CONSTANTS.HP_PICKUP_BONUS_PER_LEVEL), detailedDescription: `HP pickups restore an additional ${CONSTANTS.HP_PICKUP_BONUS_PER_LEVEL} health per level.`, isMaxed:function(p){return p && p.hpPickupBonus >= CONSTANTS.MAX_HP_PICKUP_BONUS || this.level >= this.maxLevel;}, apply:function(){if(!player) return""; player.hpPickupBonus += CONSTANTS.HP_PICKUP_BONUS_PER_LEVEL; this.level++; return `HP pickups +${player.hpPickupBonus} HP!`;}, getEffectString: function() { return `HP Pickups +${player?player.hpPickupBonus:0} HP`;}},
         {id:'focusedBeam', classType: 'attack', text:"Focused Beam", level:0, maxLevel: 999 , detailedDescription: "Increases the damage of your rays by +1 per level.", isMaxed:function(p){return false;}, apply:function(){if(!player) return""; player.rayDamageBonus++; this.level++; return `Ray damage now +${player.rayDamageBonus}!`;}, getEffectString: function() { return `+${player?player.rayDamageBonus:0} Ray Damage`;}},
-        {id:'unstableCore', classType: 'attack', text:"Unstable Core", level:0, maxLevel:Math.round(CONSTANTS.MAX_CHAIN_REACTION_CHANCE/0.05), detailedDescription: `Gives your rays a 5% chance per level to cause a chain reaction explosion when destroying a target. Max ${CONSTANTS.MAX_CHAIN_REACTION_CHANCE*100}%.`, isMaxed:function(p){return p && p.chainReactionChance >= CONSTANTS.MAX_CHAIN_REACTION_CHANCE || this.level >= this.maxLevel;}, apply:function(){if(!player) return""; player.chainReactionChance = Math.min(CONSTANTS.MAX_CHAIN_REACTION_CHANCE, player.chainReactionChance + 0.05); this.level++; return `Chain reaction ${Math.round(player.chainReactionChance * 100)}%!`;}, getEffectString: function() { return `${Math.round((player?player.chainReactionChance:0) * 100)}% Chain Chance`;}},
+        {
+            id: 'unstableCore',
+            classType: 'attack',
+            text: "Unstable Core",
+            level: 0, // Level can still be tracked for display if desired, or removed if purely based on chance
+            // maxLevel: 20, // REMOVED - No longer needed if isMaxed checks the chance directly
+            detailedDescription: `Gives your rays a 5% chance per level to cause an AOE explosion on hit. Caps at 100%.`, // Description updated
+            isMaxed: function(p) { // MODIFIED
+                if (!p) return true; // No player, can't take it
+                return p.chainReactionChance >= 1.0; // Is maxed if chance is 100% or more
+            },
+            apply: function() {
+                if (!player) return "";
+                player.chainReactionChance = Math.min(1.0, player.chainReactionChance + 0.05);
+                this.level++; // Keep incrementing level for potential display or other logic
+                return `Unstable Core: ${Math.round(player.chainReactionChance * 100)}% chance for AOE on hit!`;
+            },
+            getEffectString: function() { return `${Math.round((player ? player.chainReactionChance : 0) * 100)}% AOE Chance`; }
+        },
         {id:'heavyImpact', classType: 'attack', text:"Heavy Impact", level:0, maxLevel:Math.round(CONSTANTS.MAX_STUN_CHANCE_BONUS/CONSTANTS.STUN_CHANCE_PER_LEVEL), detailedDescription: `Increases the chance for your rays to briefly stun bosses by ${CONSTANTS.STUN_CHANCE_PER_LEVEL*100}% per level. Max +${CONSTANTS.MAX_STUN_CHANCE_BONUS*100}%.`, isMaxed:function(p){return p && p.bossStunChanceBonus >= CONSTANTS.MAX_STUN_CHANCE_BONUS || this.level >= this.maxLevel;}, apply:function(){if(!player) return""; player.bossStunChanceBonus = Math.min(CONSTANTS.MAX_STUN_CHANCE_BONUS, player.bossStunChanceBonus + CONSTANTS.STUN_CHANCE_PER_LEVEL); this.level++; return `Boss stun chance bonus +${Math.round(player.bossStunChanceBonus*100)}%!`;}, getEffectString: function() { return `+${Math.round((player?player.bossStunChanceBonus:0)*100)}% Boss Stun`;}},
         {
             id: 'maxHpIncrease', classType: 'tank', text: "Fortified Core", level: 0, maxLevel: 999,
@@ -620,19 +636,30 @@ function updateGame(deltaTime) {
             for(let j=targets.length-1;j>=0;j--){
                 const t=targets[j];
                 if(checkCollision(r,t)){
-                    let chainTriggered = false;
+                    // MODIFIED: Trigger Unstable Core AOE on hit, not just destruction
+                    let aoeTriggeredOnHit = false;
                     if (player && player.chainReactionChance > 0 && Math.random() < player.chainReactionChance) {
                         playSound(chainReactionSound);
-                        bossDefeatEffects.push({ x: t.x, y: t.y, radius: CONSTANTS.CHAIN_REACTION_RADIUS * 0.1, opacity: 1, timer: CONSTANTS.CHAIN_REACTION_EXPLOSION_DURATION, duration: CONSTANTS.CHAIN_REACTION_EXPLOSION_DURATION, color: CONSTANTS.CHAIN_REACTION_EXPLOSION_COLOR, maxRadius: CONSTANTS.CHAIN_REACTION_RADIUS, initialRadius: CONSTANTS.CHAIN_REACTION_RADIUS * 0.1 });
-                        for (let k = targets.length - 1; k >= 0; k--) {
-                            if (k === j) continue; const otherT = targets[k];
-                            const dist = Math.sqrt((t.x - otherT.x)**2 + (t.y - otherT.y)**2);
-                            if (dist < CONSTANTS.CHAIN_REACTION_RADIUS) { targets.splice(k, 1); score += 5; if (j > k) j--; }
-                        }
-                        chainTriggered = true;
+                        bossDefeatEffects.push({
+                            x: t.x, y: t.y, // AOE originates from the target hit
+                            radius: CONSTANTS.CHAIN_REACTION_RADIUS * 0.1,
+                            opacity: 1,
+                            timer: CONSTANTS.CHAIN_REACTION_EXPLOSION_DURATION,
+                            duration: CONSTANTS.CHAIN_REACTION_EXPLOSION_DURATION,
+                            color: CONSTANTS.CHAIN_REACTION_EXPLOSION_COLOR,
+                            maxRadius: CONSTANTS.CHAIN_REACTION_RADIUS,
+                            initialRadius: CONSTANTS.CHAIN_REACTION_RADIUS * 0.1,
+                            isAOEDamage: true, // Custom flag
+                            damage: (player.rayDamageBonus + 1) * 0.5 // Example: AOE does 50% of ray's damage
+                        });
+                        aoeTriggeredOnHit = true;
+                        // The AOE effect itself will handle damaging nearby targets/bosses in the bossDefeatEffects loop
                     }
-                    targets.splice(j,1); score+=10; updateScoreDisplay(score); checkForNewColorUnlock();
-                    if (!chainTriggered) playSound(targetHitSound);
+
+                    targets.splice(j,1); // Target is always destroyed by a direct ray hit
+                    score+=10; updateScoreDisplay(score); checkForNewColorUnlock();
+                    if (!aoeTriggeredOnHit) playSound(targetHitSound); // Play regular hit if no AOE
+
                     if (r.pierceUsesLeft > 0) r.pierceUsesLeft--; else r.isActive = false;
                     if (!r.isActive) break;
                 }
@@ -646,7 +673,28 @@ function updateGame(deltaTime) {
                         const bossTakeDmgCtx = {CONSTANTS, playerInstance: player};
                         if (boss instanceof MirrorShieldBoss) { const applied = boss.takeDamage(dmg, r, player, bossTakeDmgCtx); if (!applied && r.isActive) consumed = false; tookDmg = applied; }
                         else { tookDmg = boss.takeDamage(dmg, r, player, bossTakeDmgCtx); }
-                        if(tookDmg) { playSound(bossHitSound); if (player && player.visualModifiers.serratedNanites) { const bleed = dmg * 0.05; if (typeof boss.applyBleed === 'function') boss.applyBleed(bleed, 3000);}}
+
+                        if(tookDmg) {
+                            playSound(bossHitSound);
+                            if (player && player.visualModifiers.serratedNanites) { const bleed = dmg * 0.05; if (typeof boss.applyBleed === 'function') boss.applyBleed(bleed, 3000);}}
+                        
+                        // MODIFIED: Trigger Unstable Core AOE on boss hit
+                        if (player && player.chainReactionChance > 0 && Math.random() < player.chainReactionChance) {
+                            playSound(chainReactionSound); // Might play again if targetHitSound also played, consider a flag
+                            bossDefeatEffects.push({
+                                x: r.x, y: r.y, // AOE originates from the ray's impact point
+                                radius: CONSTANTS.CHAIN_REACTION_RADIUS * 0.1,
+                                opacity: 1,
+                                timer: CONSTANTS.CHAIN_REACTION_EXPLOSION_DURATION,
+                                duration: CONSTANTS.CHAIN_REACTION_EXPLOSION_DURATION,
+                                color: CONSTANTS.CHAIN_REACTION_EXPLOSION_COLOR,
+                                maxRadius: CONSTANTS.CHAIN_REACTION_RADIUS,
+                                initialRadius: CONSTANTS.CHAIN_REACTION_RADIUS * 0.1,
+                                isAOEDamage: true,
+                                damage: (player.rayDamageBonus + 1) * 0.5 // Example AOE damage
+                            });
+                        }
+
                         if(consumed) r.isActive = false;
                         if(!r || !r.isActive) break;
                     }
@@ -719,6 +767,33 @@ function updateGame(deltaTime) {
                  }
              }
          }
+    }
+    // MODIFIED: AOE Damage from Unstable Core (applied after main target/boss loop)
+    for (let i = bossDefeatEffects.length - 1; i >= 0; i--) {
+        const effect = bossDefeatEffects[i];
+        if (effect.isAOEDamage && effect.timer === effect.duration) { // Apply damage once when effect starts
+            // Damage nearby targets
+            for (let tIdx = targets.length - 1; tIdx >= 0; tIdx--) {
+                const target = targets[tIdx];
+                const dist = Math.sqrt((effect.x - target.x) ** 2 + (effect.y - target.y) ** 2);
+                if (dist < effect.maxRadius + target.radius) {
+                    targets.splice(tIdx, 1); // For simplicity, AOE destroys targets
+                    score += 5; // Less score for AOE kills
+                    updateScoreDisplay(score);
+                }
+            }
+            // Damage nearby bosses
+            if (bossManager && bossManager.activeBosses) {
+                bossManager.activeBosses.forEach(boss => {
+                    const dist = Math.sqrt((effect.x - boss.x) ** 2 + (effect.y - boss.y) ** 2);
+                    if (dist < effect.maxRadius + boss.radius) {
+                        if (typeof boss.takeDamage === 'function') {
+                            boss.takeDamage(effect.damage, null, player); // AOE damage doesn't involve a specific ray
+                        }
+                    }
+                });
+            }
+        }
     }
 }
 
@@ -868,7 +943,6 @@ function selectEvolutionInternal(choice) {
 
     if (choice.id !== 'smallerPlayer') {
         currentPlayerRadiusGrowthFactor = currentEffectiveDefaultGrowthFactor;
-        // console.log(`SelectEvo: Choice was NOT smallerPlayer, main.js_currentPlayerRadiusGrowthFactor RESTORED to: ${currentPlayerRadiusGrowthFactor}`);
     }
 
     gamePausedForEvolution = false; evolutionPendingAfterBoss = false; postPopupImmunityTimer = CONSTANTS.POST_POPUP_IMMUNITY_DURATION;
@@ -958,30 +1032,38 @@ function selectLootUpgradeInternal(chosenUpgrade) {
 }
 
 function createFinalStatsSnapshot() {
-    // console.log(`SNAPSHOT START: Player exists: ${!!player}. main.js_currentPlayerRadiusGrowthFactor: ${currentPlayerRadiusGrowthFactor}`);
+    // console.log(`SNAPSHOT ENTRY POINT - Player: ${!!player}, Game Running: ${gameRunning}, Game Over: ${gameOver}, Paused by ESC: ${gamePausedByEsc}`);
+    // console.log(`SNAPSHOT - Main.js Scope: currentPlayerRadiusGrowthFactor: ${currentPlayerRadiusGrowthFactor}, currentEffectiveDefaultGrowthFactor: ${currentEffectiveDefaultGrowthFactor}`);
+
     if (!player) {
         console.warn("Snapshot: Player is null during createFinalStatsSnapshot call.");
-        // Return a very basic default snapshot
         return { playerData: { baseRadius: CONSTANTS.PLAYER_BASE_RADIUS, finalRadius: CONSTANTS.PLAYER_BASE_RADIUS, scoreSizeFactor: currentEffectiveDefaultGrowthFactor, scoreOffsetForSizing: 0, scoreBasedSizeActual: 0, maxHp: CONSTANTS.PLAYER_MAX_HP, currentSpeed: CONSTANTS.PLAYER_SPEED_BASE, timesHit:0, totalDamageDealt:0, immuneColorsList:[], activeAbilities:{}, formattedActiveAbilities:[], formattedMouseAbilities:[], displayedUpgrades:[] }, bossTierData: { chaser: 0, reflector: 0, singularity: 0 }, gameplayTimeData: gameplayTimeElapsed };
     }
 
-    // This is the player's fundamental base size (initial + direct bonus additions like Fortified Core if it modifies baseRadius)
-    const currentBaseRadius = player.initialBaseRadius + player.bonusBaseRadius;
+    player.baseRadius = player.initialBaseRadius + player.bonusBaseRadius;
+    // console.log(`SNAPSHOT - Player Object State: player.radius: ${player.radius}, player.scoreBasedSize: ${player.scoreBasedSize}, player.scoreOffsetForSizing: ${player.scoreOffsetForSizing}, player.baseRadius: ${player.baseRadius}`);
 
-    // This is the growth factor that should be displayed.
-    // If Evasive Maneuver is active (currentPlayerRadiusGrowthFactor === 0), we display the underlying game's default rate.
-    // Otherwise, we display the currently active rate.
-    let factorForDisplay = (currentPlayerRadiusGrowthFactor === 0) ? currentEffectiveDefaultGrowthFactor : currentPlayerRadiusGrowthFactor;
-    if (typeof factorForDisplay !== 'number' || isNaN(factorForDisplay)) { // Safety net
-        factorForDisplay = currentEffectiveDefaultGrowthFactor;
+    let factorForDisplay;
+    if (typeof currentPlayerRadiusGrowthFactor === 'number' && !isNaN(currentPlayerRadiusGrowthFactor)) {
+        factorForDisplay = currentPlayerRadiusGrowthFactor;
+        if (factorToDisplay === 0) { // If growth is paused (Evasive active), show the underlying rate
+            factorToDisplay = currentEffectiveDefaultGrowthFactor;
+        }
+    } else {
+        // console.warn(`SNAPSHOT: currentPlayerRadiusGrowthFactor was problematic (${currentPlayerRadiusGrowthFactor}), used default: ${currentEffectiveDefaultGrowthFactor}`);
+        factorToDisplay = currentEffectiveDefaultGrowthFactor; // Fallback
+    }
+    if (typeof factorToDisplay !== 'number' || isNaN(factorToDisplay)) {
+        console.error(`CRITICAL SNAPSHOT: factorForDisplay is STILL problematic (${factorToDisplay}) before toFixed!`);
+        factorToDisplay = 0.000;
     }
 
     const playerDataSnapshot = {
-        baseRadius: currentBaseRadius, // The true base (initial + upgrades that directly add to base)
-        finalRadius: player.radius,    // The current visual/collision radius
-        scoreSizeFactor: factorForDisplay, // The growth factor that's conceptually in effect or would be
-        scoreOffsetForSizing: player.scoreOffsetForSizing, // How much score is "ignored" for size calc
-        scoreBasedSizeActual: player.scoreBasedSize, // The calculated size from (effective_score * growth_factor)
+        baseRadius: player.baseRadius,
+        finalRadius: player.radius,
+        scoreSizeFactor: factorToDisplay,
+        scoreOffsetForSizing: player.scoreOffsetForSizing,
+        scoreBasedSizeActual: player.scoreBasedSize,
 
         maxHp: player.maxHp, currentSpeed: player.currentSpeed,
         timesHit: player.timesHit, totalDamageDealt: player.totalDamageDealt,
@@ -992,7 +1074,7 @@ function createFinalStatsSnapshot() {
         formattedMouseAbilities: getFormattedMouseAbilitiesForStats(player),
         displayedUpgrades: prepareDisplayedUpgradesForStats(player)
     };
-    // console.log(`SNAPSHOT END: playerDataSnapshot.finalRadius: ${playerDataSnapshot.finalRadius}, playerDataSnapshot.scoreSizeFactor: ${playerDataSnapshot.scoreSizeFactor}`);
+    // console.log(`SNAPSHOT DATA: finalRadius: ${playerDataSnapshot.finalRadius}, scoreSizeFactor: ${playerDataSnapshot.scoreSizeFactor}`);
 
     const bossTierSnapshot = bossManager ? { ...bossManager.bossTiers } : { chaser: 0, reflector: 0, singularity: 0 };
     return {
@@ -1005,7 +1087,7 @@ function getFormattedActiveAbilitiesForStats(p) { if (!p || !p.activeAbilities) 
 function getFormattedMouseAbilitiesForStats(p) { if(!p) return []; let abs = []; if (p.hasOmegaLaser) abs.push({name: "Omega Laser", desc: `${(CONSTANTS.OMEGA_LASER_COOLDOWN/1000)}s CD`}); if (p.hasShieldOvercharge) abs.push({name: "Shield Overcharge", desc: `${(CONSTANTS.SHIELD_OVERCHARGE_COOLDOWN/1000)}s CD`}); return abs; }
 function prepareDisplayedUpgradesForStats(p) {
     if (!p) return []; let list = [];
-    evolutionChoices.forEach(e => { if (e.level > 0) { let desc = ""; if (e.id === 'colorImmunity') desc = `${p.immuneColorsList.length} colors`; else if (e.id === 'smallerPlayer') desc = `Lvl ${e.level} (Effective Size)`; else if (e.id === 'reinforcedHull') desc = `${Math.round(p.damageReductionFactor * 100)}%`; else if (e.id === 'vitalitySurge') desc = `+${p.hpRegenBonusFromEvolution} HP/tick`; else if (e.id === 'slowRays') desc = `${currentRaySpeedMultiplier.toFixed(2)}x Speed`; else if (e.id === 'systemOvercharge') desc = `${Math.round(p.evolutionIntervalModifier*100)}% Interval`; else if (e.id === 'enhancedRegen') desc = `+${p.hpPickupBonus} HP`; else if (e.id === 'focusedBeam') desc = `+${p.rayDamageBonus} Dmg`; else if (e.id === 'unstableCore') desc = `${Math.round(p.chainReactionChance * 100)}% Chance`; else if (e.id === 'heavyImpact') desc = `+${Math.round(p.bossStunChanceBonus*100)}% Stun`; else if (e.id === 'maxHpIncrease') desc = `+${e.level * 10} Max HP`; else if (e.id === 'abilityCooldownReduction') desc = `Applied ${e.level}x`; else if (e.getEffectString) desc = e.getEffectString(); if (desc) list.push({ name: e.text.replace(/\s\(Lvl.*/, ''), description: desc });}});
+    evolutionChoices.forEach(e => { if (e.level > 0) { let desc = ""; if (e.id === 'colorImmunity') desc = `${p.immuneColorsList.length} colors`; else if (e.id === 'smallerPlayer') desc = `Lvl ${e.level} (Effective Size)`; else if (e.id === 'reinforcedHull') desc = `${Math.round(p.damageReductionFactor * 100)}%`; else if (e.id === 'vitalitySurge') desc = `+${p.hpRegenBonusFromEvolution} HP/tick`; else if (e.id === 'slowRays') desc = `${currentRaySpeedMultiplier.toFixed(2)}x Speed`; else if (e.id === 'systemOvercharge') desc = `${Math.round(p.evolutionIntervalModifier*100)}% Interval`; else if (e.id === 'enhancedRegen') desc = `+${p.hpPickupBonus} HP`; else if (e.id === 'focusedBeam') desc = `+${p.rayDamageBonus} Dmg`; else if (e.id === 'unstableCore') desc = `${Math.round(p.chainReactionChance * 100)}% AOE Chance`; else if (e.id === 'heavyImpact') desc = `+${Math.round(p.bossStunChanceBonus*100)}% Stun`; else if (e.id === 'maxHpIncrease') desc = `+${e.level * 10} Max HP`; else if (e.id === 'abilityCooldownReduction') desc = `Applied ${e.level}x`; else if (e.getEffectString) desc = e.getEffectString(); if (desc) list.push({ name: e.text.replace(/\s\(Lvl.*/, ''), description: desc });}});
     p.acquiredBossUpgrades.forEach(id => { const upg = bossLootPool.find(u => u.id === id); if (upg) { let d = `(${upg.type.charAt(0).toUpperCase() + upg.type.slice(1)})`; if (upg.id === 'adaptiveShield') d = "(Color Immunities)"; else if (upg.type === 'ability' || upg.type === 'ability_mouse') return; list.push({ name: upg.name, description: d });}});
     if (p.pickupAttractionRadius > 0) list.push({name: "Pickup Attraction", description: `Radius ${p.pickupAttractionRadius.toFixed(0)}`});
     if (p.scatterShotLevel > 0) list.push({name: "Scatter Shot", description: `Lvl ${p.scatterShotLevel +1}`});
