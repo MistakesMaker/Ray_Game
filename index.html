@@ -52,12 +52,13 @@
             box-shadow: 0 0 30px rgba(150, 150, 255, 0.7);
             padding: 30px;
             width: 80%;
-            max-width: 700px;
+            max-width: 700px; 
             box-sizing: border-box;
         }
         #evolutionScreen h2, #freeUpgradeScreen h2 { color: #99ccff; font-size: 30px; margin-bottom: 20px; }
         #evolutionOptionsContainer, #freeUpgradeOptionContainer {
             display: flex;
+            flex-wrap: wrap; 
             justify-content: space-around;
             align-items: stretch;
             gap: 15px;
@@ -70,11 +71,14 @@
             padding: 15px;
             border-radius: 10px;
             cursor: pointer;
-            transition: background-color 0.3s, transform 0.2s, box-shadow 0.3s;
-            flex: 1; display: flex; flex-direction: column;
+            transition: background-color 0.3s, transform 0.2s, box-shadow 0.3s, border-color 0.3s;
+            flex: 1; 
+            display: flex; flex-direction: column;
             justify-content: center; align-items: center;
-            min-height: 100px;
+            min-height: 100px; 
+            min-width: 150px; 
             text-align: center;
+            box-sizing: border-box; 
         }
         #evolutionScreen .evolutionOption .evolution-details {
             font-size: 12px;
@@ -82,22 +86,134 @@
             margin-top: 5px;
         }
 
-        .evolutionOption[data-class="attack"] { box-shadow: 0 0 30px 10px rgba(255,60,60,0.9), 0 0 15px rgba(255,100,100,0.7) inset; border-color: #FF5555; }
-        .evolutionOption[data-class="attack"]:hover { background-color: #582828; transform: translateY(-3px) scale(1.02); box-shadow: 0 0 45px 12px rgba(255,50,50,1), 0 0 18px rgba(255,120,120,0.9) inset; }
-        .evolutionOption[data-class="tank"] { box-shadow: 0 0 30px 10px rgba(60,255,60,0.9), 0 0 10px rgba(80,255,80,0.7) inset; border-color: #55FF55; }
-        .evolutionOption[data-class="tank"]:hover { background-color: #285828; transform: translateY(-3px) scale(1.02); box-shadow: 0 0 45px 12px rgba(50,255,50,1), 0 0 18px rgba(100,255,100,0.9) inset; }
-        .evolutionOption[data-class="utility"] { box-shadow: 0 0 30px 10px rgba(180,60,255,0.9), 0 0 10px rgba(210,100,255,0.7) inset; border-color: #C077FF; }
-        .evolutionOption[data-class="utility"]:hover { background-color: #382058; transform: translateY(-3px) scale(1.02); box-shadow: 0 0 45px 12px rgba(190,80,255,1), 0 0 18px rgba(220,120,255,0.9) inset; }
-        #evolutionScreen .evolutionOption:hover,
-        #freeUpgradeScreen .freeUpgradeOption:hover {
-            background-color: #3a3a70;
-            transform: translateY(-3px) scale(1.02);
+        /* --- Tiered Evolution Option Styling --- */
+        /* COMMON (Subtle class-colored glow) */
+        .evolutionOption[data-tier="common"] {
+            border-color: #78788f; 
         }
+        .evolutionOption[data-tier="common"][data-class="attack"] {
+            box-shadow: 0 0 10px 2px rgba(255,100,100,0.3), 0 0 4px rgba(255,120,120,0.2) inset; 
+            border-color: #B33A3A; 
+        }
+        .evolutionOption[data-tier="common"][data-class="tank"] {
+            box-shadow: 0 0 10px 2px rgba(100,255,100,0.3), 0 0 4px rgba(120,255,120,0.2) inset;
+            border-color: #3AB33A; 
+        }
+        .evolutionOption[data-tier="common"][data-class="utility"] {
+            box-shadow: 0 0 10px 2px rgba(190,100,255,0.3), 0 0 4px rgba(210,120,255,0.2) inset;
+            border-color: #8A3AB3; 
+        }
+        .evolutionOption[data-tier="common"]:hover {
+            background-color: #323260;
+            transform: translateY(-2px) scale(1.01);
+            border-color: #9090aa;
+        }
+        .evolutionOption[data-tier="common"][data-class="attack"]:hover { border-color: #cc5c5c; background-color: #432525; }
+        .evolutionOption[data-tier="common"][data-class="tank"]:hover   { border-color: #5ccc5c; background-color: #254325; }
+        .evolutionOption[data-tier="common"][data-class="utility"]:hover{ border-color: #a55ccc; background-color: #322543; }
+
+        
+        /* RARE */
+        .evolutionOption[data-tier="rare"][data-class="attack"],
+        .evolutionOption[data-class="attack"]:not([data-tier="common"]):not([data-tier="epic"]):not([data-tier="legendary"]) { 
+            box-shadow: 0 0 20px 7px rgba(255,60,60,0.6), 0 0 10px rgba(255,100,100,0.4) inset; 
+            border-color: #FF5555; 
+        }
+        .evolutionOption[data-tier="rare"][data-class="attack"]:hover,
+        .evolutionOption[data-class="attack"]:not([data-tier="common"]):not([data-tier="epic"]):not([data-tier="legendary"]):hover {
+            background-color: #582828; transform: translateY(-3px) scale(1.02); 
+            box-shadow: 0 0 30px 9px rgba(255,50,50,0.8), 0 0 15px rgba(255,120,120,0.6) inset;
+        }
+
+        .evolutionOption[data-tier="rare"][data-class="tank"],
+        .evolutionOption[data-class="tank"]:not([data-tier="common"]):not([data-tier="epic"]):not([data-tier="legendary"]) {
+            box-shadow: 0 0 20px 7px rgba(60,255,60,0.6), 0 0  7px rgba(80,255,80,0.4) inset; 
+            border-color: #55FF55; 
+        }
+        .evolutionOption[data-tier="rare"][data-class="tank"]:hover,
+        .evolutionOption[data-class="tank"]:not([data-tier="common"]):not([data-tier="epic"]):not([data-tier="legendary"]):hover {
+            background-color: #285828; transform: translateY(-3px) scale(1.02); 
+            box-shadow: 0 0 30px 9px rgba(50,255,50,0.8), 0 0 12px rgba(100,255,100,0.6) inset;
+        }
+
+        .evolutionOption[data-tier="rare"][data-class="utility"],
+        .evolutionOption[data-class="utility"]:not([data-tier="common"]):not([data-tier="epic"]):not([data-tier="legendary"]) {
+            box-shadow: 0 0 20px 7px rgba(180,60,255,0.6), 0 0 7px rgba(210,100,255,0.4) inset; 
+            border-color: #C077FF; 
+        }
+        .evolutionOption[data-tier="rare"][data-class="utility"]:hover,
+        .evolutionOption[data-class="utility"]:not([data-tier="common"]):not([data-tier="epic"]):not([data-tier="legendary"]):hover {
+            background-color: #382058; transform: translateY(-3px) scale(1.02); 
+            box-shadow: 0 0 30px 9px rgba(190,80,255,0.8), 0 0 12px rgba(220,120,255,0.6) inset;
+        }
+
+        /* EPIC */
+        .evolutionOption[data-tier="epic"] {
+             border-width: 2px; 
+        }
+        .evolutionOption[data-tier="epic"][data-class="attack"] {
+            box-shadow: 0 0 35px 10px rgba(255,30,30,0.95), 0 0 18px rgba(255,80,80,0.8) inset;
+            border-color: #FF2222;
+            animation: epicPulseAttack 1.5s infinite ease-in-out;
+        }
+        .evolutionOption[data-tier="epic"][data-class="tank"] {
+            box-shadow: 0 0 35px 10px rgba(30,255,30,0.95), 0 0 12px rgba(60,255,60,0.8) inset;
+            border-color: #22FF22;
+            animation: epicPulseTank 1.5s infinite ease-in-out;
+        }
+        .evolutionOption[data-tier="epic"][data-class="utility"] {
+            box-shadow: 0 0 35px 10px rgba(200,60,255,0.95), 0 0 12px rgba(220,100,255,0.8) inset;
+            border-color: #D055FF;
+            animation: epicPulseUtility 1.5s infinite ease-in-out;
+        }
+
+        /* LEGENDARY */
+        .evolutionOption[data-tier="legendary"] {
+            border-width: 3px; 
+            transform: scale(1.01); 
+        }
+        .evolutionOption[data-tier="legendary"][data-class="attack"] {
+            box-shadow: 0 0 50px 15px rgba(255,100,0,1), 0 0 25px rgba(255,150,50,0.95) inset, 0 0 10px #FFD700; 
+            border-color: #FFD700; 
+            animation: legendaryPulseAttack 1s infinite ease-in-out;
+        }
+        .evolutionOption[data-tier="legendary"][data-class="tank"] {
+            box-shadow: 0 0 50px 15px rgba(0,200,0,1), 0 0 20px rgba(100,255,100,0.95) inset, 0 0 10px #DDFFDD; 
+            border-color: #7CFC00; 
+            animation: legendaryPulseTank 1s infinite ease-in-out;
+        }
+        .evolutionOption[data-tier="legendary"][data-class="utility"] {
+            box-shadow: 0 0 50px 15px rgba(180,0,255,1), 0 0 20px rgba(220,100,255,0.95) inset, 0 0 10px #F0CCFF; 
+            border-color: #DA70D6; 
+            animation: legendaryPulseUtility 1s infinite ease-in-out;
+        }
+
+        #evolutionScreen .evolutionOption[data-tier="epic"]:hover,
+        #evolutionScreen .evolutionOption[data-tier="legendary"]:hover {
+            transform: translateY(-5px) scale(1.05); 
+        }
+        .evolutionOption[data-tier="epic"][data-class="attack"]:hover { box-shadow: 0 0 50px 14px rgba(255,30,30,1), 0 0 22px rgba(255,100,100,0.9) inset, 0 0 5px #fff; }
+        .evolutionOption[data-tier="epic"][data-class="tank"]:hover   { box-shadow: 0 0 50px 14px rgba(30,255,30,1), 0 0 18px rgba(80,255,80,0.9) inset, 0 0 5px #fff; }
+        .evolutionOption[data-tier="epic"][data-class="utility"]:hover{ box-shadow: 0 0 50px 14px rgba(200,60,255,1), 0 0 18px rgba(220,100,255,0.9) inset, 0 0 5px #fff; }
+        
+        .evolutionOption[data-tier="legendary"][data-class="attack"]:hover { 
+            box-shadow: 0 0 70px 20px rgba(255,100,0,1), 0 0 30px rgba(255,165,0,1) inset, 0 0 15px #FFFACD; 
+        }
+         .evolutionOption[data-tier="legendary"][data-class="tank"]:hover { 
+            box-shadow: 0 0 70px 20px rgba(0,220,0,1), 0 0 25px rgba(120,255,120,1) inset, 0 0 15px #FFFFFF;
+        }
+         .evolutionOption[data-tier="legendary"][data-class="utility"]:hover { 
+            box-shadow: 0 0 70px 20px rgba(200,0,220,1), 0 0 25px rgba(240,100,240,1) inset, 0 0 15px #FFFFFF;
+        }
+        /* --- End Tiered Styling --- */
+
+
         #evolutionScreen .evolutionOption.disabled,
         #freeUpgradeScreen .freeUpgradeOption.disabled {
             background-color: #404040; border-color: #606060;
             cursor: not-allowed; opacity: 0.6;
-            box-shadow: none;
+            box-shadow: none; 
+            animation: none; 
         }
         #evolutionScreen .evolutionOption.disabled:hover,
         #freeUpgradeScreen .freeUpgradeOption.disabled:hover {
@@ -106,6 +222,33 @@
         }
         #evolutionScreen .evolutionOption h3, #freeUpgradeScreen .freeUpgradeOption h3 { margin-top: 0; color: #ddeeff; font-size: 18px; }
         #evolutionScreen .evolutionOption p, #freeUpgradeScreen .freeUpgradeOption p { font-size: 14px; color: #aabbcc; margin-bottom: 0;}
+
+        @keyframes epicPulseAttack {
+            0%, 100% { box-shadow: 0 0 35px 10px rgba(255,30,30,0.95), 0 0 18px rgba(255,80,80,0.8) inset; }
+            50% { box-shadow: 0 0 40px 12px rgba(255,50,50,1), 0 0 20px rgba(255,100,100,0.9) inset; }
+        }
+        @keyframes epicPulseTank {
+            0%, 100% { box-shadow: 0 0 35px 10px rgba(30,255,30,0.95), 0 0 12px rgba(60,255,60,0.8) inset; }
+            50% { box-shadow: 0 0 40px 12px rgba(50,255,50,1), 0 0 15px rgba(80,255,80,0.9) inset; }
+        }
+        @keyframes epicPulseUtility {
+            0%, 100% { box-shadow: 0 0 35px 10px rgba(200,60,255,0.95), 0 0 12px rgba(220,100,255,0.8) inset; }
+            50% { box-shadow: 0 0 40px 12px rgba(210,80,255,1), 0 0 15px rgba(230,120,255,0.9) inset; }
+        }
+
+        @keyframes legendaryPulseAttack {
+            0%, 100% { box-shadow: 0 0 50px 15px rgba(255,100,0,1), 0 0 25px rgba(255,150,50,0.95) inset, 0 0 10px #FFD700; }
+            50% { box-shadow: 0 0 65px 18px rgba(255,120,0,1), 0 0 30px rgba(255,175,70,1) inset, 0 0 20px #FFFACD; }
+        }
+        @keyframes legendaryPulseTank {
+            0%, 100% { box-shadow: 0 0 50px 15px rgba(0,200,0,1), 0 0 20px rgba(100,255,100,0.95) inset, 0 0 10px #DDFFDD; }
+            50% { box-shadow: 0 0 65px 18px rgba(50,220,50,1), 0 0 25px rgba(120,255,120,1) inset, 0 0 20px white; }
+        }
+        @keyframes legendaryPulseUtility {
+            0%, 100% { box-shadow: 0 0 50px 15px rgba(180,0,255,1), 0 0 20px rgba(220,100,255,0.95) inset, 0 0 10px #F0CCFF; }
+            50% { box-shadow: 0 0 65px 18px rgba(200,50,255,1), 0 0 25px rgba(240,120,255,1) inset, 0 0 20px white; }
+        }
+
 
         #countdownOverlay {
             position: absolute;
@@ -135,31 +278,30 @@
         .lootOption p { font-size: 15px; color: #aabbdd; margin-bottom: 8px; flex-grow: 1; }
         .lootOption .optionType { font-size: 13px; color: #99aabb; font-style: italic; margin-top: auto; background-color: rgba(0,0,0,0.2); padding: 3px 8px; border-radius: 4px; }
 
-        /* --- Ability Cooldown UI & Kinetic Charge Bar --- */
         #kineticChargeUI {
             position: absolute;
-            bottom: 95px; /* (60px ability slot height + 15px gap + 20px bottom offset) */
+            bottom: 95px; 
             left: 50%;
             transform: translateX(-50%);
-            width: 220px; /* Example: 3 slots * 60px + 2 gaps * 15px = 180 + 30 = 210px. Adjust as needed. */
+            width: 220px; 
             height: 15px;
-            background-color: rgba(30, 30, 50, 0.7); /* Match ability slot bg */
-            border: 2px solid #404070; /* Slightly darker than ability slot border */
+            background-color: rgba(30, 30, 50, 0.7); 
+            border: 2px solid #404070; 
             border-radius: 3px;
-            z-index: 14; /* Below abilityCooldownUI if there's overlap, though it shouldn't */
+            z-index: 14; 
             box-shadow: 0 0 6px rgba(80, 80, 120, 0.4);
             overflow: hidden;
-            display: none; /* Initially hidden, shown by JS when Kinetic Conversion is active */
+            display: none; 
         }
         #kineticChargeBarFill {
             width: 0%;
             height: 100%;
-            background-color: rgba(0, 85, 170, 0.8); /* Default low charge color */
-            border-radius: 1px; /* Inner radius */
+            background-color: rgba(0, 85, 170, 0.8); 
+            border-radius: 1px; 
             transition: width 0.1s linear, background-color 0.3s ease-out;
             position: relative;
         }
-        #kineticChargeBarFill.sparkling::after { /* Sparkle effect */
+        #kineticChargeBarFill.sparkling::after { 
             content: '';
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -168,7 +310,7 @@
                 radial-gradient(circle at var(--sparkle2-x, 70%) var(--sparkle2-y, 60%), white 0px, transparent 2px);
             background-repeat: no-repeat;
             animation: kineticSparkleAnim 1s infinite ease-in-out;
-            opacity: 0; /* Managed by JS or animation */
+            opacity: 0; 
         }
         @keyframes kineticSparkleAnim {
             0%, 100% { opacity: 0; }
@@ -182,7 +324,7 @@
             font-size: 10px;
             font-weight: bold;
             color: white;
-            text-shadow: 0 0 2px black, 0 0 2px black; /* Stronger shadow for readability */
+            text-shadow: 0 0 2px black, 0 0 2px black; 
             pointer-events: none;
             z-index: 1;
             white-space: nowrap;
@@ -414,13 +556,11 @@
         <div id="detailedScoresListContainer">
             <ol id="detailedScoresList"></ol>
             <div id="detailedStatsDisplayContainer">
-                <!-- #pausePlayerStatsPanel gets appended here by ui.js when a score is clicked -->
             </div>
         </div>
         <button id="backToMainMenuFromScoresButton" style="margin-top: 20px;">Back to Main Menu</button>
     </div>
 
-    <!-- MODIFIED: Added Kinetic Charge UI elements -->
     <div id="kineticChargeUI">
         <div id="kineticChargeBarFill"></div>
         <span id="kineticChargeText"></span>

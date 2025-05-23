@@ -1,5 +1,5 @@
 // js/ui.js
-console.log("[Debug UI_JS_LOAD] ui.js is being parsed/executed."); 
+// console.log("[Debug UI_JS_LOAD] ui.js is being parsed/executed."); 
 
 import * as CONSTANTS from './constants.js';
 
@@ -77,6 +77,10 @@ export function updateActiveBuffIndicator(playerInstance, currentPostPopupImmuni
     if (playerInstance.teleporting && playerInstance.teleportEffectTimer > 0) { textParts.push(`Teleporting (${(playerInstance.teleportEffectTimer / 1000).toFixed(1)}s)`); }
     if (playerInstance.isShieldOvercharging) { textParts.push(`Overcharge (${(playerInstance.shieldOverchargeTimer / 1000).toFixed(1)}s)`); }
     if (maxImmunityTime > 0 && !(playerInstance.teleporting && playerInstance.teleportEffectTimer > 0) && !playerInstance.isShieldOvercharging) { textParts.push(`Shield (${Math.ceil(maxImmunityTime / 1000)}s)`);}
+    
+    if (playerInstance.isHarmonized && playerInstance.hasPerfectHarmonyHelm) {
+        textParts.push("Harmony!");
+    }
     activeBuffIndicator.textContent = textParts.join(' ').trim();
 }
 export function displayHighScores(containerElement, scoresArray) {
@@ -88,7 +92,6 @@ export function displayHighScores(containerElement, scoresArray) {
 
 export function updateAbilityCooldownUI(playerInstance) {
     if (!abilityCooldownUI || !playerInstance) {
-        // console.warn("updateAbilityCooldownUI: abilityCooldownUI or playerInstance is null/undefined.", "abilityCooldownUI:", abilityCooldownUI, "playerInstance:", playerInstance);
         return;
     }
     abilityCooldownUI.innerHTML = '';
@@ -109,21 +112,19 @@ export function updateAbilityCooldownUI(playerInstance) {
         let isUnlocked = false;
         let isReady = false;
         let isChargingOrActive = false;
-        let currentTimer = 0;
-        let maxTimer = 0;
-        let actualIconText = desc.defaultIcon || '?';
-        let keybindText = desc.keybindText || desc.slot;
+        // let currentTimer = 0; // Not used directly for overlay height, displayCooldownTimerValue is used
+        let maxTimer = 0; 
+        let displayCooldownTimerValue = 0; 
 
         if (desc.type === 'mouse') {
             isUnlocked = desc.check();
-            actualIconText = desc.iconText;
             if (isUnlocked) {
                 isChargingOrActive = desc.isCharging();
                 if (isChargingOrActive) {
-                    currentTimer = desc.timer();
+                    displayCooldownTimerValue = desc.timer(); 
                     maxTimer = desc.maxTime();
                 } else if (desc.cooldownTimer() > 0) {
-                    currentTimer = desc.cooldownTimer();
+                    displayCooldownTimerValue = desc.cooldownTimer(); 
                     maxTimer = desc.cooldownMax();
                 } else {
                     isReady = true;
@@ -133,36 +134,42 @@ export function updateAbilityCooldownUI(playerInstance) {
             const ability = playerInstance.activeAbilities[desc.slot];
             if (ability) {
                 isUnlocked = true;
-                switch(ability.id) {
-                    case 'empBurst': actualIconText = '💥'; break;
-                    case 'miniGravityWell': actualIconText = '🔮'; break;
-                    case 'teleport': actualIconText = '🌀'; break;
-                    default: actualIconText = '?';
+                maxTimer = ability.cooldownDuration; 
+                if (playerInstance.hasUltimateConfigurationHelm) { 
+                    maxTimer *= 1.5;
                 }
 
                 if (ability.id === 'miniGravityWell' && playerInstance.activeMiniWell && playerInstance.activeMiniWell.isActive) {
                     isChargingOrActive = true;
-                    currentTimer = playerInstance.activeMiniWell.lifeTimer;
-                    maxTimer = playerInstance.activeMiniWell.maxLife;
+                    displayCooldownTimerValue = playerInstance.activeMiniWell.lifeTimer;
+                    maxTimer = playerInstance.activeMiniWell.maxLife; 
                 } else if (ability.cooldownTimer > 0) {
-                    currentTimer = ability.cooldownTimer;
-                    maxTimer = ability.cooldownDuration;
+                    displayCooldownTimerValue = ability.cooldownTimer;
                 } else {
                     isReady = true;
                 }
             } else {
                 isUnlocked = false;
-                actualIconText = desc.defaultIcon;
             }
         }
 
         const keybindSpan = document.createElement('span');
         keybindSpan.classList.add('keybind');
-        keybindSpan.textContent = keybindText;
+        keybindSpan.textContent = desc.keybindText || desc.slot;
 
         const iconDivElem = document.createElement('div');
         iconDivElem.classList.add('icon');
-        iconDivElem.textContent = actualIconText;
+        iconDivElem.textContent = desc.defaultIcon || '?';
+         if (isUnlocked && desc.type === 'mouse') iconDivElem.textContent = desc.iconText;
+         else if (isUnlocked && desc.type === 'slot' && playerInstance.activeAbilities[desc.slot]) {
+            const abilityId = playerInstance.activeAbilities[desc.slot].id;
+             switch(abilityId) {
+                case 'empBurst': iconDivElem.textContent = '💥'; break;
+                case 'miniGravityWell': iconDivElem.textContent = '🔮'; break;
+                case 'teleport': iconDivElem.textContent = '🌀'; break;
+            }
+         }
+
 
         const cooldownOverlayDiv = document.createElement('div');
         cooldownOverlayDiv.classList.add('cooldown-overlay');
@@ -178,61 +185,49 @@ export function updateAbilityCooldownUI(playerInstance) {
         if (!isUnlocked) {
             slotDiv.classList.add('locked');
             iconDivElem.style.opacity = '0.3';
-
             const lockIconDiv = document.createElement('div');
-            lockIconDiv.classList.add('icon', 'lock-icon-overlay');
-            lockIconDiv.textContent = '🔒';
-            lockIconDiv.style.position = 'absolute';
-            lockIconDiv.style.zIndex = '4';
-            lockIconDiv.style.color = '#DDD';
-            lockIconDiv.style.opacity = '0.7';
+            lockIconDiv.classList.add('icon', 'lock-icon-overlay'); lockIconDiv.textContent = '🔒';
             slotDiv.appendChild(lockIconDiv);
-
             cooldownOverlayDiv.style.height = '100%';
             cooldownOverlayDiv.style.backgroundColor = 'rgba(50,50,50,0.8)';
-            cooldownTimerSpan.textContent = '';
         } else if (isChargingOrActive) {
             slotDiv.classList.add('charging');
-            if (maxTimer > 0) {
-                cooldownOverlayDiv.style.height = `${(1 - (currentTimer / maxTimer)) * 100}%`;
-                cooldownTimerSpan.textContent = (currentTimer / 1000).toFixed(1) + 's';
+            if (maxTimer > 0 && displayCooldownTimerValue >= 0) { // ensure displayCooldownTimerValue is not negative
+                cooldownOverlayDiv.style.height = `${Math.max(0, (1 - (displayCooldownTimerValue / maxTimer)) * 100)}%`;
+                cooldownTimerSpan.textContent = (displayCooldownTimerValue / 1000).toFixed(1) + 's';
+            } else if (maxTimer > 0 && displayCooldownTimerValue < 0) { // Handles case where timer might have overshot due to large dt
+                 cooldownOverlayDiv.style.height = '100%'; // Or 0% depending on desired full charge visual
+                 cooldownTimerSpan.textContent = '0.0s';
             }
-        } else if (!isReady && currentTimer > 0) {
+        } else if (!isReady && displayCooldownTimerValue > 0) {
             slotDiv.classList.add('on-cooldown');
             if (maxTimer > 0) {
-                const cooldownPercent = (currentTimer / maxTimer) * 100;
-                cooldownOverlayDiv.style.height = `${Math.min(100, cooldownPercent)}%`;
-                cooldownTimerSpan.textContent = (currentTimer / 1000).toFixed(1) + 's';
+                const cooldownPercent = (displayCooldownTimerValue / maxTimer) * 100;
+                cooldownOverlayDiv.style.height = `${Math.min(100, Math.max(0, cooldownPercent))}%`;
+                cooldownTimerSpan.textContent = (displayCooldownTimerValue / 1000).toFixed(1) + 's';
             }
         } else if (isReady) {
             slotDiv.classList.add('ready');
             cooldownOverlayDiv.style.height = '0%';
-            cooldownTimerSpan.textContent = '';
         }
         abilityCooldownUI.appendChild(slotDiv);
     });
 }
 
-console.log("[Debug UI_JS_FUNC_DEF] Defining updateKineticChargeUI function now.");
-
+// console.log("[Debug UI_JS_FUNC_DEF] Defining updateKineticChargeUI function now.");
 export function updateKineticChargeUI(currentCharge, maxCharge, currentMaxPotencyBonus, playerHasKineticConversionEvolution) {
     // console.log(`[Debug KINETIC_UI_ENTERED] updateKineticChargeUI ENTERED. Visible: ${playerHasKineticConversionEvolution}, Charge: ${currentCharge}/${maxCharge}`);
-    
     if (!kineticChargeUIElement || !kineticChargeBarFillElement || !kineticChargeTextElement) {
-        // console.error("[Debug KINETIC_UI] CRITICAL: One or more Kinetic Charge UI DOM elements are NULL. Aborting UI update.");
         return;
     }
-
     if (playerHasKineticConversionEvolution) {
         kineticChargeUIElement.style.display = 'flex';
     } else {
         kineticChargeUIElement.style.display = 'none';
         return; 
     }
-
     const chargePercentage = Math.max(0, Math.min(100, (currentCharge / maxCharge) * 100));
     kineticChargeBarFillElement.style.width = `${chargePercentage}%`;
-
     let barColor = 'rgba(0, 60, 120, 0.8)';
     if (chargePercentage > 89.9) {
         // console.log("[Debug SPARKLE] Charge percentage > 89.9. Current:", chargePercentage); 
@@ -256,7 +251,6 @@ export function updateKineticChargeUI(currentCharge, maxCharge, currentMaxPotenc
         }
     }
     kineticChargeBarFillElement.style.backgroundColor = barColor;
-
     if (kineticChargeTextElement) {
         if (currentCharge > 1) {
             const potencyBonusForCurrentCharge = currentMaxPotencyBonus * (currentCharge / maxCharge);
@@ -267,14 +261,12 @@ export function updateKineticChargeUI(currentCharge, maxCharge, currentMaxPotenc
     }
 }
 
-
 // --- Screen Management ---
 const ALL_SCREENS_FOR_SHOW_SCREEN = [ startScreen, settingsScreen, gameOverScreen, evolutionScreen, freeUpgradeScreen, pauseScreen, countdownOverlay, lootChoiceScreen, detailedHighScoresScreen ];
 export function showScreen(screenElementToShow, cameFromPauseMenu = false, callbacks = {}) {
     ALL_SCREENS_FOR_SHOW_SCREEN.forEach(screen => {
         if (screen) screen.style.display = 'none';
     });
-
     if (pausePlayerStatsPanel) {
         if (detailedStatsDisplayContainer && pausePlayerStatsPanel.parentElement === detailedStatsDisplayContainer && screenElementToShow !== detailedHighScoresScreen) {
             document.body.appendChild(pausePlayerStatsPanel);
@@ -285,11 +277,8 @@ export function showScreen(screenElementToShow, cameFromPauseMenu = false, callb
             pausePlayerStatsPanel.style.display = 'none';
         }
     }
-
-
     let gameIsNowPaused = false;
     let canvasShouldBeVisible = false;
-
     if (screenElementToShow === null) {
         if (canvas) canvas.style.display = 'block';
         canvasShouldBeVisible = true;
@@ -300,27 +289,21 @@ export function showScreen(screenElementToShow, cameFromPauseMenu = false, callb
                                  screenElementToShow === lootChoiceScreen ||
                                  screenElementToShow === countdownOverlay ||
                                  (screenElementToShow === settingsScreen && previousScreenForSettings === pauseScreen);
-
         if (canvas) canvas.style.display = showCanvasBehind ? 'block' : 'none';
         canvasShouldBeVisible = showCanvasBehind;
-
         if (screenElementToShow) screenElementToShow.style.display = 'flex';
-
         if ([evolutionScreen, freeUpgradeScreen, lootChoiceScreen, startScreen, gameOverScreen, settingsScreen, pauseScreen, countdownOverlay, detailedHighScoresScreen].includes(screenElementToShow)) {
             gameIsNowPaused = true;
         }
     }
-
     if (gameIsNowPaused && callbacks.onPauseGame) {
         callbacks.onPauseGame(screenElementToShow);
     } else if (!gameIsNowPaused && callbacks.onResumeGame) {
         callbacks.onResumeGame(screenElementToShow);
     }
-
     if (callbacks.onApplyMusicPlayState) {
         callbacks.onApplyMusicPlayState(screenElementToShow);
     }
-
     return gameIsNowPaused;
 }
 export function getPreviousScreenForSettings() { return previousScreenForSettings; }
@@ -330,57 +313,72 @@ export function setPreviousScreenForSettings(screenRef) { previousScreenForSetti
 export function populateEvolutionOptionsUI(choices, playerInstance, evolutionSelectCallback, currentShrinkMeCooldown, getReadableColorNameFunc) {
     if (!evolutionOptionsContainer || !playerInstance) return;
     evolutionOptionsContainer.innerHTML = '';
-    choices.forEach(choice => {
+
+    choices.forEach(uiChoiceData => { 
         const optionDiv = document.createElement('div');
         optionDiv.classList.add('evolutionOption');
-        optionDiv.dataset.class = choice.classType;
-        let displayText = choice.text;
+        optionDiv.dataset.class = uiChoiceData.classType;
 
-        let currentLevelForDisplay = choice.level || 0;
-        if (choice.id === 'kineticConversion' && playerInstance.kineticConversionLevel !== undefined) {
-            currentLevelForDisplay = playerInstance.kineticConversionLevel;
+        if (uiChoiceData.originalEvolution.isTiered && uiChoiceData.rolledTier) {
+            optionDiv.dataset.tier = uiChoiceData.rolledTier; 
+        } else {
+            optionDiv.dataset.tier = "none"; // For non-tiered or if tier somehow missing (applies default .evolutionOption styles)
         }
-        // For Reinforced Hull, levels might not be displayed if it's based on multiplier directly
-        if (choice.id === 'reinforcedHull') {
-            // No (Lvl X/Y) needed if it's infinitely stackable with diminishing returns
-        } else if (choice.maxLevel !== undefined && choice.maxLevel > 0 && choice.maxLevel < 500) {
-            displayText += ` (Lvl ${currentLevelForDisplay}/${choice.maxLevel})`;
-        } else if (currentLevelForDisplay > 0 && choice.maxLevel === 999) { 
-             displayText += ` (Lvl ${currentLevelForDisplay})`;
+        
+        let displayText = uiChoiceData.text; // Should include tier from main.js, e.g., "Focused Beam (Rare)"
+        
+        if (uiChoiceData.cardEffectString) { // This is the string describing THIS PICK's effect
+             displayText += `<br><span class="evolution-details">${uiChoiceData.cardEffectString}</span>`;
         }
-
-
-        if (choice.getEffectString && typeof choice.getEffectString === 'function') {
-            let effectString;
-            if (choice.id === 'kineticConversion') {
-                const tempChoiceForString = {...choice, level: playerInstance.kineticConversionLevel || 0 };
-                effectString = tempChoiceForString.getEffectString();
-            } else {
-                effectString = choice.getEffectString();
-            }
-            displayText += `<br><span class="evolution-details">${effectString}</span>`;
-        }
-
-
+        
         optionDiv.innerHTML = `<h3>${displayText}</h3>`;
 
-        if (choice.detailedDescription && evolutionTooltip) {
-            optionDiv.onmouseover = (event) => { evolutionTooltip.innerHTML = choice.detailedDescription; evolutionTooltip.style.left = `${event.pageX + 15}px`; evolutionTooltip.style.top = `${event.pageY + 15}px`; evolutionTooltip.style.display = 'block'; };
-            optionDiv.onmousemove = (event) => { evolutionTooltip.style.left = `${event.pageX + 15}px`; evolutionTooltip.style.top = `${event.pageY + 15}px`;};
+        if (uiChoiceData.detailedDescription && evolutionTooltip) {
+            optionDiv.onmouseover = (event) => { 
+                let tooltipText = "";
+                if (uiChoiceData.originalEvolution.isTiered && uiChoiceData.rolledTier) {
+                    tooltipText = `<span style="text-transform: capitalize; font-weight: bold; color: ${getTierColor(uiChoiceData.rolledTier)};">${uiChoiceData.rolledTier} Tier</span><br>`;
+                }
+                tooltipText += uiChoiceData.detailedDescription;
+                evolutionTooltip.innerHTML = tooltipText; 
+                evolutionTooltip.style.left = `${event.pageX + 15}px`; 
+                evolutionTooltip.style.top = `${event.pageY + 15}px`; 
+                evolutionTooltip.style.display = 'block'; 
+            };
+            optionDiv.onmousemove = (event) => { 
+                evolutionTooltip.style.left = `${event.pageX + 15}px`; 
+                evolutionTooltip.style.top = `${event.pageY + 15}px`;
+            };
             optionDiv.onmouseout = () => { evolutionTooltip.style.display = 'none'; };
         }
 
-        if (choice.id === 'noMoreEvolutions' || (choice.isMaxed && choice.isMaxed(playerInstance))) {
+        const baseEvoForMaxCheck = uiChoiceData.originalEvolution;
+        // Pass the player instance to isMaxed if it needs it
+        const isMaxed = baseEvoForMaxCheck.isMaxed ? baseEvoForMaxCheck.isMaxed(playerInstance) : false;
+
+        if (baseEvoForMaxCheck.id === 'noMoreEvolutions' || isMaxed ) {
             optionDiv.classList.add('disabled');
-            if (choice.id === 'smallerPlayer' && currentShrinkMeCooldown > 0) {
+            if (baseEvoForMaxCheck.id === 'smallerPlayer' && currentShrinkMeCooldown > 0) {
                 optionDiv.innerHTML += `<p>(Available in ${currentShrinkMeCooldown} more evolution${currentShrinkMeCooldown !== 1 ? 's' : ''})</p>`;
             }
         } else {
-            optionDiv.onclick = () => evolutionSelectCallback(choice);
+            optionDiv.onclick = () => evolutionSelectCallback(uiChoiceData); 
         }
         evolutionOptionsContainer.appendChild(optionDiv);
     });
 }
+
+// Helper for tooltip tier color
+function getTierColor(tier) {
+    switch(tier) {
+        case 'common': return '#9db8b7'; // Dull cyan/grey
+        case 'rare': return '#598cd0';   // Blue
+        case 'epic': return '#c077ff';   // Purple
+        case 'legendary': return '#ffb000';// Orange/Gold
+        default: return '#ffffff';
+    }
+}
+
 
 export function populateFreeUpgradeOptionUI(chosenUpgrade, onContinueCallback) {
     if (!freeUpgradeOptionContainer || !closeFreeUpgradeButton) return;
@@ -548,17 +546,11 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, getReadableColorNam
     const formatNum = (val, digits = 1) => (typeof val === 'number' && !isNaN(val) ? val.toFixed(digits) : 'N/A');
     const formatInt = (val) => (typeof val === 'number' && !isNaN(val) ? val.toString() : 'N/A');
 
-    // ---- START OF MODIFICATION for Core Stats Display ----
     coreHTML += `<p><span class="stat-label">Max HP:</span><span class="stat-value">${formatInt(playerData.maxHp)}</span></p>`;
-    // Speed removed
-    // Base Radius removed
-    coreHTML += `<p><span class="stat-label">Player Size:</span><span class="stat-value">${formatNum(playerData.finalRadius)}</span></p>`; // Renamed from Final Radius
-    // Score Size Factor removed
-    // Score Size Comp removed
+    coreHTML += `<p><span class="stat-label">Player Size:</span><span class="stat-value">${formatNum(playerData.finalRadius)}</span></p>`; 
     coreHTML += `<p><span class="stat-label">Times Hit:</span><span class="stat-value">${formatInt(playerData.timesHit)}</span></p>`;
     if (gameplayTimeData !== undefined) { const mins = Math.floor(gameplayTimeData / 60000); const secs = Math.floor((gameplayTimeData % 60000) / 1000); coreHTML += `<p><span class="stat-label">Time Played:</span><span class="stat-value">${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}</span></p>`; }
     coreHTML += `<p><span class="stat-label">Damage Dealt:</span><span class="stat-value">${playerData.totalDamageDealt ? playerData.totalDamageDealt.toLocaleString() : 0}</span></p>`;
-    // ---- END OF MODIFICATION for Core Stats Display ----
     statsCoreDiv.innerHTML = coreHTML;
 
     statsUpgradesUl.innerHTML = '';
