@@ -73,7 +73,7 @@ export function updateActiveBuffIndicator(playerInstance, currentPostPopupImmuni
     if (maxImmunityTime > 0 && !(playerInstance.teleporting && playerInstance.teleportEffectTimer > 0) && !playerInstance.isShieldOvercharging) { textParts.push(`Shield (${Math.ceil(maxImmunityTime / 1000)}s)`);}
     activeBuffIndicator.textContent = textParts.join(' ').trim();
 }
-export function displayHighScores(containerElement, scoresArray) { 
+export function displayHighScores(containerElement, scoresArray) {
     if (!containerElement) return; containerElement.innerHTML = '';
     if (!scoresArray || scoresArray.length === 0) { containerElement.innerHTML = "<li>No scores yet!</li>"; return; }
     scoresArray.forEach(scoreItem => { const li = document.createElement('li'); li.textContent = `${scoreItem.name}: ${scoreItem.score}`; containerElement.appendChild(li); });
@@ -95,19 +95,19 @@ export function updateAbilityCooldownUI(playerInstance) {
     abilityDisplayOrder.forEach(desc => {
         const slotDiv = document.createElement('div');
         slotDiv.classList.add('ability-slot');
-        slotDiv.id = `ability-slot-${desc.id || desc.slot}`; 
+        slotDiv.id = `ability-slot-${desc.id || desc.slot}`;
 
         let isUnlocked = false;
         let isReady = false;
-        let isChargingOrActive = false; 
+        let isChargingOrActive = false;
         let currentTimer = 0;
-        let maxTimer = 0; 
-        let actualIconText = desc.defaultIcon || '?'; 
+        let maxTimer = 0;
+        let actualIconText = desc.defaultIcon || '?';
         let keybindText = desc.keybindText || desc.slot;
 
         if (desc.type === 'mouse') {
             isUnlocked = desc.check();
-            actualIconText = desc.iconText; 
+            actualIconText = desc.iconText;
             if (isUnlocked) {
                 isChargingOrActive = desc.isCharging();
                 if (isChargingOrActive) {
@@ -122,13 +122,13 @@ export function updateAbilityCooldownUI(playerInstance) {
             }
         } else if (desc.type === 'slot') {
             const ability = playerInstance.activeAbilities[desc.slot];
-            if (ability) { 
+            if (ability) {
                 isUnlocked = true;
                 switch(ability.id) {
                     case 'empBurst': actualIconText = '💥'; break;
                     case 'miniGravityWell': actualIconText = '🔮'; break;
                     case 'teleport': actualIconText = '🌀'; break;
-                    default: actualIconText = '?'; 
+                    default: actualIconText = '?';
                 }
 
                 if (ability.id === 'miniGravityWell' && playerInstance.activeMiniWell && playerInstance.activeMiniWell.isActive) {
@@ -141,9 +141,9 @@ export function updateAbilityCooldownUI(playerInstance) {
                 } else {
                     isReady = true;
                 }
-            } else { 
+            } else {
                 isUnlocked = false;
-                actualIconText = desc.defaultIcon; 
+                actualIconText = desc.defaultIcon;
             }
         }
 
@@ -151,9 +151,9 @@ export function updateAbilityCooldownUI(playerInstance) {
         keybindSpan.classList.add('keybind');
         keybindSpan.textContent = keybindText;
 
-        const iconDivElem = document.createElement('div'); 
+        const iconDivElem = document.createElement('div');
         iconDivElem.classList.add('icon');
-        iconDivElem.textContent = actualIconText; 
+        iconDivElem.textContent = actualIconText;
 
         const cooldownOverlayDiv = document.createElement('div');
         cooldownOverlayDiv.classList.add('cooldown-overlay');
@@ -162,22 +162,22 @@ export function updateAbilityCooldownUI(playerInstance) {
         cooldownTimerSpan.classList.add('cooldown-timer');
 
         slotDiv.appendChild(keybindSpan);
-        slotDiv.appendChild(iconDivElem); 
+        slotDiv.appendChild(iconDivElem);
         slotDiv.appendChild(cooldownOverlayDiv);
         slotDiv.appendChild(cooldownTimerSpan);
 
         if (!isUnlocked) {
             slotDiv.classList.add('locked');
-            iconDivElem.style.opacity = '0.3'; 
+            iconDivElem.style.opacity = '0.3';
 
-            const lockIconDiv = document.createElement('div'); 
-            lockIconDiv.classList.add('icon', 'lock-icon-overlay'); 
+            const lockIconDiv = document.createElement('div');
+            lockIconDiv.classList.add('icon', 'lock-icon-overlay');
             lockIconDiv.textContent = '🔒';
-            lockIconDiv.style.position = 'absolute'; 
-            lockIconDiv.style.zIndex = '4'; 
-            lockIconDiv.style.color = '#DDD'; 
-            lockIconDiv.style.opacity = '0.7'; 
-            slotDiv.appendChild(lockIconDiv); 
+            lockIconDiv.style.position = 'absolute';
+            lockIconDiv.style.zIndex = '4';
+            lockIconDiv.style.color = '#DDD';
+            lockIconDiv.style.opacity = '0.7';
+            slotDiv.appendChild(lockIconDiv);
 
             cooldownOverlayDiv.style.height = '100%';
             cooldownOverlayDiv.style.backgroundColor = 'rgba(50,50,50,0.8)';
@@ -188,7 +188,7 @@ export function updateAbilityCooldownUI(playerInstance) {
                 cooldownOverlayDiv.style.height = `${(1 - (currentTimer / maxTimer)) * 100}%`;
                 cooldownTimerSpan.textContent = (currentTimer / 1000).toFixed(1) + 's';
             }
-        } else if (!isReady && currentTimer > 0) { 
+        } else if (!isReady && currentTimer > 0) {
             slotDiv.classList.add('on-cooldown');
             if (maxTimer > 0) {
                 const cooldownPercent = (currentTimer / maxTimer) * 100;
@@ -213,7 +213,7 @@ export function showScreen(screenElementToShow, cameFromPauseMenu = false, callb
 
     if (pausePlayerStatsPanel) {
         if (detailedStatsDisplayContainer && pausePlayerStatsPanel.parentElement === detailedStatsDisplayContainer && screenElementToShow !== detailedHighScoresScreen) {
-            document.body.appendChild(pausePlayerStatsPanel); 
+            document.body.appendChild(pausePlayerStatsPanel);
         }
         if (screenElementToShow !== pauseScreen &&
             screenElementToShow !== gameOverScreen &&
@@ -223,10 +223,10 @@ export function showScreen(screenElementToShow, cameFromPauseMenu = false, callb
     }
 
 
-    let gameIsNowPaused = false; 
+    let gameIsNowPaused = false;
     let canvasShouldBeVisible = false;
 
-    if (screenElementToShow === null) { 
+    if (screenElementToShow === null) {
         if (canvas) canvas.style.display = 'block';
         canvasShouldBeVisible = true;
     } else {
@@ -248,13 +248,13 @@ export function showScreen(screenElementToShow, cameFromPauseMenu = false, callb
     }
 
     if (gameIsNowPaused && callbacks.onPauseGame) {
-        callbacks.onPauseGame(screenElementToShow); 
+        callbacks.onPauseGame(screenElementToShow);
     } else if (!gameIsNowPaused && callbacks.onResumeGame) {
-        callbacks.onResumeGame(screenElementToShow); 
+        callbacks.onResumeGame(screenElementToShow);
     }
 
     if (callbacks.onApplyMusicPlayState) {
-        callbacks.onApplyMusicPlayState(screenElementToShow); 
+        callbacks.onApplyMusicPlayState(screenElementToShow);
     }
 
     return gameIsNowPaused;
@@ -272,11 +272,11 @@ export function populateEvolutionOptionsUI(choices, playerInstance, evolutionSel
         optionDiv.dataset.class = choice.classType;
         let displayText = choice.text;
 
-        if (choice.maxLevel !== undefined && choice.maxLevel > 0 && choice.maxLevel < 500) { 
+        if (choice.maxLevel !== undefined && choice.maxLevel > 0 && choice.maxLevel < 500) {
             displayText += ` (Lvl ${choice.level || 0}/${choice.maxLevel})`;
-        } else if (choice.level !== undefined && choice.id !== 'smallerPlayer' && choice.maxLevel !== 999) { 
+        } else if (choice.level !== undefined && choice.id !== 'smallerPlayer' && choice.maxLevel !== 999) {
              displayText += ` (Lvl ${choice.level || 0})`;
-        } else if (choice.maxLevel === 999 && choice.level !== undefined) { 
+        } else if (choice.maxLevel === 999 && choice.level !== undefined) {
             displayText += ` (Lvl ${choice.level || 0})`;
         }
 
@@ -292,7 +292,7 @@ export function populateEvolutionOptionsUI(choices, playerInstance, evolutionSel
             optionDiv.onmouseout = () => { evolutionTooltip.style.display = 'none'; };
         }
 
-        if (choice.id === 'noMoreEvolutions' || (choice.isMaxed && choice.isMaxed(playerInstance))) { 
+        if (choice.id === 'noMoreEvolutions' || (choice.isMaxed && choice.isMaxed(playerInstance))) {
             optionDiv.classList.add('disabled');
             if (choice.id === 'smallerPlayer' && currentShrinkMeCooldown > 0) {
                 optionDiv.innerHTML += `<p>(Available in ${currentShrinkMeCooldown} more evolution${currentShrinkMeCooldown !== 1 ? 's' : ''})</p>`;
@@ -334,7 +334,7 @@ export function populateLootOptionsUI(choices, playerInstance, onSelectLootCallb
                }
                optionDiv.innerHTML = `<h3>${choice.name}</h3> <p>${choice.description.replace('up to 4 new random ray colors', `immunity to: ${offeredColorsText.join(', ')}`)}</p> <span class="optionType">${choice.type.charAt(0).toUpperCase() + choice.type.slice(1)}</span>`;
                optionDiv.onclick = () => onSelectLootCallback({...choice, chosenColors: colorsToOffer });
-           } else { 
+           } else {
                optionDiv.innerHTML = `<h3>${choice.name}</h3> <p>Already immune to all known ray colors!</p> <span class="optionType">${choice.type.charAt(0).toUpperCase() + choice.type.slice(1)}</span>`;
                optionDiv.style.opacity = '0.6'; optionDiv.style.cursor = 'not-allowed';
            }
@@ -349,7 +349,7 @@ export function populateLootOptionsUI(choices, playerInstance, onSelectLootCallb
 
 export function displayGameOverScreenContent(currentScore, isNewHighScore, onSubmitScoreCallback, onRestartCallback, onMainMenuCallback) {
     if (!gameOverScreen) return;
-    gameOverScreen.innerHTML = ''; 
+    gameOverScreen.innerHTML = '';
 
     const title = document.createElement('h2');
     title.textContent = "Game Over!";
@@ -367,7 +367,7 @@ export function displayGameOverScreenContent(currentScore, isNewHighScore, onSub
 
         const nameInput = document.createElement('input');
         nameInput.type = 'text';
-        nameInput.id = 'playerNameInputGameOver'; 
+        nameInput.id = 'playerNameInputGameOver';
         nameInput.placeholder = "Enter name (max 10)";
         nameInput.maxLength = 10;
         gameOverScreen.appendChild(nameInput);
@@ -402,8 +402,8 @@ export function displayDetailedHighScoresScreenUI(scoresData, onEntryClickCallba
     detailedScoresList.innerHTML = '';
 
     if (pausePlayerStatsPanel && pausePlayerStatsPanel.parentElement !== document.body) {
-        document.body.appendChild(pausePlayerStatsPanel); 
-        pausePlayerStatsPanel.style.display = 'none'; 
+        document.body.appendChild(pausePlayerStatsPanel);
+        pausePlayerStatsPanel.style.display = 'none';
     }
 
 
@@ -437,7 +437,7 @@ export function displayDetailedHighScoresScreenUI(scoresData, onEntryClickCallba
 
     const backButton = document.getElementById('backToMainMenuFromScoresButton');
     if (backButton) {
-        const newBackButton = backButton.cloneNode(true); 
+        const newBackButton = backButton.cloneNode(true);
         backButton.parentNode.replaceChild(newBackButton, backButton);
         newBackButton.onclick = onBackCallback;
     }
@@ -454,7 +454,6 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, getReadableColorNam
         statsPanelTitle.textContent = panelTitleText;
     }
 
-
     if (!statsSnapshot || !statsSnapshot.playerData) {
         const noDataMsg = "<p><span style='color: #aaa; font-size:11px;'>No data available for this entry.</span></p>";
         statsCoreDiv.innerHTML = noDataMsg; statsUpgradesUl.innerHTML = `<li>${noDataMsg.replace(/<p>|<\/p>/g, '')}</li>`;
@@ -464,16 +463,26 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, getReadableColorNam
     }
 
     const { playerData, bossTierData, gameplayTimeData } = statsSnapshot;
-    const bossTypeNamesFromSource = CONSTANTS.bossTypeNames || ["CHASER", "REFLECTOR", "SINGULARITY"]; 
-    const bossTypeKeysFromSource = CONSTANTS.bossTypeKeys || ["chaser", "reflector", "singularity"]; 
+    const bossTypeNamesFromSource = CONSTANTS.bossTypeNames || ["CHASER", "REFLECTOR", "SINGULARITY"];
+    const bossTypeKeysFromSource = CONSTANTS.bossTypeKeys || ["chaser", "reflector", "singularity"];
 
     let coreHTML = '';
-    coreHTML += `<p><span class="stat-label">Max HP:</span><span class="stat-value">${playerData.maxHp || CONSTANTS.PLAYER_MAX_HP}</span></p>`;
-    coreHTML += `<p><span class="stat-label">Speed:</span><span class="stat-value">${playerData.currentSpeed !== undefined ? playerData.currentSpeed.toFixed(1) : (CONSTANTS.PLAYER_SPEED_BASE !== undefined ? CONSTANTS.PLAYER_SPEED_BASE.toFixed(1) : 'N/A')}</span></p>`;
-    coreHTML += `<p><span class="stat-label">Base Radius:</span><span class="stat-value">${playerData.baseRadius ? playerData.baseRadius.toFixed(1) : 'N/A'}</span></p>`;
-    coreHTML += `<p><span class="stat-label">Final Radius:</span><span class="stat-value">${playerData.radius ? playerData.radius.toFixed(1) : 'N/A'}</span></p>`;
-    coreHTML += `<p><span class="stat-label">Score Size Factor:</span><span class="stat-value">${playerData.currentGrowthFactor !== undefined ? playerData.currentGrowthFactor.toFixed(3) : 'N/A'}</span></p>`;
-    coreHTML += `<p><span class="stat-label">Times Hit:</span><span class="stat-value">${playerData.timesHit !== undefined ? playerData.timesHit : 'N/A'}</span></p>`;
+    // Helper to format numbers or show N/A
+    const formatNum = (val, digits = 1) => (typeof val === 'number' && !isNaN(val) ? val.toFixed(digits) : 'N/A');
+    const formatInt = (val) => (typeof val === 'number' && !isNaN(val) ? val.toString() : 'N/A');
+
+    coreHTML += `<p><span class="stat-label">Max HP:</span><span class="stat-value">${formatInt(playerData.maxHp)}</span></p>`;
+    coreHTML += `<p><span class="stat-label">Speed:</span><span class="stat-value">${formatNum(playerData.currentSpeed)}</span></p>`;
+    coreHTML += `<p><span class="stat-label">Base Radius:</span><span class="stat-value">${formatNum(playerData.baseRadius)}</span></p>`;
+    coreHTML += `<p><span class="stat-label">Final Radius:</span><span class="stat-value">${formatNum(playerData.finalRadius)}</span></p>`;
+    coreHTML += `<p><span class="stat-label">Score Size Factor:</span><span class="stat-value">${formatNum(playerData.scoreSizeFactor, 3)}</span></p>`;
+    if (playerData.scoreOffsetForSizing !== undefined && playerData.scoreOffsetForSizing > 0) { // Only show if relevant
+        coreHTML += `<p><span class="stat-label">Size Score Offset:</span><span class="stat-value">${formatNum(playerData.scoreOffsetForSizing, 0)}</span></p>`;
+    }
+    if (playerData.scoreBasedSizeActual !== undefined) { // For debugging Evasive
+         coreHTML += `<p><span class="stat-label">Score Size Comp:</span><span class="stat-value">${formatNum(playerData.scoreBasedSizeActual, 2)}</span></p>`;
+    }
+    coreHTML += `<p><span class="stat-label">Times Hit:</span><span class="stat-value">${formatInt(playerData.timesHit)}</span></p>`;
     if (gameplayTimeData !== undefined) { const mins = Math.floor(gameplayTimeData / 60000); const secs = Math.floor((gameplayTimeData % 60000) / 1000); coreHTML += `<p><span class="stat-label">Time Played:</span><span class="stat-value">${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}</span></p>`; }
     coreHTML += `<p><span class="stat-label">Damage Dealt:</span><span class="stat-value">${playerData.totalDamageDealt ? playerData.totalDamageDealt.toLocaleString() : 0}</span></p>`;
     statsCoreDiv.innerHTML = coreHTML;

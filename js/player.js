@@ -17,14 +17,22 @@ import { checkCollision, hexToRgb, lightenColor, isLineSegmentIntersectingCircle
 import {
     playSound, stopSound,
     playerHitSound, shieldOverchargeSound, omegaLaserSound, teleportSound, empBurstSound,
-    playerWellDeploySound, playerWellDetonateSound // Ensure playerWellDetonateSound is imported
+    playerWellDeploySound, playerWellDetonateSound
 } from './audio.js';
 import { PlayerGravityWell } from './ray.js';
 
 
 export class Player {
     constructor(x, y, initialPlayerSpeed) {
-        this.x = x; this.y = y; this.baseRadius = PLAYER_BASE_RADIUS; this.radius = this.baseRadius;
+        this.x = x; this.y = y;
+        this.initialBaseRadius = PLAYER_BASE_RADIUS; // True start, e.g. 12
+        this.bonusBaseRadius = 0;                    // From upgrades like Fortified Core, if they change base visual
+        this.baseRadius = this.initialBaseRadius + this.bonusBaseRadius; // Current effective base before score
+
+        this.scoreBasedSize = 0;             // Stores the calculated size component from score: (effectiveScore * growthFactor)
+        this.scoreOffsetForSizing = 0;       // How much of the total game 'score' is ignored for sizing
+        this.radius = this.baseRadius;       // Initial actual radius
+
         this.hp = PLAYER_MAX_HP; this.maxHp = PLAYER_MAX_HP; this.aimAngle = 0;
         this.immuneColorsList = [];
         this.velX = 0; this.velY = 0;
@@ -78,7 +86,6 @@ export class Player {
         this.currentSpeed = initialPlayerSpeed;
     }
 
-    // --- drawHpBar and draw methods remain unchanged from the last full version ---
     drawHpBar(ctx) {
         if (!this || typeof this.hp === 'undefined' || typeof this.maxHp === 'undefined' || typeof this.radius === 'undefined' || isNaN(this.radius)) {
             return;
@@ -243,9 +250,11 @@ export class Player {
 
     update(gameContext) {
         const { dt, keys, mouseX, mouseY, canvasWidth, canvasHeight, targets, activeBosses,
-                currentGrowthFactor, updateHealthDisplayCallback, updateAbilityCooldownCallback,
+                currentGrowthFactor, // This is currentPlayerRadiusGrowthFactor from main.js
+                updateHealthDisplayCallback, updateAbilityCooldownCallback,
                 isAnyPauseActiveCallback, decoysArray, bossDefeatEffectsArray, allRays,
-                screenShakeParams, activeBuffNotificationsArray, score } = gameContext;
+                screenShakeParams, activeBuffNotificationsArray, score
+              } = gameContext;
 
         if (this.teleporting && this.teleportEffectTimer > 0) {
             this.teleportEffectTimer -= dt;
@@ -360,8 +369,24 @@ export class Player {
         }
 
         this.x = nX; this.y = nY;
-        this.radius = this.baseRadius + (score * currentGrowthFactor);
+
+        // MODIFIED: Radius Calculation Logic
+        this.baseRadius = this.initialBaseRadius + this.bonusBaseRadius; // Update effective base (e.g. if Fortified Core modifies bonusBaseRadius)
+        let effectiveScoreForRadiusCalc = Math.max(0, score - this.scoreOffsetForSizing);
+
+        if (currentGrowthFactor > 0) { // currentGrowthFactor is currentPlayerRadiusGrowthFactor from main.js
+            // If growth is active (not paused by Evasive Maneuver this cycle)
+            this.scoreBasedSize = effectiveScoreForRadiusCalc * currentGrowthFactor;
+        } else {
+            // If currentGrowthFactor is 0 (e.g. Evasive Maneuver is active for this cycle),
+            // this.scoreBasedSize should have already been set by Evasive's apply() method
+            // to the fixed, halved value based on the score *at that moment*.
+            // It should not change further with new score this cycle.
+            // The value of this.scoreBasedSize set in Evasive.apply() will be used.
+        }
+        this.radius = this.baseRadius + this.scoreBasedSize;
         this.radius = Math.max(MIN_PLAYER_BASE_RADIUS, this.radius);
+
 
         this.x = Math.max(this.radius, Math.min(this.x, canvasWidth - this.radius));
         this.y = Math.max(this.radius, Math.min(this.y, canvasHeight - this.radius));
@@ -371,8 +396,6 @@ export class Player {
         }
 
         this.timeSinceLastHit += dt;
-        // MODIFIED HP REGENERATION LOGIC:
-        // The condition "&& this.timeSinceLastHit >= HP_REGEN_NO_DAMAGE_THRESHOLD" has been removed.
         if (this.hp > 0 && this.hp < this.maxHp) {
             this.hpRegenTimer += dt;
             if (this.hpRegenTimer >= HP_REGEN_INTERVAL) {
@@ -412,8 +435,7 @@ export class Player {
 
 
         this.timesHit++;
-        this.timeSinceLastHit = 0; // This is still useful for other mechanics or stats if needed
-        // this.hpRegenTimer = 0; // Resetting regen timer on hit might still be desired by some, but not for continuous regen. Kept for now.
+        this.timeSinceLastHit = 0;
 
         let damageToTake = RAY_DAMAGE_TO_PLAYER;
         if (hittingRay && typeof hittingRay.damageValue === 'number') {
@@ -479,18 +501,16 @@ export class Player {
         if (ability.id === 'miniGravityWell') {
             if (this.activeMiniWell && this.activeMiniWell.isActive) {
                 this.activeMiniWell.detonate({ targetX: mouseX, targetY: mouseY, player: this });
-                // The PlayerGravityWell's detonate method sets this.activeMiniWell = null on the player
                 ability.cooldownTimer = ability.cooldownDuration;
                 ability.justBecameReady = false;
             } else if (ability.cooldownTimer <= 0) {
-                // Deploy new well
                 this.deployMiniGravityWell(ability.duration, decoysArray, mouseX, mouseY);
-                if (this.activeMiniWell) { // Successfully deployed
+                if (this.activeMiniWell) {
                     ability.cooldownTimer = ability.cooldownDuration;
                     ability.justBecameReady = false;
                 }
             }
-        } else if (ability.cooldownTimer <= 0) { // For other abilities (Teleport, EMP)
+        } else if (ability.cooldownTimer <= 0) {
             switch (ability.id) {
                 case 'teleport':
                     this.doTeleport(bossDefeatEffectsArray, mouseX, mouseY, canvasWidth, canvasHeight);
@@ -509,9 +529,7 @@ export class Player {
     }
 
     deployMiniGravityWell(duration, decoysArray, mouseX, mouseY) {
-        // This method is now ONLY for DEPLOYING a NEW well if one isn't active.
         if (this.activeMiniWell && this.activeMiniWell.isActive) {
-            // This log helps catch if logic flow is wrong. activateAbility should handle detonation.
             console.warn("deployMiniGravityWell called while a well is already active.");
             return;
         }

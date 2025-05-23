@@ -111,7 +111,6 @@ function addHighScore(name, scoreValue, finalStatsSnapshot) {
 function updateAllHighScoreDisplays() { const currentHighScores = getHighScores(); if (highScoreListDisplay) displayHighScores(highScoreListDisplay, currentHighScores.slice(0,5)); if (startScreenHighScoresDiv) displayHighScores(startScreenHighScoresDiv, currentHighScores.slice(0,5)); }
 function initializeAllPossibleRayColors() { if (CONSTANTS.INITIAL_RAY_COLORS && CONSTANTS.UNLOCKABLE_RAY_COLORS_LIST) { ALL_POSSIBLE_RAY_COLORS = [...CONSTANTS.INITIAL_RAY_COLORS, ...CONSTANTS.UNLOCKABLE_RAY_COLORS_LIST]; } else { console.error("ERROR: Ray color constants not available!"); ALL_POSSIBLE_RAY_COLORS = []; }}
 
-// MOVED Interval Management Functions Higher Up
 function pausePickupSpawners() {
     if (targetSpawnIntervalId) clearInterval(targetSpawnIntervalId); targetSpawnIntervalId = null;
     if (heartSpawnIntervalId) clearInterval(heartSpawnIntervalId); heartSpawnIntervalId = null;
@@ -136,17 +135,56 @@ function resumePickupSpawners() {
 function resumeAllGameIntervals() {
     if (gameRunning && !isAnyPauseActiveInternal() && !gameOver) {
         resumePickupSpawners();
-        if (!shootIntervalId && player) { // Check if player exists before trying to update shoot interval
+        if (!shootIntervalId && player) {
             updateShootInterval();
         }
     }
 }
-// END MOVED Interval Management Functions
 
 function initEvolutionChoicesInternal() {
     evolutionChoices = [
         {id:'colorImmunity', classType: 'tank', text:"Chameleon Plating", level:0, maxLevel: ALL_POSSIBLE_RAY_COLORS.length - CONSTANTS.INITIAL_RAY_COLORS.length, detailedDescription: "Gain immunity to a new random ray color each time this is chosen. Protects against rays of that specific color.", isMaxed:function(p){return !p||p.immuneColorsList.length>=ALL_POSSIBLE_RAY_COLORS.length || this.level >= this.maxLevel;}, apply:function(){if(!player)return"";const a=ALL_POSSIBLE_RAY_COLORS.filter(c=>!player.immuneColorsList.includes(c));if(a.length>0){const r=a[Math.floor(Math.random()*a.length)];player.immuneColorsList.push(r);uiUpdateBuffIndicator(player.immuneColorsList, getReadableColorNameFromUtils); this.level++; return`Now immune to <span style="color:${r};text-shadow:0 0 3px black;font-weight:bold;">${getReadableColorNameFromUtils(r)}</span> rays!`;}return"No new colors left!";}, getEffectString: function() { return `Immune to ${player?player.immuneColorsList.length:0} colors`;}},
-        {id:'smallerPlayer', classType: 'tank', text:"Evasive Maneuver", level:0, detailedDescription: "Become smaller, making you harder to hit. Also reduces how much your size increases with score.", isMaxed:function(p){ if (!p) return true; return shrinkMeCooldown > 0; }, apply:function(){if(!player)return"";player.baseRadius=Math.max(CONSTANTS.MIN_PLAYER_BASE_RADIUS,player.baseRadius/2);player.radius=player.baseRadius;currentPlayerRadiusGrowthFactor=0;currentEffectiveDefaultGrowthFactor=Math.max(0.001,currentEffectiveDefaultGrowthFactor/2);shrinkMeCooldown=3; this.level++;return"Base size & growth halved! (Next 2 Evos CD)";}, getEffectString: function() { return `Size reduced!`;}},
+        {
+            id: 'smallerPlayer',
+            classType: 'tank',
+            text: "Evasive Maneuver",
+            level: 0,
+            detailedDescription: "Your effective size from score gain is halved! Growth from score is paused for this evolution cycle. Resumes normally afterwards.",
+            isMaxed: function(p) {
+                if (!p) return true;
+                return shrinkMeCooldown > 0;
+            },
+            apply: function() {
+                if (!player) return "";
+                // console.log(`Evasive Apply START - Score: ${score}, Offset: ${player.scoreOffsetForSizing}, Player Radius: ${player.radius}, Player BaseRadius: ${player.baseRadius}, Player scoreBasedSize: ${player.scoreBasedSize}, currentEffectiveDefaultGrowthFactor: ${currentEffectiveDefaultGrowthFactor}`);
+
+                let effectiveScoreBeforeThisPick = Math.max(0, score - player.scoreOffsetForSizing);
+                let currentScoreBasedSize = effectiveScoreBeforeThisPick * currentEffectiveDefaultGrowthFactor;
+                let halvedNewScoreBasedSize = currentScoreBasedSize / 2;
+
+                player.scoreBasedSize = halvedNewScoreBasedSize;
+
+                if (currentEffectiveDefaultGrowthFactor > 0) {
+                    let newEffectiveScoreToAchieveHalvedSize = halvedNewScoreBasedSize / currentEffectiveDefaultGrowthFactor;
+                    newEffectiveScoreToAchieveHalvedSize = Math.max(0, newEffectiveScoreToAchieveHalvedSize);
+                    let scoreValueToDiscard = effectiveScoreBeforeThisPick - newEffectiveScoreToAchieveHalvedSize;
+                    player.scoreOffsetForSizing += scoreValueToDiscard;
+                    player.scoreOffsetForSizing = Math.max(0, player.scoreOffsetForSizing);
+                }
+
+                currentPlayerRadiusGrowthFactor = 0;
+
+                player.baseRadius = player.initialBaseRadius + player.bonusBaseRadius;
+                player.radius = player.baseRadius + player.scoreBasedSize;
+                player.radius = Math.max(CONSTANTS.MIN_PLAYER_BASE_RADIUS, player.radius);
+                // console.log(`Evasive Apply END - New Offset: ${player.scoreOffsetForSizing}, New player.scoreBasedSize: ${player.scoreBasedSize}, New player.radius: ${player.radius}, currentPlayerRadiusGrowthFactor is now 0`);
+
+                shrinkMeCooldown = 3;
+                this.level++;
+                return `Effective size reduced! Growth paused this cycle. (Cooldown: ${shrinkMeCooldown} evos)`;
+            },
+            getEffectString: function() { return `Effective size reduced (this cycle)!`; }
+        },
         {id:'reinforcedHull', classType: 'tank', text:"Reinforced Hull", level:0, maxLevel:Math.round(CONSTANTS.MAX_DAMAGE_REDUCTION/CONSTANTS.DAMAGE_REDUCTION_PER_LEVEL), detailedDescription: `Reduces all incoming damage by ${CONSTANTS.DAMAGE_REDUCTION_PER_LEVEL*100}% per level. Max ${CONSTANTS.MAX_DAMAGE_REDUCTION*100}%.`, isMaxed:function(p){return p && p.damageReductionFactor >= CONSTANTS.MAX_DAMAGE_REDUCTION || this.level >= this.maxLevel;}, apply:function(){if(!player) return""; player.damageReductionFactor = Math.min(CONSTANTS.MAX_DAMAGE_REDUCTION, player.damageReductionFactor + CONSTANTS.DAMAGE_REDUCTION_PER_LEVEL); this.level++; return `Damage reduction now ${Math.round(player.damageReductionFactor * 100)}%!`;}, getEffectString: function() { return `${Math.round((player?player.damageReductionFactor:0) * 100)}% Dmg Reduction`;}},
         {id:'vitalitySurge', classType: 'tank', text:"Vitality Surge", level:0, maxLevel: 999, detailedDescription: `Increases passive health regeneration by ${CONSTANTS.HP_REGEN_BONUS_PER_LEVEL_EVOLUTION} HP per tick.`, isMaxed:function(p){return false;}, apply:function(){if(!player) return""; player.hpRegenBonusFromEvolution += CONSTANTS.HP_REGEN_BONUS_PER_LEVEL_EVOLUTION; this.level++; return `Passive HP regen now +${player.hpRegenBonusFromEvolution} HP per tick!`;}, getEffectString: function() { return `+${player?player.hpRegenBonusFromEvolution:0} HP/tick Regen`;}},
         {id:'slowRays', classType: 'utility', text:"Field Disruption", level:0, detailedDescription: `Permanently slows all environmental rays by an additional ${((1-CONSTANTS.SLOW_RAYS_REDUCTION_FACTOR)*100).toFixed(0)}% of their current speed each level. Diminishing returns apply.`, isMaxed:function(p){ return currentRaySpeedMultiplier <= CONSTANTS.MIN_RAY_SPEED_MULTIPLIER_AFTER_SLOW * 1.01;}, apply:function(){currentRaySpeedMultiplier=Math.max(CONSTANTS.MIN_RAY_SPEED_MULTIPLIER_AFTER_SLOW, currentRaySpeedMultiplier * CONSTANTS.SLOW_RAYS_REDUCTION_FACTOR);this.level++;return `Environmental ray speed multiplier reduced! (${currentRaySpeedMultiplier.toFixed(2)}x)`;}, getEffectString: function() { return `Env. Ray Speed: ${currentRaySpeedMultiplier.toFixed(2)}x`;}},
@@ -159,7 +197,13 @@ function initEvolutionChoicesInternal() {
             id: 'maxHpIncrease', classType: 'tank', text: "Fortified Core", level: 0, maxLevel: 999,
             detailedDescription: "Permanently increases your Maximum HP by 10.",
             isMaxed: function(p) { return false; },
-            apply: function() { if (!player) return ""; player.maxHp += 10; player.gainHealth(10, (hp, maxHp) => uiUpdateHealthDisplay(hp,maxHp)); this.level++; return `Maximum HP increased by 10! (Now ${player.maxHp})`; },
+            apply: function() {
+                if (!player) return "";
+                player.maxHp += 10;
+                player.gainHealth(10, (hp, maxHp) => uiUpdateHealthDisplay(hp,maxHp));
+                this.level++;
+                return `Maximum HP increased by 10! (Now ${player.maxHp})`;
+            },
             getEffectString: function() { return `Max HP: ${player ? player.maxHp : CONSTANTS.PLAYER_MAX_HP}`; }
         },
         {
@@ -307,7 +351,6 @@ function initGame() {
     survivalPointsTimer = 0;
 
     player = new Player(canvas.width / 2, canvas.height / 2, CONSTANTS.PLAYER_SPEED_BASE);
-    player.activeAbilities = { '1': null, '2': null, '3': null };
 
     initializeAllPossibleRayColors();
     initializeRayPool(Ray);
@@ -429,6 +472,7 @@ function updateGame(deltaTime) {
                 targets: targets,
                 activeBosses: bossManager ? bossManager.activeBosses : [],
                 currentGrowthFactor: currentPlayerRadiusGrowthFactor,
+                currentEffectiveDefaultGrowthFactor: currentEffectiveDefaultGrowthFactor,
                 score: score,
                 updateHealthDisplayCallback: (currentHp, maxHp) => uiUpdateHealthDisplay(currentHp, maxHp),
                 updateAbilityCooldownCallback: (pInst) => uiUpdateAbilityCooldownUI(pInst),
@@ -547,7 +591,6 @@ function updateGame(deltaTime) {
                             };
                             const damageActuallyDealt = player.takeDamage(rayThatHitPlayer, ptdGameCtxForGravityBall, ptdDamageCtxForGravityBall);
                             if (damageActuallyDealt > 0) {
-                                // Gravity ball hits do NOT grant immunity.
                                 const bounceAngle = Math.atan2(player.y - rayThatHitPlayer.y, player.x - rayThatHitPlayer.x);
                                 player.velX = Math.cos(bounceAngle) * CONSTANTS.PLAYER_BOUNCE_FORCE_FROM_GRAVITY_BALL;
                                 player.velY = Math.sin(bounceAngle) * CONSTANTS.PLAYER_BOUNCE_FORCE_FROM_GRAVITY_BALL;
@@ -720,7 +763,7 @@ function drawGame(){
 // --- Core Game Event Functions (Internal versions) ---
 function endGameInternal() {
     gameOver = true; gameRunning = false; pauseAllGameIntervals();
-    currentActiveScreenElement = gameOverScreen; // Set current screen
+    currentActiveScreenElement = gameOverScreen;
     applyMusicPlayStateWrapper();
     playSound(gameOverSoundFX);
     if (player && player.isFiringOmegaLaser) stopSound(omegaLaserSound);
@@ -754,7 +797,9 @@ function togglePauseMenuInternal() {
     if (gameOver || isCountingDownToResume || gamePausedForEvolution || gamePausedForFreeUpgrade || gamePausedForLootChoice) return;
     gamePausedByEsc = !gamePausedByEsc;
     if (gamePausedByEsc) {
-        pauseAllGameIntervals(); prepareAndShowPauseStats("Paused - Current Status");
+        pauseAllGameIntervals();
+        // console.log("Paused via ESC. Player Radius:", player ? player.radius.toFixed(1) : "N/A", "Score Size Factor (main.js):", typeof currentPlayerRadiusGrowthFactor === 'number' ? currentPlayerRadiusGrowthFactor.toFixed(3) : "N/A (undefined)");
+        prepareAndShowPauseStats("Paused - Current Status");
         currentActiveScreenElement = pauseScreen;
         showScreen(pauseScreen, true, gameScreenCallbacks);
         if(pausePlayerStatsPanel) {
@@ -766,7 +811,7 @@ function togglePauseMenuInternal() {
         }
     } else {
         if(pausePlayerStatsPanel) pausePlayerStatsPanel.style.display = 'none';
-        currentActiveScreenElement = countdownOverlay; // Or null if countdown is just an overlay
+        currentActiveScreenElement = countdownOverlay;
         startResumeCountdownInternal();
     }
 }
@@ -782,7 +827,7 @@ function startResumeCountdownInternal() {
         if (countVal <= 0) {
             if(countdownOverlay) countdownOverlay.style.display = 'none'; clearInterval(resumeCountdownTimerId); resumeCountdownTimerId = null;
             isCountingDownToResume = false; gamePausedByEsc = false;
-            currentActiveScreenElement = null; // Game screen is active
+            currentActiveScreenElement = null;
             resumeAllGameIntervals(); applyMusicPlayStateWrapper();
             lastTime = performance.now(); if (!animationFrameId && !gameOver && gameRunning) animationFrameId = requestAnimationFrame(gameLoop);
         }
@@ -810,16 +855,33 @@ function selectEvolutionInternal(choice) {
         currentActiveScreenElement = null;
         showScreen(null, false, gameScreenCallbacks);
         applyMusicPlayStateWrapper(); lastTime=performance.now(); if(!gameOver&&!animationFrameId && gameRunning)animationFrameId=requestAnimationFrame(gameLoop);
-        uiUpdateActiveBuffIndicator(player, postPopupImmunityTimer, postDamageImmunityTimer); resumeAllGameIntervals(); return;
+        uiUpdateActiveBuffIndicator(player, postPopupImmunityTimer, postDamageImmunityTimer); resumeAllGameIntervals();
+        return;
     }
+    // console.log(`SelectEvo: BEFORE apply - choice: ${choice.id}, main.js_currentPlayerRadiusGrowthFactor: ${currentPlayerRadiusGrowthFactor}`);
     choice.apply();
+    // console.log(`SelectEvo: AFTER apply - choice: ${choice.id}, main.js_currentPlayerRadiusGrowthFactor: ${currentPlayerRadiusGrowthFactor}`);
+
+
     lastEvolutionScore = player.evolutionIntervalModifier > 0 ? Math.floor(score / (CONSTANTS.EVOLUTION_SCORE_INTERVAL * player.evolutionIntervalModifier)) * (CONSTANTS.EVOLUTION_SCORE_INTERVAL * player.evolutionIntervalModifier) : score;
-    survivalScoreThisCycle=0; if (choice.id !== 'smallerPlayer') currentPlayerRadiusGrowthFactor = currentEffectiveDefaultGrowthFactor;
-    gamePausedForEvolution=false; evolutionPendingAfterBoss = false; postPopupImmunityTimer=CONSTANTS.POST_POPUP_IMMUNITY_DURATION;
+    survivalScoreThisCycle = 0;
+
+    if (choice.id !== 'smallerPlayer') {
+        currentPlayerRadiusGrowthFactor = currentEffectiveDefaultGrowthFactor;
+        // console.log(`SelectEvo: Choice was NOT smallerPlayer, main.js_currentPlayerRadiusGrowthFactor RESTORED to: ${currentPlayerRadiusGrowthFactor}`);
+    }
+
+    gamePausedForEvolution = false; evolutionPendingAfterBoss = false; postPopupImmunityTimer = CONSTANTS.POST_POPUP_IMMUNITY_DURATION;
     currentActiveScreenElement = null;
-    showScreen(null, false, gameScreenCallbacks); applyMusicPlayStateWrapper(); lastTime=performance.now();
-    if(!gameOver&&!animationFrameId && gameRunning)animationFrameId=requestAnimationFrame(gameLoop);
-    uiUpdateActiveBuffIndicator(player, postPopupImmunityTimer, postDamageImmunityTimer); resumeAllGameIntervals();
+    showScreen(null, false, gameScreenCallbacks);
+    applyMusicPlayStateWrapper();
+    lastTime = performance.now();
+    // console.log(`SelectEvo: END - main.js_currentPlayerRadiusGrowthFactor is now: ${currentPlayerRadiusGrowthFactor}`);
+    if(!gameOver&&!animationFrameId && gameRunning) {
+        animationFrameId = requestAnimationFrame(gameLoop);
+    }
+    uiUpdateActiveBuffIndicator(player, postPopupImmunityTimer, postDamageImmunityTimer);
+    resumeAllGameIntervals();
     if (bossManager && bossManager.isBossInQueue() && !bossManager.isBossWarningActiveProp() && !isAnyPauseActiveInternal()) bossManager.triggerNextBossWarning({isAnyPauseActive: isAnyPauseActiveInternal});
 }
 
@@ -896,10 +958,32 @@ function selectLootUpgradeInternal(chosenUpgrade) {
 }
 
 function createFinalStatsSnapshot() {
-    if (!player) return null;
+    // console.log(`SNAPSHOT START: Player exists: ${!!player}. main.js_currentPlayerRadiusGrowthFactor: ${currentPlayerRadiusGrowthFactor}`);
+    if (!player) {
+        console.warn("Snapshot: Player is null during createFinalStatsSnapshot call.");
+        // Return a very basic default snapshot
+        return { playerData: { baseRadius: CONSTANTS.PLAYER_BASE_RADIUS, finalRadius: CONSTANTS.PLAYER_BASE_RADIUS, scoreSizeFactor: currentEffectiveDefaultGrowthFactor, scoreOffsetForSizing: 0, scoreBasedSizeActual: 0, maxHp: CONSTANTS.PLAYER_MAX_HP, currentSpeed: CONSTANTS.PLAYER_SPEED_BASE, timesHit:0, totalDamageDealt:0, immuneColorsList:[], activeAbilities:{}, formattedActiveAbilities:[], formattedMouseAbilities:[], displayedUpgrades:[] }, bossTierData: { chaser: 0, reflector: 0, singularity: 0 }, gameplayTimeData: gameplayTimeElapsed };
+    }
+
+    // This is the player's fundamental base size (initial + direct bonus additions like Fortified Core if it modifies baseRadius)
+    const currentBaseRadius = player.initialBaseRadius + player.bonusBaseRadius;
+
+    // This is the growth factor that should be displayed.
+    // If Evasive Maneuver is active (currentPlayerRadiusGrowthFactor === 0), we display the underlying game's default rate.
+    // Otherwise, we display the currently active rate.
+    let factorForDisplay = (currentPlayerRadiusGrowthFactor === 0) ? currentEffectiveDefaultGrowthFactor : currentPlayerRadiusGrowthFactor;
+    if (typeof factorForDisplay !== 'number' || isNaN(factorForDisplay)) { // Safety net
+        factorForDisplay = currentEffectiveDefaultGrowthFactor;
+    }
+
     const playerDataSnapshot = {
-        maxHp: player.maxHp, currentSpeed: player.currentSpeed, baseRadius: player.baseRadius,
-        radius: player.radius, currentGrowthFactor: currentPlayerRadiusGrowthFactor,
+        baseRadius: currentBaseRadius, // The true base (initial + upgrades that directly add to base)
+        finalRadius: player.radius,    // The current visual/collision radius
+        scoreSizeFactor: factorForDisplay, // The growth factor that's conceptually in effect or would be
+        scoreOffsetForSizing: player.scoreOffsetForSizing, // How much score is "ignored" for size calc
+        scoreBasedSizeActual: player.scoreBasedSize, // The calculated size from (effective_score * growth_factor)
+
+        maxHp: player.maxHp, currentSpeed: player.currentSpeed,
         timesHit: player.timesHit, totalDamageDealt: player.totalDamageDealt,
         immuneColorsList: [...player.immuneColorsList],
         activeAbilities: JSON.parse(JSON.stringify(player.activeAbilities)),
@@ -908,6 +992,8 @@ function createFinalStatsSnapshot() {
         formattedMouseAbilities: getFormattedMouseAbilitiesForStats(player),
         displayedUpgrades: prepareDisplayedUpgradesForStats(player)
     };
+    // console.log(`SNAPSHOT END: playerDataSnapshot.finalRadius: ${playerDataSnapshot.finalRadius}, playerDataSnapshot.scoreSizeFactor: ${playerDataSnapshot.scoreSizeFactor}`);
+
     const bossTierSnapshot = bossManager ? { ...bossManager.bossTiers } : { chaser: 0, reflector: 0, singularity: 0 };
     return {
         playerData: playerDataSnapshot,
@@ -919,7 +1005,7 @@ function getFormattedActiveAbilitiesForStats(p) { if (!p || !p.activeAbilities) 
 function getFormattedMouseAbilitiesForStats(p) { if(!p) return []; let abs = []; if (p.hasOmegaLaser) abs.push({name: "Omega Laser", desc: `${(CONSTANTS.OMEGA_LASER_COOLDOWN/1000)}s CD`}); if (p.hasShieldOvercharge) abs.push({name: "Shield Overcharge", desc: `${(CONSTANTS.SHIELD_OVERCHARGE_COOLDOWN/1000)}s CD`}); return abs; }
 function prepareDisplayedUpgradesForStats(p) {
     if (!p) return []; let list = [];
-    evolutionChoices.forEach(e => { if (e.level > 0) { let desc = ""; if (e.id === 'colorImmunity') desc = `${p.immuneColorsList.length} colors`; else if (e.id === 'smallerPlayer') desc = `Lvl ${e.level}`; else if (e.id === 'reinforcedHull') desc = `${Math.round(p.damageReductionFactor * 100)}%`; else if (e.id === 'vitalitySurge') desc = `+${p.hpRegenBonusFromEvolution} HP/tick`; else if (e.id === 'slowRays') desc = `${currentRaySpeedMultiplier.toFixed(2)}x Speed`; else if (e.id === 'systemOvercharge') desc = `${Math.round(p.evolutionIntervalModifier*100)}% Interval`; else if (e.id === 'enhancedRegen') desc = `+${p.hpPickupBonus} HP`; else if (e.id === 'focusedBeam') desc = `+${p.rayDamageBonus} Dmg`; else if (e.id === 'unstableCore') desc = `${Math.round(p.chainReactionChance * 100)}% Chance`; else if (e.id === 'heavyImpact') desc = `+${Math.round(p.bossStunChanceBonus*100)}% Stun`; else if (e.id === 'maxHpIncrease') desc = `+${e.level * 10} Max HP`; else if (e.id === 'abilityCooldownReduction') desc = `Applied ${e.level}x`; else if (e.getEffectString) desc = e.getEffectString(); if (desc) list.push({ name: e.text.replace(/\s\(Lvl.*/, ''), description: desc });}});
+    evolutionChoices.forEach(e => { if (e.level > 0) { let desc = ""; if (e.id === 'colorImmunity') desc = `${p.immuneColorsList.length} colors`; else if (e.id === 'smallerPlayer') desc = `Lvl ${e.level} (Effective Size)`; else if (e.id === 'reinforcedHull') desc = `${Math.round(p.damageReductionFactor * 100)}%`; else if (e.id === 'vitalitySurge') desc = `+${p.hpRegenBonusFromEvolution} HP/tick`; else if (e.id === 'slowRays') desc = `${currentRaySpeedMultiplier.toFixed(2)}x Speed`; else if (e.id === 'systemOvercharge') desc = `${Math.round(p.evolutionIntervalModifier*100)}% Interval`; else if (e.id === 'enhancedRegen') desc = `+${p.hpPickupBonus} HP`; else if (e.id === 'focusedBeam') desc = `+${p.rayDamageBonus} Dmg`; else if (e.id === 'unstableCore') desc = `${Math.round(p.chainReactionChance * 100)}% Chance`; else if (e.id === 'heavyImpact') desc = `+${Math.round(p.bossStunChanceBonus*100)}% Stun`; else if (e.id === 'maxHpIncrease') desc = `+${e.level * 10} Max HP`; else if (e.id === 'abilityCooldownReduction') desc = `Applied ${e.level}x`; else if (e.getEffectString) desc = e.getEffectString(); if (desc) list.push({ name: e.text.replace(/\s\(Lvl.*/, ''), description: desc });}});
     p.acquiredBossUpgrades.forEach(id => { const upg = bossLootPool.find(u => u.id === id); if (upg) { let d = `(${upg.type.charAt(0).toUpperCase() + upg.type.slice(1)})`; if (upg.id === 'adaptiveShield') d = "(Color Immunities)"; else if (upg.type === 'ability' || upg.type === 'ability_mouse') return; list.push({ name: upg.name, description: d });}});
     if (p.pickupAttractionRadius > 0) list.push({name: "Pickup Attraction", description: `Radius ${p.pickupAttractionRadius.toFixed(0)}`});
     if (p.scatterShotLevel > 0) list.push({name: "Scatter Shot", description: `Lvl ${p.scatterShotLevel +1}`});
@@ -928,7 +1014,9 @@ function prepareDisplayedUpgradesForStats(p) {
     return list;
 }
 function prepareAndShowPauseStats(title) {
+    // console.log(`PAUSE STATS CALL: Player exists: ${!!player}, Radius: ${player ? player.radius.toFixed(1) : 'N/A'}, main.js_currentPlayerRadiusGrowthFactor: ${typeof currentPlayerRadiusGrowthFactor === 'number' ? currentPlayerRadiusGrowthFactor.toFixed(3) : 'N/A (undefined at call)'}`);
     const statsSnapshot = createFinalStatsSnapshot();
+    // console.log("Snapshot for pause/gameover:", JSON.parse(JSON.stringify(statsSnapshot)));
     updatePauseScreenStatsDisplay(
         statsSnapshot,
         getReadableColorNameFromUtils,
@@ -1004,7 +1092,7 @@ function applyMusicPlayStateWrapper() {
     applyMusicPlayState(
         gameOver,
         gameRunning,
-        gamePausedByEsc || isCountingDownToResume, // True pause for gameplay
+        gamePausedByEsc || isCountingDownToResume,
         isPausedForPopupLocal,
         currentActiveScreenElement
     );
@@ -1016,8 +1104,8 @@ function showStartScreenWithUpdatesInternal() {
     gamePausedForEvolution = false; gamePausedForFreeUpgrade = false; gamePausedForLootChoice = false;
     evolutionPendingAfterBoss = false;
     if (animationFrameId) cancelAnimationFrame(animationFrameId); animationFrameId = null;
-    pauseAllGameIntervals(); // Ensures all intervals are cleared
-    if (player && player.isFiringOmegaLaser) stopSound(omegaLaserSound); // Stop omega laser if active
+    pauseAllGameIntervals();
+    if (player && player.isFiringOmegaLaser) stopSound(omegaLaserSound);
     if (bossManager) bossManager.reset();
 
     if (pausePlayerStatsPanel) {
