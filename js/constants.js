@@ -7,7 +7,7 @@ export const PLAYER_BASE_COLOR = '#FFFFFF';
 export const PLAYER_MAX_HP = 100;
 export const RAY_DAMAGE_TO_PLAYER = 10;
 export const HP_REGEN_PER_PICKUP = 25;
-export const HP_REGEN_NO_DAMAGE_THRESHOLD = 10000;
+export const HP_REGEN_NO_DAMAGE_THRESHOLD = 10000; 
 export const HP_REGEN_INTERVAL = 5000;
 export let PLAYER_SPEED_BASE = 3.5;
 export const PLAYER_AIM_INDICATOR_LENGTH = 25;
@@ -128,9 +128,7 @@ export const MAX_CHAIN_REACTION_CHANCE = 0.25;
 export const CHAIN_REACTION_RADIUS = 80;
 export const CHAIN_REACTION_EXPLOSION_DURATION = 300;
 export const CHAIN_REACTION_EXPLOSION_COLOR = 'rgba(255, 165, 0, opacity)';
-// export const MAX_DAMAGE_REDUCTION = 0.4; // Old constant, can be removed if not used elsewhere
-// export const DAMAGE_REDUCTION_PER_LEVEL = 0.10; // Old constant
-export const REINFORCED_HULL_EFFECTIVENESS_PER_LEVEL = 0.10; // New constant for 10% effectiveness per level
+export const REINFORCED_HULL_EFFECTIVENESS_PER_LEVEL = 0.10; 
 export const MAX_HP_PICKUP_BONUS = 15;
 export const HP_PICKUP_BONUS_PER_LEVEL = 10;
 export const MAX_HP_REGEN_BONUS_EVOLUTION = 2;
@@ -138,6 +136,22 @@ export const HP_REGEN_BONUS_PER_LEVEL_EVOLUTION = 1;
 export const BASE_BOSS_STUN_CHANCE = 0.05;
 export const STUN_CHANCE_PER_LEVEL = 0.05;
 export const MAX_STUN_CHANCE_BONUS = 0.15;
+
+// ---- Unique Path Buff Constants ----
+export const PERFECT_HARMONY_NO_DAMAGE_DURATION_THRESHOLD = 5000; // 5 seconds of no damage taken
+export const PERFECT_HARMONY_RAY_DAMAGE_BONUS = 0.20;   // +20% (Nerfed from 0.30)
+export const PERFECT_HARMONY_SPEED_BONUS = 0.15;      // +15%
+export const PERFECT_HARMONY_COOLDOWN_REDUCTION = 0.20; // 20% faster (effectively 0.8x cooldown time)
+
+export const BERSERKERS_ECHO_DAMAGE_PER_10_HP = 0.09; // +9% ray damage per 10% missing HP
+export const BERSERKERS_ECHO_SPEED_PER_10_HP = 0.03;  // +3% speed per 10% missing HP
+
+// Kinetic Conversion - Base values if not overridden by player properties (used in stat display fallback)
+export const KINETIC_INITIAL_DAMAGE_BONUS = 0.30;
+export const KINETIC_ADDITIONAL_DAMAGE_PER_LEVEL = 0.20;
+export const KINETIC_BASE_CHARGE_RATE = 1.0; 
+export const KINETIC_CHARGE_RATE_PER_LEVEL = 0.25;
+// ---- END Unique Path Buff Constants ----
 
 // Mouse Abilities Constants
 export const OMEGA_LASER_DURATION = 2500;

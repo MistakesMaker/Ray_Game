@@ -3,7 +3,7 @@ import * as CONSTANTS_IMPORTED from './constants.js';
 import { ChaserBoss } from './chaserBoss.js';
 import { MirrorShieldBoss } from './mirrorShieldBoss.js';
 import { GravityWellBoss } from './gravityWellBoss.js';
-import { LootDrop } from './entities.js';
+import { LootDrop } from './entities.js'; // For standard loot drops
 import {
     playSound, stopSound, gravityWellChargeSound,
     chaserSpawnSound as audioChaserSpawnSoundLocal,
@@ -106,22 +106,17 @@ export class BossManager {
                 gameContext.callbacks.pausePickups(true);
             }
             
-            // If this was the first boss of a wave (the one that had the warning),
-            // and there are more in the queue for THIS wave, process the next one almost immediately.
-            // This ensures subsequent bosses in a wave appear quickly after the first.
             if (this.bossSpawnQueue.length > 0 && this.activeBosses.length < this.bossesToSpawnInCurrentWave && this.activeBosses.length < CONSTANTS_IMPORTED.MAX_BOSSES_IN_WAVE_CAP) {
-                 // No new full warning, just process the next one from the queue.
-                 // A very short delay could be added here if needed before calling processBossSpawnQueue again.
-                 // For now, they will try to spawn rapidly as long as processBossSpawnQueue gets called.
+                 // Spawns next in wave almost immediately if conditions met
             } else {
-                this.nextBossToSpawnInfo = null; // Clear after the first boss of a wave is processed or queue is empty
+                this.nextBossToSpawnInfo = null; 
             }
         }
     }
 
     update(playerInstance, gameContext) {
         if (!gameContext || typeof gameContext.dt === 'undefined') {
-            console.error(`BOSSMANAGER.JS: CRITICAL - gameContext or .dt undefined!`);
+            // console.error(`BOSSMANAGER.JS: CRITICAL - gameContext or .dt undefined!`);
             return;
         }
 
@@ -132,8 +127,6 @@ export class BossManager {
                 this.processBossSpawnQueue(gameContext); 
             }
         } else if (this.bossSpawnQueue.length > 0 && this.isWaveInProgress && !this.bossWarningActive && gameContext.isAnyPauseActive && !gameContext.isAnyPauseActive()) {
-            // If the main warning is done, and we have more bosses to spawn for the current wave
-            // and we are below the concurrent boss cap, spawn the next one.
             if (this.activeBosses.length < CONSTANTS_IMPORTED.MAX_BOSSES_IN_WAVE_CAP) {
                  this.processBossSpawnQueue(gameContext);
             }
@@ -172,7 +165,10 @@ export class BossManager {
 
     handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
         if (!defeatedBoss) return;
-        if (!gameContext || !gameContext.callbacks) { return; }
+        if (!gameContext || !gameContext.callbacks || !gameContext.firstBossDefeatedThisRunRef) { 
+            // console.error("BossManager: Missing context for boss defeat handling.");
+            return; 
+        }
 
         if (defeatedBoss instanceof GravityWellBoss) { 
             stopSound(gravityWellChargeSound);
@@ -184,12 +180,14 @@ export class BossManager {
         }
         this.activeBosses.splice(index, 1);
 
+        let wasFirstBoss = !gameContext.firstBossDefeatedThisRunRef.get(); // ---- CHECK if it was the first ----
+
         if (this.isWaveInProgress) {
             this.bossesDefeatedInCurrentWave++;
             
             if (this.bossesDefeatedInCurrentWave >= this.bossesToSpawnInCurrentWave &&
                 this.activeBosses.length === 0 && 
-                this.bossSpawnQueue.length === 0) { // Wave truly finished
+                this.bossSpawnQueue.length === 0) { 
 
                 let scoreToGrant = CONSTANTS_IMPORTED.BOSS_REWARD_BASE_SCORE_PER_TIER * this.waveRewardTier;
                 if (gameContext.callbacks.updateScore) gameContext.callbacks.updateScore(scoreToGrant);
@@ -202,27 +200,29 @@ export class BossManager {
                 this.nextBossToSpawnInfo = null;
 
                 let lootGeneratedThisTurn = false;
-                if (gameContext.bossLootPool && playerInstance && gameContext.lootDropsArray) {
+                if (wasFirstBoss && gameContext.callbacks.requestFirstBossLoot) { // ---- FIRST BOSS LOOT ----
+                    gameContext.callbacks.requestFirstBossLoot(defeatedBoss.x, defeatedBoss.y);
+                    gameContext.firstBossDefeatedThisRunRef.set(true);
+                    lootGeneratedThisTurn = true; // Special loot counts as generated
+                } else if (!wasFirstBoss && gameContext.bossLootPool && playerInstance && gameContext.lootDropsArray) { // ---- REGULAR BOSS LOOT ----
                     const availableUpgrades = gameContext.bossLootPool.filter(upgrade => {
                         if (!playerInstance) return true; 
                         if (upgrade.type === 'ability' && upgrade.slot) {
-                            if (playerInstance.activeAbilities[upgrade.slot] && playerInstance.activeAbilities[upgrade.slot].id === upgrade.id) {
-                                return false; 
-                            }
+                            if (playerInstance.activeAbilities[upgrade.slot] && playerInstance.activeAbilities[upgrade.slot].id === upgrade.id) return false; 
                         }
                         else if (upgrade.type === 'ability_mouse') {
                             if (upgrade.id === 'omegaLaser' && playerInstance.hasOmegaLaser) return false;
                             if (upgrade.id === 'shieldOvercharge' && playerInstance.hasShieldOvercharge) return false;
                         }
-                        else if (playerInstance.acquiredBossUpgrades && playerInstance.acquiredBossUpgrades.includes(upgrade.id)) {
-                            return false; 
-                        }
+                        else if (playerInstance.acquiredBossUpgrades && playerInstance.acquiredBossUpgrades.includes(upgrade.id)) return false; 
                         return true; 
                     });
                     let choices = [];
                     if (availableUpgrades.length > 0) { choices = [...availableUpgrades].sort(() => 0.5 - Math.random()).slice(0, 3); }
                     if (choices.length > 0) {
-                        gameContext.lootDropsArray.push(new LootDrop(defeatedBoss.x, defeatedBoss.y, choices));
+                        const loot = new LootDrop(defeatedBoss.x, defeatedBoss.y, choices);
+                        loot.isFirstBossLoot = false; // Mark as regular loot
+                        gameContext.lootDropsArray.push(loot);
                         lootGeneratedThisTurn = true;
                     }
                 }
@@ -236,24 +236,43 @@ export class BossManager {
                     gameContext.callbacks.pausePickups(false);
                 }
             } else if (this.bossSpawnQueue.length > 0 && this.activeBosses.length < CONSTANTS_IMPORTED.MAX_BOSSES_IN_WAVE_CAP && !this.bossWarningActive) {
-                // If part of a wave was defeated, and there are more bosses queued for this wave,
-                // and we are not currently showing a major warning, process the next one.
                 this.processBossSpawnQueue(gameContext);
             } else if (this.activeBosses.length === 0 && this.bossSpawnQueue.length === 0 && this.isWaveInProgress) {
-                // This case could happen if bossesToSpawnInCurrentWave was not yet met, but queue is empty
-                // and active bosses are zero. This means the wave is effectively over.
-                // This might be redundant with the first check, but good for safety.
                 this.isWaveInProgress = false;
                  if (gameContext.callbacks.pausePickups) {
                     gameContext.callbacks.pausePickups(false);
                 }
             }
-        } else { // Not a wave, or wave logic somehow bypassed
-            if (this.activeBosses.length === 0 && this.bossSpawnQueue.length === 0) {
-                // If it wasn't a wave but it was the last boss, pickups resume
-                if (gameContext.callbacks.pausePickups) {
+        } else { // Not a wave, or wave logic somehow bypassed (should mostly be first boss if not wave)
+            if (wasFirstBoss && gameContext.callbacks.requestFirstBossLoot) { // ---- FIRST BOSS LOOT (non-wave context) ----
+                gameContext.callbacks.requestFirstBossLoot(defeatedBoss.x, defeatedBoss.y);
+                gameContext.firstBossDefeatedThisRunRef.set(true);
+            } else if (this.activeBosses.length === 0 && this.bossSpawnQueue.length === 0) { // Single boss defeated, not first, or non-wave boss
+                 if (gameContext.callbacks.pausePickups) {
                     gameContext.callbacks.pausePickups(false);
                 }
+                 // And potentially regular loot if it wasn't the very first boss
+                 if (!wasFirstBoss && gameContext.bossLootPool && playerInstance && gameContext.lootDropsArray) {
+                    const availableUpgrades = gameContext.bossLootPool.filter(upgrade => { /* same filter as above */ 
+                        if (!playerInstance) return true; 
+                        if (upgrade.type === 'ability' && upgrade.slot) {
+                            if (playerInstance.activeAbilities[upgrade.slot] && playerInstance.activeAbilities[upgrade.slot].id === upgrade.id) return false; 
+                        }
+                        else if (upgrade.type === 'ability_mouse') {
+                            if (upgrade.id === 'omegaLaser' && playerInstance.hasOmegaLaser) return false;
+                            if (upgrade.id === 'shieldOvercharge' && playerInstance.hasShieldOvercharge) return false;
+                        }
+                        else if (playerInstance.acquiredBossUpgrades && playerInstance.acquiredBossUpgrades.includes(upgrade.id)) return false; 
+                        return true; 
+                    });
+                    let choices = [];
+                    if (availableUpgrades.length > 0) { choices = [...availableUpgrades].sort(() => 0.5 - Math.random()).slice(0, 3); }
+                    if (choices.length > 0) {
+                        const loot = new LootDrop(defeatedBoss.x, defeatedBoss.y, choices);
+                        loot.isFirstBossLoot = false;
+                        gameContext.lootDropsArray.push(loot);
+                    }
+                 }
             }
         }
 
@@ -297,13 +316,11 @@ export class BossManager {
         this.isWaveInProgress = false; this.waveRewardTier = 0;
         this.bossesToSpawnInCurrentWave = 0; 
         this.bossesDefeatedInCurrentWave = 0;
+        // Note: firstBossDefeatedThisRun is reset in main.js's initGame()
     }
 
     isBossSequenceActive() { return this.activeBosses.length > 0 || this.bossWarningActive || this.bossSpawnQueue.length > 0; }
     isBossWarningActiveProp() { return this.bossWarningActive; } 
     isBossInQueue() { return this.bossSpawnQueue.length > 0; }
 
-    // This method might not be needed if processBossSpawnQueue handles subsequent spawns within a wave effectively
-    // or if subsequent spawns are only triggered by boss defeats.
-    // triggerNextBossWarning(gameContext) { ... }
 }

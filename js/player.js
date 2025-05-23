@@ -10,8 +10,14 @@ import {
     POST_POPUP_IMMUNITY_DURATION,
     POST_DAMAGE_IMMUNITY_DURATION,
     PLAYER_BOUNCE_FORCE_FROM_GRAVITY_BALL,
-    RAY_SPAWN_GRACE_PERIOD
-} from './constants.js';
+    RAY_SPAWN_GRACE_PERIOD,
+    PERFECT_HARMONY_NO_DAMAGE_DURATION_THRESHOLD, 
+    PERFECT_HARMONY_RAY_DAMAGE_BONUS,    
+    PERFECT_HARMONY_SPEED_BONUS,       
+    PERFECT_HARMONY_COOLDOWN_REDUCTION, 
+    BERSERKERS_ECHO_DAMAGE_PER_10_HP,  
+    BERSERKERS_ECHO_SPEED_PER_10_HP,   
+} from './constants.js'; 
 
 import { checkCollision, hexToRgb, lightenColor, isLineSegmentIntersectingCircle } from './utils.js';
 import {
@@ -40,19 +46,16 @@ export class Player {
         this.hasTargetPierce = false; this.chainReactionChance = 0.0;
         this.scatterShotLevel = 0; this.ownRaySpeedMultiplier = 1.0;
         
-        // ---- MODIFICATION for Reinforced Hull ----
-        // this.damageReductionFactor = 0.0; // Old property, can be removed or kept if other systems use it
-        this.damageTakenMultiplier = 1.0; // New: Player takes 100% of damage initially
-        // ---- END MODIFICATION ----
+        this.damageTakenMultiplier = 1.0; 
 
         this.hpPickupBonus = 0;
-        this.abilityDamageMultiplier = 1.0;
+        this.abilityDamageMultiplier = 1.0; 
         this.temporalEchoChance = 0.0;
         this.temporalEchoFixedReduction = 2000;
 
         // Kinetic Conversion Properties
         this.kineticCharge = 0;                            
-        this.baseKineticChargeRate = 1.0; // You changed this from 0.25              
+        this.baseKineticChargeRate = 1.0;             
         this.kineticChargeRatePerLevel = 0.25;            
         this.kineticDecayRate = 2.0;                       
         this.kineticChargeSpeedThresholdFactor = 0.70;     
@@ -64,19 +67,27 @@ export class Player {
         this.currentOmegaLaserKineticBoost = 1.0;    
         this.currentGravityWellKineticBoost = 1.0; 
 
-
-        this.timeSinceLastHit = Number.MAX_SAFE_INTEGER;
+        this.timeSinceLastHit = Number.MAX_SAFE_INTEGER; // Used for Perfect Harmony
         this.hpRegenTimer = 0; this.baseHpRegenAmount = 1;
         this.hpRegenBonusFromEvolution = 0;
-        this.acquiredBossUpgrades = [];
+        this.acquiredBossUpgrades = []; 
+        
+        this.hasPerfectHarmonyHelm = false;
+        this.hasBerserkersEchoHelm = false;
+        this.hasUltimateConfigurationHelm = false; 
+
+        this.isHarmonized = false;
+        // this.hpAtFullForXSecondsTimer = 0; // No longer needed for Perfect Harmony's new logic
+
         this.activeAbilities = {
             '1': null,
             '2': null,
             '3': null
         };
-        this.visualModifiers = {};
-        this.bleedOnHit = false; this.momentumDamageBonus = 0;
-        this.bossDamageReduction = 0.0; // Ensure this is initialized (was in your code, just confirming)
+        this.visualModifiers = {}; 
+        this.bleedOnHit = false; 
+        this.momentumDamageBonus = 0; 
+        this.bossDamageReduction = 0.0; 
         this.teleporting = false; this.teleportEffectTimer = 0;
         this.activeMiniWell = null;
         this.phaseStabilizerAnimTimer = Math.random() * 5000;
@@ -106,10 +117,9 @@ export class Player {
         this.omegaLaserRange = OMEGA_LASER_RANGE;
         this.omegaLaserWidth = OMEGA_LASER_WIDTH;
         this.originalPlayerSpeed = initialPlayerSpeed;
-        this.currentSpeed = initialPlayerSpeed;
+        this.currentSpeed = initialPlayerSpeed; 
     }
 
-    // ... (drawHpBar and draw methods remain the same) ...
     drawHpBar(ctx) {
         if (!this || typeof this.hp === 'undefined' || typeof this.maxHp === 'undefined' || typeof this.radius === 'undefined' || isNaN(this.radius)) {
             return;
@@ -143,14 +153,111 @@ export class Player {
         ctx.save();
         ctx.translate(this.x, this.y);
 
+        // ---- HELMET DRAWING with CONDITIONAL GLOWS ----
+        ctx.save(); 
+        let helmGlowRadius = 0;
+        let helmGlowColor = "transparent";
+
+        if (this.hasPerfectHarmonyHelm) {
+            ctx.fillStyle = "rgba(255, 255, 200, 0.6)"; 
+            ctx.strokeStyle = "gold";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, -this.radius * 0.85, this.radius * 0.6, 0, Math.PI * 2, false);
+            if (!this.isHarmonized) { // Only fill if not actively harmonized, stroke always to show base circlet
+                ctx.globalAlpha = 0.3 + Math.abs(Math.sin(now / 300)) * 0.3;
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+            }
+            ctx.stroke();
+
+            if (this.isHarmonized) {
+                helmGlowRadius = 15 + Math.sin(now / 200) * 5; 
+                helmGlowColor = "rgba(255, 255, 100, 0.7)"; 
+                ctx.shadowBlur = helmGlowRadius;
+                ctx.shadowColor = helmGlowColor;
+                ctx.lineWidth = 2.5;
+                ctx.strokeStyle = "rgba(255, 255, 180, 1)"; // Brighter stroke for active harmony
+                ctx.beginPath(); // Redraw for glow effect
+                ctx.arc(0, -this.radius * 0.85, this.radius * 0.65, 0, Math.PI * 2, false); // Slightly larger for glow emphasis
+                ctx.stroke();
+                ctx.shadowBlur = 0; 
+                ctx.shadowColor = "transparent";
+            }
+
+        } else if (this.hasBerserkersEchoHelm) {
+            ctx.fillStyle = "rgb(120, 20, 20)"; 
+            ctx.strokeStyle = "rgb(50, 0, 0)";
+            ctx.lineWidth = 1.5;
+            
+            const missingHpFactor = Math.max(0, (this.maxHp - this.hp) / this.maxHp); 
+            if (missingHpFactor > 0.05) { 
+                helmGlowRadius = 5 + missingHpFactor * 20; 
+                const glowIntensity = 0.3 + missingHpFactor * 0.6; 
+                helmGlowColor = `rgba(255, 0, 0, ${glowIntensity})`; 
+                ctx.shadowBlur = helmGlowRadius;
+                ctx.shadowColor = helmGlowColor;
+            }
+
+            const hornBaseOffsetY = -this.radius * 0.5;
+            const hornSideOffsetX = this.radius * 0.45;
+            const hornTipOffsetY = -this.radius * 1.1; 
+            const hornTipSideOffsetX = this.radius * 0.7; 
+
+            ctx.beginPath();
+            ctx.moveTo(-hornSideOffsetX, hornBaseOffsetY); 
+            ctx.quadraticCurveTo(-hornTipSideOffsetX * 0.8, hornTipOffsetY * 0.9, -hornTipSideOffsetX, hornTipOffsetY); 
+            ctx.quadraticCurveTo(-hornTipSideOffsetX * 0.6, hornTipOffsetY * 1.1, -hornSideOffsetX + this.radius * 0.15, hornBaseOffsetY + this.radius * 0.1); 
+            ctx.closePath();
+            ctx.fill(); ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(hornSideOffsetX, hornBaseOffsetY); 
+            ctx.quadraticCurveTo(hornTipSideOffsetX * 0.8, hornTipOffsetY * 0.9, hornTipSideOffsetX, hornTipOffsetY); 
+            ctx.quadraticCurveTo(hornTipSideOffsetX * 0.6, hornTipOffsetY * 1.1, hornSideOffsetX - this.radius * 0.15, hornBaseOffsetY + this.radius * 0.1); 
+            ctx.closePath();
+            ctx.fill(); ctx.stroke();
+
+            ctx.shadowBlur = 0; 
+            ctx.shadowColor = "transparent";
+
+        } else if (this.hasUltimateConfigurationHelm) {
+            ctx.fillStyle = "rgba(80, 0, 120, 0.85)"; 
+            ctx.strokeStyle = "rgba(180, 120, 255, 0.9)";
+            ctx.lineWidth = 2;
+
+            helmGlowRadius = 8 + Math.sin(now / 350) * 3;
+            helmGlowColor = "rgba(150, 100, 220, 0.4)";
+            ctx.shadowBlur = helmGlowRadius;
+            ctx.shadowColor = helmGlowColor;
+
+            ctx.beginPath(); 
+            ctx.moveTo(0, -this.radius * 1.8); 
+            ctx.lineTo(-this.radius * 0.8, -this.radius * 0.5); 
+            ctx.quadraticCurveTo(0, -this.radius * 0.1, this.radius * 0.8, -this.radius * 0.5); 
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            
+            ctx.shadowBlur = 0; 
+            ctx.shadowColor = "transparent";
+
+            ctx.fillStyle = "yellow";
+            ctx.beginPath();
+            ctx.arc(0, -this.radius * 1.5, this.radius * 0.15, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore(); 
+        // ---- END HELMET DRAWING ----
+
         if (this.teleporting && this.teleportEffectTimer > 0) {
             const effectProgress = 1 - (this.teleportEffectTimer / TELEPORT_IMMUNITY_DURATION);
             const alpha = 0.5 * (1 - effectProgress) + Math.abs(Math.sin(now / 80)) * 0.3;
-            ctx.globalAlpha = alpha;
+            ctx.globalAlpha = alpha; 
         }
 
-        const isImmuneActive = postPopupTimerFromCtx > 0 || postDamageTimerFromCtx > 0 || this.isShieldOvercharging;
-        if (isImmuneActive && !(this.teleporting && this.teleportEffectTimer > 0)) {
+        const isImmuneActiveForShield = postPopupTimerFromCtx > 0 || postDamageTimerFromCtx > 0 || this.isShieldOvercharging;
+        if (isImmuneActiveForShield && !(this.teleporting && this.teleportEffectTimer > 0)) {
             ctx.beginPath();
             let shieldRadius = this.radius + 5;
             let shieldAlpha = 0.3;
@@ -189,7 +296,7 @@ export class Player {
             ctx.arc(0, 0, shieldRadius, 0, Math.PI * 2);
             ctx.stroke();
         }
-
+        ctx.globalAlpha = 1.0; 
 
         ctx.beginPath();
         ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
@@ -221,13 +328,8 @@ export class Player {
         if(isAbl){ctx.beginPath();ctx.arc(0,0,this.radius-2,0,Math.PI*2);ctx.strokeStyle='rgba(160,180,255,0.3)';ctx.lineWidth=1;ctx.stroke();}
         ctx.closePath();
 
-
         if (this.visualModifiers.momentumInjectors) {
             const nV=2; const vAO=Math.PI/2.5; const vL=this.radius*0.4; const vW=this.radius*0.15; ctx.fillStyle='#AAAAAA'; for(let i=0;i<nV;i++){const a=-Math.PI+(i===0?-vAO:vAO); ctx.save();ctx.rotate(a);ctx.fillRect(-this.radius*0.9,-vW/2,vL,vW);ctx.restore();}}
-
-        if (this.visualModifiers.phaseStabilizers) {
-            const hBW = this.radius*1.8; const hBH = this.radius*0.3; const hTW = this.radius*1.2; const hTH = this.radius*1.1; const hYO = -this.radius*0.8; ctx.fillStyle='#333'; ctx.strokeStyle='#111'; ctx.lineWidth=1; ctx.beginPath(); ctx.rect(-hBW/2, hYO-hBH/2, hBW,hBH);ctx.fill();ctx.stroke(); ctx.beginPath();ctx.rect(-hTW/2,hYO-hBH/2-hTH,hTW,hTH);ctx.fill();ctx.stroke();
-        }
 
         if (this.visualModifiers.serratedNanites) {
             const nG=3; const oR=this.radius+9; const gS=1/600; ctx.fillStyle='rgba(255,50,50,0.95)'; ctx.strokeStyle='rgba(255,100,100,0.5)'; ctx.lineWidth=1; for(let i=0;i<nG;i++){const a=(this.naniteAnimTimer*gS+(i*Math.PI*2/nG))%(Math.PI*2); const gx=Math.cos(a)*oR; const gy=Math.sin(a)*oR; const gSize=3.5; ctx.save();ctx.translate(gx,gy);ctx.rotate(a+Math.PI/2); ctx.beginPath();ctx.moveTo(0,-gSize*0.6);ctx.lineTo(-gSize*0.5,gSize*0.4);ctx.lineTo(gSize*0.5,gSize*0.4);ctx.closePath();ctx.fill(); const pA=a-gS*50;const pX=Math.cos(pA)*oR;const pY=Math.sin(pA)*oR; ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(pX-gx,pY-gy);ctx.stroke(); ctx.restore();}}
@@ -269,7 +371,7 @@ export class Player {
             ctx.restore();
         }
 
-        ctx.restore();
+        ctx.restore(); // Restore from player translate
     }
     
     update(gameContext) {
@@ -283,6 +385,10 @@ export class Player {
                 ui 
               } = gameContext;
 
+        // Increment timeSinceLastHit if not taking damage this frame.
+        // The reset to 0 is handled in takeDamage.
+        this.timeSinceLastHit += dt; 
+
         if (this.teleporting && this.teleportEffectTimer > 0) {
             this.teleportEffectTimer -= dt;
             if (this.teleportEffectTimer <= 0) {
@@ -290,66 +396,100 @@ export class Player {
             }
         }
 
+        // ---- PERFECT HARMONY LOGIC (uses timeSinceLastHit) ----
+        if (this.hasPerfectHarmonyHelm) {
+            if (this.timeSinceLastHit >= PERFECT_HARMONY_NO_DAMAGE_DURATION_THRESHOLD) {
+                if (!this.isHarmonized) {
+                    this.isHarmonized = true;
+                    if(activeBuffNotificationsArray) activeBuffNotificationsArray.push({ text: `Perfect Harmony Active!`, timer: 2000});
+                }
+            } else {
+                // If timeSinceLastHit is less, and player was harmonized, it means they just took damage.
+                // takeDamage() will set isHarmonized to false.
+            }
+        }
+        // ---- END PERFECT HARMONY LOGIC ----
+
         let numericAbilityUIUpdateNeeded = false;
         for (const slot in this.activeAbilities) {
-             if (this.activeAbilities[slot] && this.activeAbilities[slot].cooldownTimer > 0) {
-                this.activeAbilities[slot].cooldownTimer -= dt;
-                numericAbilityUIUpdateNeeded = true;
-                if (this.activeAbilities[slot].cooldownTimer <= 0) {
-                    this.activeAbilities[slot].cooldownTimer = 0;
-                    this.activeAbilities[slot].justBecameReady = true;
-                } else {
-                    this.activeAbilities[slot].justBecameReady = false;
+             if (this.activeAbilities[slot]) {
+                let effectiveCooldownMultiplier = 1.0; 
+                if (this.isHarmonized && this.hasPerfectHarmonyHelm) {
+                    effectiveCooldownMultiplier *= (1.0 - PERFECT_HARMONY_COOLDOWN_REDUCTION); 
                 }
-            } else if (this.activeAbilities[slot] && this.activeAbilities[slot].cooldownTimer <= 0 && !this.activeAbilities[slot].justBecameReady) {
-                 this.activeAbilities[slot].justBecameReady = true;
-                 numericAbilityUIUpdateNeeded = true;
+                if (this.hasUltimateConfigurationHelm) { 
+                    effectiveCooldownMultiplier *= 1.5; 
+                }
+
+                if (this.activeAbilities[slot].cooldownTimer > 0) {
+                    this.activeAbilities[slot].cooldownTimer -= dt / effectiveCooldownMultiplier; 
+                    numericAbilityUIUpdateNeeded = true;
+                    if (this.activeAbilities[slot].cooldownTimer <= 0) {
+                        this.activeAbilities[slot].cooldownTimer = 0;
+                        this.activeAbilities[slot].justBecameReady = true;
+                    } else {
+                        this.activeAbilities[slot].justBecameReady = false;
+                    }
+                } else if (this.activeAbilities[slot].cooldownTimer <= 0 && !this.activeAbilities[slot].justBecameReady) {
+                     this.activeAbilities[slot].justBecameReady = true;
+                     numericAbilityUIUpdateNeeded = true;
+                }
             }
         }
 
         let mouseAbilityUIUpdateNeeded = false;
-        if (this.hasShieldOvercharge) {
-            if (this.isShieldOvercharging) {
-                this.shieldOverchargeTimer -= dt;
+        const updateMouseAbility = (abilityStateProp, abilityTimerProp, abilityCooldownTimerProp, abilityCooldownConst) => {
+            let effectiveCooldownMultiplier = 1.0;
+            if (this.isHarmonized && this.hasPerfectHarmonyHelm) {
+                effectiveCooldownMultiplier *= (1.0 - PERFECT_HARMONY_COOLDOWN_REDUCTION);
+            }
+
+            if (this[abilityStateProp]) { 
+                this[abilityTimerProp] -= dt;
                 mouseAbilityUIUpdateNeeded = true;
-                if (this.shieldOverchargeTimer <= 0) {
-                    this.isShieldOvercharging = false;
-                    this.shieldOverchargeCooldownTimer = this.shieldOverchargeCooldown;
+                if (this[abilityTimerProp] <= 0) {
+                    return true; 
                 }
-            } else if (this.shieldOverchargeCooldownTimer > 0) {
-                this.shieldOverchargeCooldownTimer -= dt;
+            } else if (this[abilityCooldownTimerProp] > 0) {
+                this[abilityCooldownTimerProp] -= dt / effectiveCooldownMultiplier;
                 mouseAbilityUIUpdateNeeded = true;
-                if (this.shieldOverchargeCooldownTimer < 0) this.shieldOverchargeCooldownTimer = 0;
+                if (this[abilityCooldownTimerProp] < 0) this[abilityCooldownTimerProp] = 0;
+            }
+            return false; 
+        };
+        
+        if (this.hasShieldOvercharge) {
+            if(updateMouseAbility('isShieldOvercharging', 'shieldOverchargeTimer', 'shieldOverchargeCooldownTimer', this.shieldOverchargeCooldown)){
+                this.isShieldOvercharging = false;
+                this.shieldOverchargeCooldownTimer = this.shieldOverchargeCooldown;
             }
         }
 
         if (this.hasOmegaLaser) {
             if (this.isFiringOmegaLaser) {
-                this.currentSpeed = this.originalPlayerSpeed / 2;
                 this.omegaLaserAngle = Math.atan2(mouseY - this.y, mouseX - this.x);
-
                 this.omegaLaserTimer -= dt;
                 this.omegaLaserCurrentTickTimer -= dt;
                 mouseAbilityUIUpdateNeeded = true;
 
                 if (this.omegaLaserCurrentTickTimer <= 0) {
-                    const laserDamageContext = {
-                        updateScoreCallback: gameContext.updateScoreCallback,
-                    };
-                    this.dealOmegaLaserDamage(targets, activeBosses, laserDamageContext);
+                    const laserDamageContext = { updateScoreCallback: gameContext.updateScoreCallback };
+                    this.dealOmegaLaserDamage(targets, activeBosses, laserDamageContext); 
                     this.omegaLaserCurrentTickTimer = OMEGA_LASER_TICK_INTERVAL;
                 }
                 if (this.omegaLaserTimer <= 0) {
                     this.isFiringOmegaLaser = false;
-                    this.currentSpeed = this.originalPlayerSpeed;
                     stopSound(omegaLaserSound);
                     this.omegaLaserCooldownTimer = this.omegaLaserCooldown;
                     this.currentOmegaLaserKineticBoost = 1.0; 
                 }
-            } else {
-                if (this.currentSpeed !== this.originalPlayerSpeed) this.currentSpeed = this.originalPlayerSpeed;
+            } else { 
                 if (this.omegaLaserCooldownTimer > 0) {
-                    this.omegaLaserCooldownTimer -= dt;
+                     let effectiveCooldownMultiplier = 1.0;
+                    if (this.isHarmonized && this.hasPerfectHarmonyHelm) {
+                        effectiveCooldownMultiplier *= (1.0 - PERFECT_HARMONY_COOLDOWN_REDUCTION);
+                    }
+                    this.omegaLaserCooldownTimer -= dt / effectiveCooldownMultiplier;
                     mouseAbilityUIUpdateNeeded = true;
                     if (this.omegaLaserCooldownTimer < 0) this.omegaLaserCooldownTimer = 0;
                 }
@@ -362,7 +502,6 @@ export class Player {
             if(forceUIUpdate && gameContext) gameContext.forceAbilityUIUpdate = false;
         }
 
-
         this.x += this.velX; this.y += this.velY;
         this.velX *= 0.95; this.velY *= 0.95;
         if (Math.abs(this.velX) < 0.1) this.velX = 0;
@@ -374,12 +513,31 @@ export class Player {
         if (keys.ArrowLeft || keys.a) dxMovement -= 1;
         if (keys.ArrowRight || keys.d) dxMovement += 1;
 
+        let actualCurrentSpeed = this.originalPlayerSpeed;
+        if (this.isFiringOmegaLaser && this.hasOmegaLaser) {
+            actualCurrentSpeed = this.originalPlayerSpeed / 2;
+        } else {
+            let speedMultiplier = 1.0;
+            if (this.hasBerserkersEchoHelm) {
+                const missingHpPercentage = (this.maxHp - this.hp) / this.maxHp;
+                const tenPercentIncrements = Math.floor(missingHpPercentage * 10);
+                if (tenPercentIncrements > 0) {
+                    speedMultiplier *= (1 + (tenPercentIncrements * BERSERKERS_ECHO_SPEED_PER_10_HP));
+                }
+            }
+            if (this.isHarmonized && this.hasPerfectHarmonyHelm) {
+                speedMultiplier *= (1 + PERFECT_HARMONY_SPEED_BONUS);
+            }
+            actualCurrentSpeed *= speedMultiplier;
+        }
+        this.currentSpeed = actualCurrentSpeed; 
+
         let playerIsActuallyMoving = false;
         if (dxMovement !== 0 || dyMovement !== 0) {
             playerIsActuallyMoving = true;
             if (dxMovement !== 0 && dyMovement !== 0) {
                 const m = Math.sqrt(2);
-                dxMovement = (dxMovement / m) * this.currentSpeed;
+                dxMovement = (dxMovement / m) * this.currentSpeed; 
                 dyMovement = (dyMovement / m) * this.currentSpeed;
             } else {
                 dxMovement *= this.currentSpeed;
@@ -387,7 +545,6 @@ export class Player {
             }
         }
 
-        // Kinetic Charge Update
         let currentTotalKineticChargeRate = this.baseKineticChargeRate;
         if (this.kineticConversionLevel > 0) { 
             currentTotalKineticChargeRate += this.kineticConversionLevel * this.kineticChargeRatePerLevel;
@@ -404,7 +561,6 @@ export class Player {
             if (this.kineticConversionLevel > 0) {
                 maxPotencyAtFullCharge = this.initialKineticDamageBonus + (Math.max(0, this.kineticConversionLevel - 1) * this.additionalKineticDamageBonusPerLevel);
             }
-            // console.log(`[Debug PLAYER_UPDATE_KINETIC_UI] Calling updateKineticChargeUI. Player Level: ${this.kineticConversionLevel}, Visible Arg: ${this.kineticConversionLevel > 0}`);
             ui.updateKineticChargeUI(this.kineticCharge, this.kineticChargeConsumption, maxPotencyAtFullCharge, this.kineticConversionLevel > 0);
         }
 
@@ -440,8 +596,7 @@ export class Player {
         if (!this.isFiringOmegaLaser) {
             this.aimAngle = Math.atan2(mouseY - this.y, mouseX - this.x);
         }
-
-        this.timeSinceLastHit += dt;
+        
         if (this.hp > 0 && this.hp < this.maxHp) {
             this.hpRegenTimer += dt;
             if (this.hpRegenTimer >= HP_REGEN_INTERVAL) {
@@ -479,9 +634,13 @@ export class Player {
             return 0;
         }
 
+        if (this.isHarmonized && this.hasPerfectHarmonyHelm) {
+            this.isHarmonized = false;
+            if(gameContext.activeBuffNotificationsArray) gameContext.activeBuffNotificationsArray.push({ text: `Harmony Lost!`, timer: 1500});
+        }
+        this.timeSinceLastHit = 0; 
 
         this.timesHit++;
-        this.timeSinceLastHit = 0;
 
         let damageToTake = RAY_DAMAGE_TO_PLAYER;
         if (hittingRay && typeof hittingRay.damageValue === 'number') {
@@ -489,17 +648,12 @@ export class Player {
         } else if (!hittingRay) {
         }
 
-        // ---- MODIFICATION for Reinforced Hull ----
-        // Apply general damage multiplier first
-        damageToTake *= this.damageTakenMultiplier;
+        damageToTake *= this.damageTakenMultiplier; 
 
-        // Then apply specific boss damage reduction if applicable (e.g. from Ablative Sublayer gear)
-        // This ensures the gear stacks multiplicatively with the general reduction.
         if (hittingRay && hittingRay.isBossProjectile && this.visualModifiers.ablativeSublayer) {
             damageToTake *= (1 - (this.bossDamageReduction || 0));
         }
-        // ---- END MODIFICATION ----
-
+        
         damageToTake = Math.max(1, Math.round(damageToTake));
 
         this.hp -= damageToTake;
@@ -541,10 +695,8 @@ export class Player {
         if (this.kineticCharge <= 0 || this.kineticConversionLevel <= 0) {
             return 1.0; 
         }
-
         let chargeToConsume = Math.min(this.kineticCharge, this.kineticChargeConsumption);
         let effectScale = chargeToConsume / this.kineticChargeConsumption; 
-
         let maxPossiblePotencyBonus;
         if (this.kineticConversionLevel === 1) {
             maxPossiblePotencyBonus = this.initialKineticDamageBonus;
@@ -552,10 +704,8 @@ export class Player {
             maxPossiblePotencyBonus = this.initialKineticDamageBonus +
                                       ((this.kineticConversionLevel - 1) * this.additionalKineticDamageBonusPerLevel);
         }
-
         let currentPotencyBonus = effectScale * maxPossiblePotencyBonus;
         let finalDamageMultiplier = 1.0 + currentPotencyBonus;
-
         this.kineticCharge -= chargeToConsume;
         return finalDamageMultiplier;
     }
@@ -564,7 +714,6 @@ export class Player {
         if (this.temporalEchoChance > 0 && Math.random() < this.temporalEchoChance) {
             let echoApplied = false;
             const { updateAbilityCooldownCallback } = abilityContext || {};
-
             for (const otherSlotKey in this.activeAbilities) {
                 const otherAbility = this.activeAbilities[otherSlotKey];
                 if (otherAbility && otherAbility.id !== abilityIdJustUsed && otherAbility.cooldownTimer > 0) {
@@ -575,17 +724,14 @@ export class Player {
                     echoApplied = true;
                 }
             }
-
             if (this.hasOmegaLaser && abilityIdJustUsed !== 'omegaLaser' && this.omegaLaserCooldownTimer > 0) {
                 this.omegaLaserCooldownTimer = Math.max(0, this.omegaLaserCooldownTimer - this.temporalEchoFixedReduction);
                 echoApplied = true;
             }
-
             if (this.hasShieldOvercharge && abilityIdJustUsed !== 'shieldOvercharge' && this.shieldOverchargeCooldownTimer > 0) {
                 this.shieldOverchargeCooldownTimer = Math.max(0, this.shieldOverchargeCooldownTimer - this.temporalEchoFixedReduction);
                 echoApplied = true;
             }
-
             if (echoApplied && updateAbilityCooldownCallback) {
                 updateAbilityCooldownCallback(this);
             }
@@ -600,48 +746,50 @@ export class Player {
         const ability = this.activeAbilities[slotStr];
         if (!ability) return;
 
-        let abilityWasSuccessfullyTriggered = false;
+        let abilityUsedSuccessfully = false;
+        let actualCooldownDuration = ability.cooldownDuration;
+
+        if (this.hasUltimateConfigurationHelm) {
+            actualCooldownDuration *= 1.5;
+        }
 
         if (ability.id === 'miniGravityWell') {
             if (this.activeMiniWell && this.activeMiniWell.isActive) {
                 this.currentGravityWellKineticBoost = this.consumeKineticChargeForDamageBoost();
                 this.activeMiniWell.detonate({ targetX: abilityContext.mouseX, targetY: abilityContext.mouseY, player: this });
-                ability.cooldownTimer = ability.cooldownDuration;
+                ability.cooldownTimer = actualCooldownDuration; 
                 ability.justBecameReady = false;
-                abilityWasSuccessfullyTriggered = true;
-                this.procTemporalEcho(ability.id, abilityContext);
+                abilityUsedSuccessfully = true;
             } else if (ability.cooldownTimer <= 0) {
                 this.deployMiniGravityWell(ability.duration, abilityContext.decoysArray, abilityContext.mouseX, abilityContext.mouseY);
-                if (this.activeMiniWell) {
-                    this.procTemporalEcho(ability.id, abilityContext);
-                    abilityWasSuccessfullyTriggered = true;
+                if (this.activeMiniWell) { 
+                    abilityUsedSuccessfully = true; 
                 }
             }
         } else if (ability.cooldownTimer <= 0) { 
             switch (ability.id) {
                 case 'teleport':
                     this.doTeleport(abilityContext.bossDefeatEffectsArray, abilityContext.mouseX, abilityContext.mouseY, abilityContext.canvasWidth, abilityContext.canvasHeight);
-                    ability.cooldownTimer = ability.cooldownDuration;
-                    ability.justBecameReady = false;
-                    abilityWasSuccessfullyTriggered = true;
-                    this.procTemporalEcho(ability.id, abilityContext);
+                    ability.cooldownTimer = actualCooldownDuration;
+                    abilityUsedSuccessfully = true;
                     break;
                 case 'empBurst':
                     this.triggerEmpBurst(abilityContext.bossDefeatEffectsArray, abilityContext.allRays, abilityContext.screenShakeParams, abilityContext.canvasWidth, abilityContext.canvasHeight);
-                    ability.cooldownTimer = ability.cooldownDuration;
-                    ability.justBecameReady = false;
-                    abilityWasSuccessfullyTriggered = true;
-                    this.procTemporalEcho(ability.id, abilityContext);
+                    ability.cooldownTimer = actualCooldownDuration;
+                    abilityUsedSuccessfully = true;
                     break;
             }
+            if(abilityUsedSuccessfully) ability.justBecameReady = false;
         }
 
+        if (abilityUsedSuccessfully) {
+             this.procTemporalEcho(ability.id, abilityContext);
+        }
         if (updateAbilityCooldownCallback) updateAbilityCooldownCallback(this);
     }
 
     deployMiniGravityWell(duration, decoysArray, mouseX, mouseY) {
         if (this.activeMiniWell && this.activeMiniWell.isActive) {
-            console.warn("deployMiniGravityWell called while a well is already active.");
             return;
         }
         this.currentGravityWellKineticBoost = 1.0; 
@@ -649,7 +797,6 @@ export class Player {
         if (decoysArray) decoysArray.push(this.activeMiniWell);
         playSound(playerWellDeploySound);
     }
-
 
     doTeleport(bossDefeatEffectsArray, mouseX, mouseY, canvasWidth, canvasHeight) {
         if (this.teleporting && this.teleportEffectTimer > 0) return;
@@ -672,7 +819,7 @@ export class Player {
         if (allRays) {
             for (let i = allRays.length - 1; i >= 0; i--) {
                 const ray = allRays[i];
-                if (ray && !ray.isGravityWellRay) {
+                if (ray && !ray.isGravityWellRay) { 
                     ray.isActive = false;
                 }
             }
@@ -681,7 +828,7 @@ export class Player {
             screenShakeParams.isScreenShaking = true;
             screenShakeParams.screenShakeTimer = 400;
             screenShakeParams.currentShakeMagnitude = 8;
-            screenShakeParams.currentShakeType = 'playerHit';
+            screenShakeParams.currentShakeType = 'playerHit'; 
             screenShakeParams.hitShakeDx = 0; screenShakeParams.hitShakeDy = 0;
         }
         playSound(empBurstSound);
@@ -698,7 +845,7 @@ export class Player {
 
             this.currentOmegaLaserKineticBoost = this.consumeKineticChargeForDamageBoost();
 
-            this.procTemporalEcho('omegaLaser', abilityContext);
+            this.procTemporalEcho('omegaLaser', abilityContext); 
             if (abilityContext && abilityContext.updateAbilityCooldownCallback) abilityContext.updateAbilityCooldownCallback(this);
         }
     }
@@ -710,25 +857,38 @@ export class Player {
             playSound(shieldOverchargeSound);
             if(activeBuffNotificationsArray) activeBuffNotificationsArray.push({ text: `Shield Overcharge Active! Healing!`, timer: SHIELD_OVERCHARGE_DURATION });
 
-            this.procTemporalEcho('shieldOvercharge', abilityContext);
+            this.procTemporalEcho('shieldOvercharge', abilityContext); 
             if (abilityContext && abilityContext.updateAbilityCooldownCallback) abilityContext.updateAbilityCooldownCallback(this);
         }
     }
 
-    dealOmegaLaserDamage(targetsArray, activeBossesArray, laserDamageContext) {
+    dealOmegaLaserDamage(targetsArray, activeBossesArray, laserDamageContext) { // laserDamageContext passed from player.update
         const beamStartX = this.x + Math.cos(this.omegaLaserAngle) * this.radius;
         const beamStartY = this.y + Math.sin(this.omegaLaserAngle) * this.radius;
         const beamEndX = this.x + Math.cos(this.omegaLaserAngle) * (this.radius + this.omegaLaserRange);
         const beamEndY = this.y + Math.sin(this.omegaLaserAngle) * (this.radius + this.omegaLaserRange);
 
-        const finalDamagePerTick = Math.round(this.omegaLaserDamagePerTick * this.abilityDamageMultiplier * this.currentOmegaLaserKineticBoost);
+        let damagePerTickForCalc = this.omegaLaserDamagePerTick;
+
+        if (typeof this.abilityDamageMultiplier === 'number') {
+            damagePerTickForCalc *= this.abilityDamageMultiplier;
+        }
+        if (this.hasUltimateConfigurationHelm) { 
+            damagePerTickForCalc *= 2; 
+        }
+        if (this.isHarmonized && this.hasPerfectHarmonyHelm) { 
+            damagePerTickForCalc *= (1 + PERFECT_HARMONY_RAY_DAMAGE_BONUS);
+        }
+        damagePerTickForCalc *= this.currentOmegaLaserKineticBoost; 
+
+        const finalDamagePerTick = Math.round(Math.max(1, damagePerTickForCalc));
 
         if (targetsArray) {
             for (let i = targetsArray.length - 1; i >= 0; i--) {
                 const target = targetsArray[i];
                 if (target && isLineSegmentIntersectingCircle(beamStartX, beamStartY, beamEndX, beamEndY, target.x, target.y, target.radius + this.omegaLaserWidth / 2)) {
                     targetsArray.splice(i, 1);
-                    this.totalDamageDealt += Math.round(10 * this.abilityDamageMultiplier * this.currentOmegaLaserKineticBoost);
+                    this.totalDamageDealt += 10; // Base score/damage for targets hit by Omega Laser
                     if (laserDamageContext && laserDamageContext.updateScoreCallback) laserDamageContext.updateScoreCallback(10);
                 }
             }
@@ -738,7 +898,7 @@ export class Player {
             activeBossesArray.forEach(boss => {
                 if (boss && isLineSegmentIntersectingCircle(beamStartX, beamStartY, beamEndX, beamEndY, boss.x, boss.y, boss.radius + this.omegaLaserWidth / 2)) {
                     if (typeof boss.takeDamage === 'function') {
-                        boss.takeDamage(finalDamagePerTick, null, this, {});
+                        boss.takeDamage(finalDamagePerTick, null, this, {}); 
                     }
                     this.totalDamageDealt += finalDamagePerTick;
                 }
