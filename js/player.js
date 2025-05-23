@@ -40,8 +40,24 @@ export class Player {
         this.hasTargetPierce = false; this.chainReactionChance = 0.0;
         this.scatterShotLevel = 0; this.ownRaySpeedMultiplier = 1.0;
         this.damageReductionFactor = 0.0; this.hpPickupBonus = 0;
-        // this.bossStunChanceBonus = 0.0; // REMOVED - Replaced by ability damage
-        this.abilityDamageMultiplier = 1.0; // MODIFIED: New property for ability damage
+        this.abilityDamageMultiplier = 1.0;
+        this.temporalEchoChance = 0.0;
+        this.temporalEchoFixedReduction = 2000;
+
+        // Kinetic Conversion Properties
+        this.kineticCharge = 0;                            // Current charge (0-100)
+        this.baseKineticChargeRate = 1;                    // Base charge rate if evo is not taken (or level 0)
+        this.kineticChargeRatePerLevel = 0.25;             // Additional charge rate per level of Kinetic Conversion evo
+        this.kineticDecayRate = 2.0;                       // Units per second when not moving fast
+        this.kineticChargeSpeedThresholdFactor = 0.70;     // Player must be moving at this factor of currentSpeed
+        this.kineticConversionLevel = 0;                   // How many times Kinetic Conversion evo has been picked
+        this.initialKineticDamageBonus = 0.30;             // Damage bonus from the first pick (30%) at full charge
+        this.additionalKineticDamageBonusPerLevel = 0.20;  // Additional bonus per pick AFTER the first (20%) at full charge
+        this.kineticChargeConsumption = 100;               // Consume up to this much charge for max effect
+
+        this.currentOmegaLaserKineticBoost = 1.0;    // Temp boost for current Omega Laser firing
+        this.currentGravityWellKineticBoost = 1.0; // Temp boost for next Gravity Well launch
+
 
         this.timeSinceLastHit = Number.MAX_SAFE_INTEGER;
         this.hpRegenTimer = 0; this.baseHpRegenAmount = 1;
@@ -78,7 +94,7 @@ export class Player {
         this.omegaLaserCooldownTimer = 0;
         this.omegaLaserCooldown = OMEGA_LASER_COOLDOWN;
         this.omegaLaserAngle = 0;
-        this.omegaLaserDamagePerTick = OMEGA_LASER_DAMAGE_PER_TICK; // Base damage per tick
+        this.omegaLaserDamagePerTick = OMEGA_LASER_DAMAGE_PER_TICK;
         this.omegaLaserTickInterval = OMEGA_LASER_TICK_INTERVAL;
         this.omegaLaserCurrentTickTimer = 0;
         this.omegaLaserRange = OMEGA_LASER_RANGE;
@@ -251,11 +267,13 @@ export class Player {
 
     update(gameContext) {
         const { dt, keys, mouseX, mouseY, canvasWidth, canvasHeight, targets, activeBosses,
-                currentGrowthFactor, // This is currentPlayerRadiusGrowthFactor from main.js
-                currentEffectiveDefaultGrowthFactor, // Game's standard growth rate, passed from main.js
+                currentGrowthFactor, 
+                currentEffectiveDefaultGrowthFactor, 
                 updateHealthDisplayCallback, updateAbilityCooldownCallback,
                 isAnyPauseActiveCallback, decoysArray, bossDefeatEffectsArray, allRays,
-                screenShakeParams, activeBuffNotificationsArray, score
+                screenShakeParams, activeBuffNotificationsArray, score,
+                evolutionChoices, 
+                ui 
               } = gameContext;
 
         if (this.teleporting && this.teleportEffectTimer > 0) {
@@ -289,6 +307,7 @@ export class Player {
                 mouseAbilityUIUpdateNeeded = true;
                 if (this.shieldOverchargeTimer <= 0) {
                     this.isShieldOvercharging = false;
+                    this.shieldOverchargeCooldownTimer = this.shieldOverchargeCooldown;
                 }
             } else if (this.shieldOverchargeCooldownTimer > 0) {
                 this.shieldOverchargeCooldownTimer -= dt;
@@ -317,6 +336,8 @@ export class Player {
                     this.isFiringOmegaLaser = false;
                     this.currentSpeed = this.originalPlayerSpeed;
                     stopSound(omegaLaserSound);
+                    this.omegaLaserCooldownTimer = this.omegaLaserCooldown;
+                    this.currentOmegaLaserKineticBoost = 1.0; 
                 }
             } else {
                 if (this.currentSpeed !== this.originalPlayerSpeed) this.currentSpeed = this.originalPlayerSpeed;
@@ -346,7 +367,9 @@ export class Player {
         if (keys.ArrowLeft || keys.a) dxMovement -= 1;
         if (keys.ArrowRight || keys.d) dxMovement += 1;
 
+        let playerIsActuallyMoving = false;
         if (dxMovement !== 0 || dyMovement !== 0) {
+            playerIsActuallyMoving = true;
             if (dxMovement !== 0 && dyMovement !== 0) {
                 const m = Math.sqrt(2);
                 dxMovement = (dxMovement / m) * this.currentSpeed;
@@ -356,6 +379,31 @@ export class Player {
                 dyMovement *= this.currentSpeed;
             }
         }
+
+        // Kinetic Charge Update
+        let currentTotalKineticChargeRate = this.baseKineticChargeRate;
+        if (this.kineticConversionLevel > 0) { 
+            currentTotalKineticChargeRate += this.kineticConversionLevel * this.kineticChargeRatePerLevel;
+        }
+
+        if (playerIsActuallyMoving) {
+            this.kineticCharge = Math.min(100, this.kineticCharge + currentTotalKineticChargeRate * (dt / 1000));
+        } else {
+            this.kineticCharge = Math.max(0, this.kineticCharge - this.kineticDecayRate * (dt / 1000));
+        }
+
+        if (ui && ui.updateKineticChargeUI) {
+            let maxPotencyAtFullCharge = 0;
+            if (this.kineticConversionLevel > 0) {
+                maxPotencyAtFullCharge = this.initialKineticDamageBonus + (Math.max(0, this.kineticConversionLevel - 1) * this.additionalKineticDamageBonusPerLevel);
+            }
+            // ---- START OF FIX ----
+            // Add a log here to confirm this specific call from player.update
+            // console.log(`[Debug PLAYER_UPDATE_KINETIC_UI] Calling updateKineticChargeUI. Player Level: ${this.kineticConversionLevel}, Visible Arg: ${this.kineticConversionLevel > 0}`);
+            ui.updateKineticChargeUI(this.kineticCharge, this.kineticChargeConsumption, maxPotencyAtFullCharge, this.kineticConversionLevel > 0);
+            // ---- END OF FIX ----
+        }
+
 
         let nX = this.x + dxMovement; let nY = this.y + dyMovement;
 
@@ -372,19 +420,11 @@ export class Player {
 
         this.x = nX; this.y = nY;
 
-        // Radius Calculation based on new properties
-        this.baseRadius = this.initialBaseRadius + this.bonusBaseRadius; // This is the true starting base + direct additions
+        this.baseRadius = this.initialBaseRadius + this.bonusBaseRadius;
         let effectiveScoreForSizing = Math.max(0, score - this.scoreOffsetForSizing);
 
         if (currentGrowthFactor > 0) {
-            // If growth is active this cycle (e.g., not Evasive Maneuver cycle),
-            // update scoreBasedSize based on current effective score and active growth factor.
             this.scoreBasedSize = effectiveScoreForSizing * currentGrowthFactor;
-        } else {
-            // If currentGrowthFactor is 0 (e.g., Evasive Maneuver active this cycle),
-            // player.scoreBasedSize was already set by Evasive's apply() to the desired fixed value.
-            // It should not change further based on score *this cycle*.
-            // So, this.scoreBasedSize remains what Evasive.apply() set it to.
         }
         this.radius = this.baseRadius + this.scoreBasedSize;
         this.radius = Math.max(MIN_PLAYER_BASE_RADIUS, this.radius);
@@ -443,7 +483,6 @@ export class Player {
         if (hittingRay && typeof hittingRay.damageValue === 'number') {
             damageToTake = hittingRay.damageValue;
         } else if (!hittingRay) {
-            // Default damage applies if not a ray or ray has no specific damageValue
         }
 
 
@@ -488,41 +527,101 @@ export class Player {
         if (updateHealthDisplayCallback) updateHealthDisplayCallback(this.hp, this.maxHp);
     }
 
-    activateAbility(slot, abilityContext) {
-        const { isAnyPauseActiveCallback, updateAbilityCooldownCallback, decoysArray,
-                bossDefeatEffectsArray, mouseX, mouseY, canvasWidth, canvasHeight,
-                allRays, screenShakeParams } = abilityContext;
+    consumeKineticChargeForDamageBoost() {
+        if (this.kineticCharge <= 0 || this.kineticConversionLevel <= 0) {
+            return 1.0; // No boost if no charge or no levels in the evolution
+        }
 
+        let chargeToConsume = Math.min(this.kineticCharge, this.kineticChargeConsumption);
+        let effectScale = chargeToConsume / this.kineticChargeConsumption; // Proportional effect based on charge spent
+
+        let maxPossiblePotencyBonus;
+        if (this.kineticConversionLevel === 1) {
+            maxPossiblePotencyBonus = this.initialKineticDamageBonus;
+        } else { // For levels > 1
+            maxPossiblePotencyBonus = this.initialKineticDamageBonus +
+                                      ((this.kineticConversionLevel - 1) * this.additionalKineticDamageBonusPerLevel);
+        }
+
+        let currentPotencyBonus = effectScale * maxPossiblePotencyBonus;
+        let finalDamageMultiplier = 1.0 + currentPotencyBonus;
+
+        this.kineticCharge -= chargeToConsume;
+        return finalDamageMultiplier;
+    }
+
+    procTemporalEcho(abilityIdJustUsed, abilityContext) {
+        if (this.temporalEchoChance > 0 && Math.random() < this.temporalEchoChance) {
+            let echoApplied = false;
+            const { updateAbilityCooldownCallback } = abilityContext || {};
+
+            for (const otherSlotKey in this.activeAbilities) {
+                const otherAbility = this.activeAbilities[otherSlotKey];
+                if (otherAbility && otherAbility.id !== abilityIdJustUsed && otherAbility.cooldownTimer > 0) {
+                    otherAbility.cooldownTimer = Math.max(0, otherAbility.cooldownTimer - this.temporalEchoFixedReduction);
+                    if (otherAbility.cooldownTimer === 0 && !otherAbility.justBecameReady) {
+                        otherAbility.justBecameReady = true;
+                    }
+                    echoApplied = true;
+                }
+            }
+
+            if (this.hasOmegaLaser && abilityIdJustUsed !== 'omegaLaser' && this.omegaLaserCooldownTimer > 0) {
+                this.omegaLaserCooldownTimer = Math.max(0, this.omegaLaserCooldownTimer - this.temporalEchoFixedReduction);
+                echoApplied = true;
+            }
+
+            if (this.hasShieldOvercharge && abilityIdJustUsed !== 'shieldOvercharge' && this.shieldOverchargeCooldownTimer > 0) {
+                this.shieldOverchargeCooldownTimer = Math.max(0, this.shieldOverchargeCooldownTimer - this.temporalEchoFixedReduction);
+                echoApplied = true;
+            }
+
+            if (echoApplied && updateAbilityCooldownCallback) {
+                updateAbilityCooldownCallback(this);
+            }
+        }
+    }
+
+    activateAbility(slot, abilityContext) {
+        const { isAnyPauseActiveCallback, updateAbilityCooldownCallback } = abilityContext;
         if (isAnyPauseActiveCallback && isAnyPauseActiveCallback()) return;
 
         const slotStr = String(slot);
         const ability = this.activeAbilities[slotStr];
-
         if (!ability) return;
+
+        let abilityWasSuccessfullyTriggered = false;
 
         if (ability.id === 'miniGravityWell') {
             if (this.activeMiniWell && this.activeMiniWell.isActive) {
-                this.activeMiniWell.detonate({ targetX: mouseX, targetY: mouseY, player: this });
+                this.currentGravityWellKineticBoost = this.consumeKineticChargeForDamageBoost();
+                this.activeMiniWell.detonate({ targetX: abilityContext.mouseX, targetY: abilityContext.mouseY, player: this });
                 ability.cooldownTimer = ability.cooldownDuration;
                 ability.justBecameReady = false;
+                abilityWasSuccessfullyTriggered = true;
+                this.procTemporalEcho(ability.id, abilityContext);
             } else if (ability.cooldownTimer <= 0) {
-                this.deployMiniGravityWell(ability.duration, decoysArray, mouseX, mouseY);
+                this.deployMiniGravityWell(ability.duration, abilityContext.decoysArray, abilityContext.mouseX, abilityContext.mouseY);
                 if (this.activeMiniWell) {
-                    ability.cooldownTimer = ability.cooldownDuration;
-                    ability.justBecameReady = false;
+                    this.procTemporalEcho(ability.id, abilityContext);
+                    abilityWasSuccessfullyTriggered = true;
                 }
             }
-        } else if (ability.cooldownTimer <= 0) {
+        } else if (ability.cooldownTimer <= 0) { 
             switch (ability.id) {
                 case 'teleport':
-                    this.doTeleport(bossDefeatEffectsArray, mouseX, mouseY, canvasWidth, canvasHeight);
+                    this.doTeleport(abilityContext.bossDefeatEffectsArray, abilityContext.mouseX, abilityContext.mouseY, abilityContext.canvasWidth, abilityContext.canvasHeight);
                     ability.cooldownTimer = ability.cooldownDuration;
                     ability.justBecameReady = false;
+                    abilityWasSuccessfullyTriggered = true;
+                    this.procTemporalEcho(ability.id, abilityContext);
                     break;
                 case 'empBurst':
-                    this.triggerEmpBurst(bossDefeatEffectsArray, allRays, screenShakeParams, canvasWidth, canvasHeight);
+                    this.triggerEmpBurst(abilityContext.bossDefeatEffectsArray, abilityContext.allRays, abilityContext.screenShakeParams, abilityContext.canvasWidth, abilityContext.canvasHeight);
                     ability.cooldownTimer = ability.cooldownDuration;
                     ability.justBecameReady = false;
+                    abilityWasSuccessfullyTriggered = true;
+                    this.procTemporalEcho(ability.id, abilityContext);
                     break;
             }
         }
@@ -535,6 +634,7 @@ export class Player {
             console.warn("deployMiniGravityWell called while a well is already active.");
             return;
         }
+        this.currentGravityWellKineticBoost = 1.0; 
         this.activeMiniWell = new PlayerGravityWell(mouseX, mouseY, duration);
         if (decoysArray) decoysArray.push(this.activeMiniWell);
         playSound(playerWellDeploySound);
@@ -577,25 +677,31 @@ export class Player {
         playSound(empBurstSound);
     }
 
-    activateShieldOvercharge(activeBuffNotificationsArray) {
-        if (this.hasShieldOvercharge && !this.isShieldOvercharging && this.shieldOverchargeCooldownTimer <= 0) {
-            this.isShieldOvercharging = true;
-            this.shieldOverchargeTimer = SHIELD_OVERCHARGE_DURATION;
-            this.shieldOverchargeCooldownTimer = this.shieldOverchargeCooldown;
-            playSound(shieldOverchargeSound);
-            if(activeBuffNotificationsArray) activeBuffNotificationsArray.push({ text: `Shield Overcharge Active! Healing!`, timer: SHIELD_OVERCHARGE_DURATION });
-        }
-    }
-
-    activateOmegaLaser(activeBuffNotificationsArray) {
+    activateOmegaLaser(activeBuffNotificationsArray, abilityContext) {
         if (this.hasOmegaLaser && !this.isFiringOmegaLaser && this.omegaLaserCooldownTimer <= 0) {
             this.isFiringOmegaLaser = true;
             this.omegaLaserTimer = this.omegaLaserDuration;
-            this.omegaLaserCooldownTimer = this.omegaLaserCooldown;
             this.omegaLaserCurrentTickTimer = 0;
             this.omegaLaserAngle = this.aimAngle;
             playSound(omegaLaserSound, true);
             if(activeBuffNotificationsArray) activeBuffNotificationsArray.push({ text: `Omega Laser Firing!`, timer: this.omegaLaserDuration });
+
+            this.currentOmegaLaserKineticBoost = this.consumeKineticChargeForDamageBoost();
+
+            this.procTemporalEcho('omegaLaser', abilityContext);
+            if (abilityContext && abilityContext.updateAbilityCooldownCallback) abilityContext.updateAbilityCooldownCallback(this);
+        }
+    }
+
+    activateShieldOvercharge(activeBuffNotificationsArray, abilityContext) {
+        if (this.hasShieldOvercharge && !this.isShieldOvercharging && this.shieldOverchargeCooldownTimer <= 0) {
+            this.isShieldOvercharging = true;
+            this.shieldOverchargeTimer = SHIELD_OVERCHARGE_DURATION;
+            playSound(shieldOverchargeSound);
+            if(activeBuffNotificationsArray) activeBuffNotificationsArray.push({ text: `Shield Overcharge Active! Healing!`, timer: SHIELD_OVERCHARGE_DURATION });
+
+            this.procTemporalEcho('shieldOvercharge', abilityContext);
+            if (abilityContext && abilityContext.updateAbilityCooldownCallback) abilityContext.updateAbilityCooldownCallback(this);
         }
     }
 
@@ -605,15 +711,14 @@ export class Player {
         const beamEndX = this.x + Math.cos(this.omegaLaserAngle) * (this.radius + this.omegaLaserRange);
         const beamEndY = this.y + Math.sin(this.omegaLaserAngle) * (this.radius + this.omegaLaserRange);
 
-        // MODIFIED: Apply abilityDamageMultiplier
-        const damagePerTick = this.omegaLaserDamagePerTick * this.abilityDamageMultiplier;
+        const finalDamagePerTick = Math.round(this.omegaLaserDamagePerTick * this.abilityDamageMultiplier * this.currentOmegaLaserKineticBoost);
 
         if (targetsArray) {
             for (let i = targetsArray.length - 1; i >= 0; i--) {
                 const target = targetsArray[i];
                 if (target && isLineSegmentIntersectingCircle(beamStartX, beamStartY, beamEndX, beamEndY, target.x, target.y, target.radius + this.omegaLaserWidth / 2)) {
                     targetsArray.splice(i, 1);
-                    this.totalDamageDealt += 10 * this.abilityDamageMultiplier; // Assuming base score/damage for target is 10
+                    this.totalDamageDealt += Math.round(10 * this.abilityDamageMultiplier * this.currentOmegaLaserKineticBoost);
                     if (laserDamageContext && laserDamageContext.updateScoreCallback) laserDamageContext.updateScoreCallback(10);
                 }
             }
@@ -623,9 +728,9 @@ export class Player {
             activeBossesArray.forEach(boss => {
                 if (boss && isLineSegmentIntersectingCircle(beamStartX, beamStartY, beamEndX, beamEndY, boss.x, boss.y, boss.radius + this.omegaLaserWidth / 2)) {
                     if (typeof boss.takeDamage === 'function') {
-                        boss.takeDamage(damagePerTick, null, this, {}); // Pass null for ray as it's a beam
+                        boss.takeDamage(finalDamagePerTick, null, this, {});
                     }
-                    this.totalDamageDealt += damagePerTick;
+                    this.totalDamageDealt += finalDamagePerTick;
                 }
             });
         }

@@ -1,4 +1,6 @@
 // js/ui.js
+console.log("[Debug UI_JS_LOAD] ui.js is being parsed/executed."); 
+
 import * as CONSTANTS from './constants.js';
 
 // --- DOM Element Exports ---
@@ -41,6 +43,10 @@ const statsAbilitiesDiv = document.getElementById('statsAbilities');
 const statsMouseAbilitiesDiv = document.getElementById('statsMouseAbilities');
 const statsBossTiersDiv = document.getElementById('statsBossTiers');
 
+export const kineticChargeUIElement = document.getElementById('kineticChargeUI');
+export const kineticChargeBarFillElement = document.getElementById('kineticChargeBarFill');
+export const kineticChargeTextElement = document.getElementById('kineticChargeText');
+
 
 // --- UI State ---
 let previousScreenForSettings = null;
@@ -81,7 +87,10 @@ export function displayHighScores(containerElement, scoresArray) {
 
 
 export function updateAbilityCooldownUI(playerInstance) {
-    if (!abilityCooldownUI || !playerInstance) return;
+    if (!abilityCooldownUI || !playerInstance) {
+        // console.warn("updateAbilityCooldownUI: abilityCooldownUI or playerInstance is null/undefined.", "abilityCooldownUI:", abilityCooldownUI, "playerInstance:", playerInstance);
+        return;
+    }
     abilityCooldownUI.innerHTML = '';
 
     const abilityDisplayOrder = [
@@ -204,6 +213,63 @@ export function updateAbilityCooldownUI(playerInstance) {
     });
 }
 
+console.log("[Debug UI_JS_FUNC_DEF] Defining updateKineticChargeUI function now.");
+
+export function updateKineticChargeUI(currentCharge, maxCharge, currentMaxPotencyBonus, playerHasKineticConversionEvolution) {
+    console.log(`[Debug KINETIC_UI_ENTERED] updateKineticChargeUI ENTERED. Visible: ${playerHasKineticConversionEvolution}, Charge: ${currentCharge}/${maxCharge}`);
+    
+    if (!kineticChargeUIElement || !kineticChargeBarFillElement || !kineticChargeTextElement) {
+        console.error("[Debug KINETIC_UI] CRITICAL: One or more Kinetic Charge UI DOM elements are NULL. Aborting UI update.");
+        return;
+    }
+
+    if (playerHasKineticConversionEvolution) {
+        kineticChargeUIElement.style.display = 'flex';
+    } else {
+        kineticChargeUIElement.style.display = 'none';
+        return; 
+    }
+
+    const chargePercentage = Math.max(0, Math.min(100, (currentCharge / maxCharge) * 100));
+    kineticChargeBarFillElement.style.width = `${chargePercentage}%`;
+
+    let barColor = 'rgba(0, 60, 120, 0.8)';
+    if (chargePercentage > 89.9) {
+        console.log("[Debug SPARKLE] Charge percentage > 89.9. Current:", chargePercentage); // ADDED THIS LOG
+        barColor = 'rgba(255, 100, 0, 1.0)';
+        if (!kineticChargeBarFillElement.classList.contains('sparkling')) {
+            console.log("[Debug SPARKLE] Adding 'sparkling' class."); // ADDED THIS LOG
+            kineticChargeBarFillElement.classList.add('sparkling');
+            kineticChargeBarFillElement.style.setProperty('--sparkle1-x', `${Math.random()*80 + 10}%`);
+            kineticChargeBarFillElement.style.setProperty('--sparkle1-y', `${Math.random()*60 + 20}%`);
+            kineticChargeBarFillElement.style.setProperty('--sparkle2-x', `${Math.random()*80 + 10}%`);
+            kineticChargeBarFillElement.style.setProperty('--sparkle2-y', `${Math.random()*60 + 20}%`);
+        }
+    } else { // Removed specific chargePercentage checks for removing class, simplify to an else
+        if (kineticChargeBarFillElement.classList.contains('sparkling')) {
+            // console.log("[Debug SPARKLE] Removing 'sparkling' class. Charge:", chargePercentage); // Optional log
+            kineticChargeBarFillElement.classList.remove('sparkling');
+        }
+        // Determine bar color based on ranges if not sparkling
+        if (chargePercentage > 70) {
+            barColor = 'rgba(255, 180, 0, 0.9)';
+        } else if (chargePercentage > 30) {
+            barColor = 'rgba(0, 150, 200, 0.9)';
+        }
+    }
+    kineticChargeBarFillElement.style.backgroundColor = barColor;
+
+    if (kineticChargeTextElement) {
+        if (currentCharge > 1) {
+            const potencyBonusForCurrentCharge = currentMaxPotencyBonus * (currentCharge / maxCharge);
+            kineticChargeTextElement.textContent = `+${(potencyBonusForCurrentCharge * 100).toFixed(0)}% Dmg`;
+        } else {
+            kineticChargeTextElement.textContent = '';
+        }
+    }
+}
+
+
 // --- Screen Management ---
 const ALL_SCREENS_FOR_SHOW_SCREEN = [ startScreen, settingsScreen, gameOverScreen, evolutionScreen, freeUpgradeScreen, pauseScreen, countdownOverlay, lootChoiceScreen, detailedHighScoresScreen ];
 export function showScreen(screenElementToShow, cameFromPauseMenu = false, callbacks = {}) {
@@ -272,17 +338,28 @@ export function populateEvolutionOptionsUI(choices, playerInstance, evolutionSel
         optionDiv.dataset.class = choice.classType;
         let displayText = choice.text;
 
+        let currentLevelForDisplay = choice.level || 0;
+        if (choice.id === 'kineticConversion' && playerInstance.kineticConversionLevel !== undefined) {
+            currentLevelForDisplay = playerInstance.kineticConversionLevel;
+        }
+
         if (choice.maxLevel !== undefined && choice.maxLevel > 0 && choice.maxLevel < 500) {
-            displayText += ` (Lvl ${choice.level || 0}/${choice.maxLevel})`;
-        } else if (choice.level !== undefined && choice.id !== 'smallerPlayer' && choice.maxLevel !== 999) {
-             displayText += ` (Lvl ${choice.level || 0})`;
-        } else if (choice.maxLevel === 999 && choice.level !== undefined) {
-            displayText += ` (Lvl ${choice.level || 0})`;
+            displayText += ` (Lvl ${currentLevelForDisplay}/${choice.maxLevel})`;
+        } else if (currentLevelForDisplay > 0 && choice.maxLevel === 999) { 
+             displayText += ` (Lvl ${currentLevelForDisplay})`;
         }
 
         if (choice.getEffectString && typeof choice.getEffectString === 'function') {
-             displayText += `<br><span class="evolution-details">${choice.getEffectString()}</span>`;
+            let effectString;
+            if (choice.id === 'kineticConversion') {
+                const tempChoiceForString = {...choice, level: playerInstance.kineticConversionLevel || 0 };
+                effectString = tempChoiceForString.getEffectString();
+            } else {
+                effectString = choice.getEffectString();
+            }
+            displayText += `<br><span class="evolution-details">${effectString}</span>`;
         }
+
 
         optionDiv.innerHTML = `<h3>${displayText}</h3>`;
 
@@ -467,7 +544,6 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, getReadableColorNam
     const bossTypeKeysFromSource = CONSTANTS.bossTypeKeys || ["chaser", "reflector", "singularity"];
 
     let coreHTML = '';
-    // Helper to format numbers or show N/A
     const formatNum = (val, digits = 1) => (typeof val === 'number' && !isNaN(val) ? val.toFixed(digits) : 'N/A');
     const formatInt = (val) => (typeof val === 'number' && !isNaN(val) ? val.toString() : 'N/A');
 
@@ -476,7 +552,7 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, getReadableColorNam
     coreHTML += `<p><span class="stat-label">Base Radius:</span><span class="stat-value">${formatNum(playerData.baseRadius)}</span></p>`;
     coreHTML += `<p><span class="stat-label">Final Radius:</span><span class="stat-value">${formatNum(playerData.finalRadius)}</span></p>`;
     coreHTML += `<p><span class="stat-label">Score Size Factor:</span><span class="stat-value">${formatNum(playerData.scoreSizeFactor, 3)}</span></p>`;
-    if (playerData.scoreOffsetForSizing !== undefined && playerData.scoreOffsetForSizing > 0) { // Only show if relevant
+    if (playerData.scoreOffsetForSizing !== undefined && playerData.scoreOffsetForSizing > 0) {
         coreHTML += `<p><span class="stat-label">Size Score Offset:</span><span class="stat-value">${formatNum(playerData.scoreOffsetForSizing, 0)}</span></p>`;
     }
     if (playerData.scoreBasedSizeActual !== undefined) { // For debugging Evasive

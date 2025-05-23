@@ -15,20 +15,21 @@ import {
     reflectorSpawnSound as audioReflectorSpawnSound,
     singularitySpawnSound as audioSingularitySpawnSound,
 } from './audio.js';
-import {
+import { // Importing specific functions from ui.js
     canvas as gameCanvasElement,
     scoreDisplayElem, healthDisplayElem, highScoreListDisplay, startScreenHighScoresDiv,
     startScreen, settingsScreen, gameOverScreen, evolutionScreen, evolutionOptionsContainer,
     freeUpgradeScreen, freeUpgradeOptionContainer, closeFreeUpgradeButton,
     lootChoiceScreen, lootOptionsContainer, abilityCooldownUI, evolutionTooltip,
     countdownOverlay, pauseScreen, pausePlayerStatsPanel,
-    detailedHighScoresScreen,
+    detailedHighScoresScreen, kineticChargeUIElement, // Added kineticChargeUIElement for initGame check
     updateScoreDisplay, updateHealthDisplay as uiUpdateHealthDisplay,
     updateBuffIndicator as uiUpdateBuffIndicator,
     updateSurvivalBonusIndicator as uiUpdateSurvivalBonusIndicator,
     updateActiveBuffIndicator as uiUpdateActiveBuffIndicator,
     displayHighScores,
     updateAbilityCooldownUI as uiUpdateAbilityCooldownUI,
+    updateKineticChargeUI, 
     showScreen, getPreviousScreenForSettings, setPreviousScreenForSettings,
     populateEvolutionOptionsUI, displayGameOverScreenContent,
     updatePauseScreenStatsDisplay,
@@ -93,8 +94,10 @@ const inputState = {
     mouseX: canvas.width / 2,
     mouseY: canvas.height / 2,
 };
-let evolutionChoices = []; let bossLootPool = []; let freeUpgradeChoicesData = [];
-let currentActiveScreenElement = null; // Track the currently displayed screen
+let evolutionChoices = [];
+let bossLootPool = [];
+let freeUpgradeChoicesData = [];
+let currentActiveScreenElement = null;
 
 
 // --- Helper Functions & Initialization Data Logic ---
@@ -185,20 +188,101 @@ function initEvolutionChoicesInternal() {
         },
         {id:'reinforcedHull', classType: 'tank', text:"Reinforced Hull", level:0, maxLevel:Math.round(CONSTANTS.MAX_DAMAGE_REDUCTION/CONSTANTS.DAMAGE_REDUCTION_PER_LEVEL), detailedDescription: `Reduces all incoming damage by ${CONSTANTS.DAMAGE_REDUCTION_PER_LEVEL*100}% per level. Max ${CONSTANTS.MAX_DAMAGE_REDUCTION*100}%.`, isMaxed:function(p){return p && p.damageReductionFactor >= CONSTANTS.MAX_DAMAGE_REDUCTION || this.level >= this.maxLevel;}, apply:function(){if(!player) return""; player.damageReductionFactor = Math.min(CONSTANTS.MAX_DAMAGE_REDUCTION, player.damageReductionFactor + CONSTANTS.DAMAGE_REDUCTION_PER_LEVEL); this.level++; return `Damage reduction now ${Math.round(player.damageReductionFactor * 100)}%!`;}, getEffectString: function() { return `${Math.round((player?player.damageReductionFactor:0) * 100)}% Dmg Reduction`;}},
         {id:'vitalitySurge', classType: 'tank', text:"Vitality Surge", level:0, maxLevel: 999, detailedDescription: `Increases passive health regeneration by ${CONSTANTS.HP_REGEN_BONUS_PER_LEVEL_EVOLUTION} HP per tick.`, isMaxed:function(p){return false;}, apply:function(){if(!player) return""; player.hpRegenBonusFromEvolution += CONSTANTS.HP_REGEN_BONUS_PER_LEVEL_EVOLUTION; this.level++; return `Passive HP regen now +${player.hpRegenBonusFromEvolution} HP per tick!`;}, getEffectString: function() { return `+${player?player.hpRegenBonusFromEvolution:0} HP/tick Regen`;}},
-        {id:'slowRays', classType: 'utility', text:"Field Disruption", level:0, detailedDescription: `Permanently slows all environmental rays by an additional ${((1-CONSTANTS.SLOW_RAYS_REDUCTION_FACTOR)*100).toFixed(0)}% of their current speed each level. Diminishing returns apply.`, isMaxed:function(p){ return currentRaySpeedMultiplier <= CONSTANTS.MIN_RAY_SPEED_MULTIPLIER_AFTER_SLOW * 1.01;}, apply:function(){currentRaySpeedMultiplier=Math.max(CONSTANTS.MIN_RAY_SPEED_MULTIPLIER_AFTER_SLOW, currentRaySpeedMultiplier * CONSTANTS.SLOW_RAYS_REDUCTION_FACTOR);this.level++;return `Environmental ray speed multiplier reduced! (${currentRaySpeedMultiplier.toFixed(2)}x)`;}, getEffectString: function() { return `Env. Ray Speed: ${currentRaySpeedMultiplier.toFixed(2)}x`;}},
-        {id:'systemOvercharge', classType: 'utility', text:"System Overcharge", level:0, maxLevel:4, detailedDescription: "Reduces the score needed between evolutions by 7.5% per level. Max 30% reduction.", isMaxed:function(p){return p && p.evolutionIntervalModifier <= 0.70 || this.level >= this.maxLevel;}, apply:function(){if(!player) return""; player.evolutionIntervalModifier = Math.max(0.70, player.evolutionIntervalModifier - 0.075); this.level++; return `Evolution interval now ${Math.round(player.evolutionIntervalModifier * 100)}%!`;}, getEffectString: function() { return `Evo Interval: ${player?Math.round(player.evolutionIntervalModifier*100):100}%`;}},
-        {id:'enhancedRegen', classType: 'utility', text:"Enhanced Regeneration", level:0, maxLevel:Math.round(CONSTANTS.MAX_HP_PICKUP_BONUS/CONSTANTS.HP_PICKUP_BONUS_PER_LEVEL), detailedDescription: `HP pickups restore an additional ${CONSTANTS.HP_PICKUP_BONUS_PER_LEVEL} health per level.`, isMaxed:function(p){return p && p.hpPickupBonus >= CONSTANTS.MAX_HP_PICKUP_BONUS || this.level >= this.maxLevel;}, apply:function(){if(!player) return""; player.hpPickupBonus += CONSTANTS.HP_PICKUP_BONUS_PER_LEVEL; this.level++; return `HP pickups +${player.hpPickupBonus} HP!`;}, getEffectString: function() { return `HP Pickups +${player?player.hpPickupBonus:0} HP`;}},
+        {
+            id: 'kineticConversion',
+            classType: 'utility',
+            text: "Kinetic Conversion",
+            level: 0, 
+            maxLevel: 999,
+            detailedDescription: "Sustained high-speed movement builds Kinetic Charge (up to 100). Using Omega Laser or launching Mini Gravity Well rays consumes Charge to boost their damage for that use (starts at +30% damage at full charge, +20% more max damage per evolution level). Each level also increases Charge generation rate.",
+            isMaxed: function(p) { return false; }, 
+            apply: function() {
+                if (!player) {
+                    console.error("[Debug KINETIC_EVO_APPLY] Player is NULL when trying to apply Kinetic Conversion!");
+                    return "";
+                }
+                player.kineticConversionLevel = (player.kineticConversionLevel || 0) + 1;
+                this.level = player.kineticConversionLevel; 
+
+                let maxPotencyBonusAtFullCharge = 0; 
+                if (player.kineticConversionLevel > 0) {
+                     maxPotencyBonusAtFullCharge = player.initialKineticDamageBonus + (Math.max(0, player.kineticConversionLevel - 1) * player.additionalKineticDamageBonusPerLevel);
+                }
+
+                if (kineticChargeUIElement) { 
+                    console.log("[Debug KINETIC_EVO_APPLY] APPLYING Kinetic Conversion. Player Level:", player.kineticConversionLevel, "Calling updateKineticChargeUI.");
+                    updateKineticChargeUI(player.kineticCharge, player.kineticChargeConsumption, maxPotencyBonusAtFullCharge, true);
+                } else {
+                    console.warn("[Debug KINETIC_EVO_APPLY] kineticChargeUIElement is NULL. Cannot update UI from apply method.");
+                }
+                
+                const currentMaxPotencyBonusForReturnString = player.initialKineticDamageBonus + (Math.max(0, player.kineticConversionLevel - 1) * player.additionalKineticDamageBonusPerLevel);
+                return `Kinetic Conversion Lvl ${player.kineticConversionLevel}! Max Dmg Boost: +${(currentMaxPotencyBonusForReturnString * 100).toFixed(0)}%`;
+            },
+            getEffectString: function() {
+                if (!player) return "Charge Rate/Potency Up";
+                const evoLevelOnPlayer = player.kineticConversionLevel || 0;
+                let maxPotencyBonus = 0;
+                 if (evoLevelOnPlayer > 0) { 
+                    maxPotencyBonus = player.initialKineticDamageBonus + (Math.max(0, evoLevelOnPlayer - 1) * player.additionalKineticDamageBonusPerLevel);
+                }
+                const chargeRate = player.baseKineticChargeRate + (evoLevelOnPlayer * player.kineticChargeRatePerLevel);
+                return `Max Dmg: +${(maxPotencyBonus * 100).toFixed(0)}%, Rate: ${chargeRate.toFixed(2)}/s`;
+            }
+        },
+        // ---- START OF MODIFICATION for System Overcharge ----
+        {
+            id:'systemOvercharge', 
+            classType: 'utility', 
+            text:"System Overcharge", 
+            level:0, 
+            maxLevel: 1, // Can only be taken once
+            detailedDescription: "Reduces the score needed between evolutions by a massive 30% (one-time upgrade).", 
+            isMaxed: function(p){ // Check if player already has it or if this.level (from the choice object) is >= 1
+                return (p && p.evolutionIntervalModifier <= 0.70) || this.level >= this.maxLevel;
+            }, 
+            apply: function(){
+                if(!player) return""; 
+                player.evolutionIntervalModifier = 0.70; // Directly set to 30% reduction
+                this.level++; // Mark this choice as taken
+                return `Evolution interval permanently reduced by 30%! (Now 70%)`;
+            }, 
+            getEffectString: function() { 
+                // If the player object exists and has the modifier, show 70%, otherwise assume 100%
+                return `Evo Interval: ${ (player && player.evolutionIntervalModifier <= 0.70) ? '70%' : '100%' }`;
+            }
+        },
+        // ---- END OF MODIFICATION for System Overcharge ----
+        {
+            id: 'temporalEcho',
+            classType: 'utility',
+            text: "Temporal Echo",
+            level: 0,
+            maxLevel: 999,
+            detailedDescription: "When you use an ability (numbered or mouse-based), there's a [10]% chance per level for ALL other abilities on cooldown to have their remaining cooldown reduced by 2 seconds. Caps at 100% chance.",
+            isMaxed: function(p) {
+                if (!p) return true;
+                return p.temporalEchoChance >= 1.0;
+            },
+            apply: function() {
+                if (!player) return "";
+                player.temporalEchoChance = Math.min(1.0, parseFloat((player.temporalEchoChance + 0.10).toFixed(2)));
+                this.level++;
+                return `Temporal Echo: Now ${Math.round(player.temporalEchoChance * 100)}% chance to reduce other ability cooldowns!`;
+            },
+            getEffectString: function() { return `Cooldown Echo: ${Math.round((player ? player.temporalEchoChance : 0) * 100)}%`; }
+        },
         {id:'focusedBeam', classType: 'attack', text:"Focused Beam", level:0, maxLevel: 999 , detailedDescription: "Increases the damage of your rays by +1 per level.", isMaxed:function(p){return false;}, apply:function(){if(!player) return""; player.rayDamageBonus++; this.level++; return `Ray damage now +${player.rayDamageBonus}!`;}, getEffectString: function() { return `+${player?player.rayDamageBonus:0} Ray Damage`;}},
         {
             id: 'unstableCore',
             classType: 'attack',
             text: "Unstable Core",
             level: 0,
-            maxLevel: 20, // To reach 100% at 5% per level
+            maxLevel: 20,
             detailedDescription: `Gives your rays a 5% chance per level to cause an AOE explosion on hit. Caps at 100%.`,
             isMaxed: function(p) {
                 if (!p) return true;
-                return p.chainReactionChance >= 1.0; // Maxed if chance is 100%
+                return p.chainReactionChance >= 1.0;
             },
             apply: function() {
                 if (!player) return "";
@@ -208,17 +292,17 @@ function initEvolutionChoicesInternal() {
             },
             getEffectString: function() { return `${Math.round((player ? player.chainReactionChance : 0) * 100)}% AOE Chance`; }
         },
-        { // MODIFIED: Replaced Heavy Impact with Ability Potency
+        {
             id: 'abilityPotency',
             classType: 'attack',
             text: "Empowered Abilities",
             level: 0,
-            maxLevel: 999, // No cap
+            maxLevel: 999,
             detailedDescription: "Increases the damage of your Omega Laser and launched Mini Gravity Well rays by 10% (multiplicative).",
             isMaxed: function(p) { return false; },
             apply: function() {
                 if (!player) return "";
-                player.abilityDamageMultiplier = parseFloat((player.abilityDamageMultiplier * 1.1).toFixed(3)); // Apply multiplicatively
+                player.abilityDamageMultiplier = parseFloat((player.abilityDamageMultiplier * 1.1).toFixed(3));
                 this.level++;
                 return `Ability damage now ${Math.round(player.abilityDamageMultiplier * 100)}% of base!`;
             },
@@ -395,6 +479,15 @@ function initGame() {
     uiUpdateActiveBuffIndicator(player, postPopupImmunityTimer, postDamageImmunityTimer);
     uiUpdateAbilityCooldownUI(player);
 
+    if (kineticChargeUIElement && player) {
+        let maxPotencyBonusAtFullCharge = 0;
+        if (player.kineticConversionLevel > 0) {
+             maxPotencyBonusAtFullCharge = player.initialKineticDamageBonus + (Math.max(0, player.kineticConversionLevel - 1) * player.additionalKineticDamageBonusPerLevel);
+        }
+        updateKineticChargeUI(player.kineticCharge, player.kineticChargeConsumption, maxPotencyBonusAtFullCharge, player.kineticConversionLevel > 0);
+    }
+
+
     if (pausePlayerStatsPanel) pausePlayerStatsPanel.style.display = 'none';
     const bossManagerAudioContext = { playSound, audioChaserSpawnSound, audioReflectorSpawnSound, audioSingularitySpawnSound };
     bossManager = new BossManager(CONSTANTS.BOSS_SPAWN_START_SCORE, CONSTANTS.BOSS_SPAWN_SCORE_INTERVAL, bossManagerAudioContext);
@@ -505,6 +598,8 @@ function updateGame(deltaTime) {
                 currentGrowthFactor: currentPlayerRadiusGrowthFactor,
                 currentEffectiveDefaultGrowthFactor: currentEffectiveDefaultGrowthFactor,
                 score: score,
+                evolutionChoices: evolutionChoices, 
+                ui: { updateKineticChargeUI },    
                 updateHealthDisplayCallback: (currentHp, maxHp) => uiUpdateHealthDisplay(currentHp, maxHp),
                 updateAbilityCooldownCallback: (pInst) => uiUpdateAbilityCooldownUI(pInst),
                 isAnyPauseActiveCallback: isAnyPauseActiveInternal,
@@ -650,8 +745,11 @@ function updateGame(deltaTime) {
             if (!r || !r.isActive || r.isBossProjectile || r.isGravityWellRay || r.isCorruptedByGravityWell || r.isCorruptedByPlayerWell || r.state!=='moving' || r.isForming) continue;
 
             let currentRayDamage = 1 + (player ? player.rayDamageBonus : 0);
-            if (r.isPlayerAbilityRay && player && typeof player.abilityDamageMultiplier === 'number') {
+            if (r.isPlayerAbilityRay && player && typeof player.abilityDamageMultiplier === 'number') { // From Empowered Abilities
                 currentRayDamage *= player.abilityDamageMultiplier;
+            }
+            if (r.customKineticDamageBoost && typeof r.customKineticDamageBoost === 'number' && r.customKineticDamageBoost > 1.0) { // From Kinetic Conversion on Mini Well
+                currentRayDamage *= r.customKineticDamageBoost;
             }
             currentRayDamage *= (1 + (r.momentumDamageBonusValue || 0));
             currentRayDamage = Math.round(currentRayDamage);
@@ -669,13 +767,13 @@ function updateGame(deltaTime) {
                             color: CONSTANTS.CHAIN_REACTION_EXPLOSION_COLOR,
                             maxRadius: CONSTANTS.CHAIN_REACTION_RADIUS, initialRadius: CONSTANTS.CHAIN_REACTION_RADIUS * 0.1,
                             isAOEDamage: true,
-                            damage: currentRayDamage * 0.5 // AOE damage is half of the (potentially ability-boosted) ray's damage
+                            damage: currentRayDamage * 0.5
                         });
                         aoeTriggeredOnHit = true;
                     }
 
                     targets.splice(j,1); score+=10; updateScoreDisplay(score); checkForNewColorUnlock();
-                    if (!aoeTriggeredOnHit) playSound(targetHitSound); // Only play target hit if no AOE, to avoid double sound
+                    if (!aoeTriggeredOnHit) playSound(targetHitSound);
                     if (r.pierceUsesLeft > 0) r.pierceUsesLeft--; else r.isActive = false;
                     if (!r.isActive) break;
                 }
@@ -690,11 +788,10 @@ function updateGame(deltaTime) {
 
                         if (boss instanceof MirrorShieldBoss) {
                             damageAppliedToBoss = boss.takeDamage(currentRayDamage, r, player, bossTakeDmgCtx);
-                            if (!damageAppliedToBoss && r.isActive) consumedByShield = false; // Ray was reflected
-                            else consumedByShield = true; // Ray hit shield/body and was consumed or damage applied
+                            consumedByShield = !r.isActive || damageAppliedToBoss;
                         } else {
                             damageAppliedToBoss = boss.takeDamage(currentRayDamage, r, player, bossTakeDmgCtx);
-                            consumedByShield = true; // Assume consumed if not MirrorShield or if MirrorShield took damage
+                            consumedByShield = true;
                         }
 
                         if(damageAppliedToBoss) {
@@ -711,7 +808,7 @@ function updateGame(deltaTime) {
                                 isAOEDamage: true, damage: currentRayDamage * 0.5
                             });
                         }
-                        if(consumedByShield) r.isActive = false; // Only deactivate if shield/body consumed it, not if reflected
+                        if(consumedByShield && r.isActive) r.isActive = false;
                         if(!r || !r.isActive) break;
                     }
                 }
@@ -784,11 +881,10 @@ function updateGame(deltaTime) {
              }
          }
     }
-    // AOE Damage from Unstable Core (applied after main target/boss loop)
+    // AOE Damage from Unstable Core
     for (let i = bossDefeatEffects.length - 1; i >= 0; i--) {
         const effect = bossDefeatEffects[i];
-        if (effect.isAOEDamage && effect.timer === effect.duration) { // Apply damage once when effect starts
-            // Damage nearby targets
+        if (effect.isAOEDamage && effect.timer === effect.duration) { 
             for (let tIdx = targets.length - 1; tIdx >= 0; tIdx--) {
                 const target = targets[tIdx];
                 const dist = Math.sqrt((effect.x - target.x) ** 2 + (effect.y - target.y) ** 2);
@@ -798,7 +894,6 @@ function updateGame(deltaTime) {
                     updateScoreDisplay(score);
                 }
             }
-            // Damage nearby bosses
             if (bossManager && bossManager.activeBosses) {
                 bossManager.activeBosses.forEach(boss => {
                     const dist = Math.sqrt((effect.x - boss.x) ** 2 + (effect.y - boss.y) ** 2);
@@ -949,25 +1044,22 @@ function selectEvolutionInternal(choice) {
         return;
     }
 
-    // console.log(`SelectEvo: BEFORE apply - choice: ${choice.id}, main.js_currentPlayerRadiusGrowthFactor: ${currentPlayerRadiusGrowthFactor}`);
     choice.apply();
-    // console.log(`SelectEvo: AFTER apply - choice: ${choice.id}, main.js_currentPlayerRadiusGrowthFactor: ${currentPlayerRadiusGrowthFactor}`);
-
 
     lastEvolutionScore = player.evolutionIntervalModifier > 0 ? Math.floor(score / (CONSTANTS.EVOLUTION_SCORE_INTERVAL * player.evolutionIntervalModifier)) * (CONSTANTS.EVOLUTION_SCORE_INTERVAL * player.evolutionIntervalModifier) : score;
     survivalScoreThisCycle = 0;
 
-    if (choice.id !== 'smallerPlayer') {
+    if (choice.id !== 'smallerPlayer') { // If Evasive wasn't picked, ensure normal growth factor
         currentPlayerRadiusGrowthFactor = currentEffectiveDefaultGrowthFactor;
     }
-
+    // If 'smallerPlayer' was chosen, its apply() method has already set currentPlayerRadiusGrowthFactor = 0.
+    // On the NEXT evolution pick (if not 'smallerPlayer' again), the above 'if' will restore it.
 
     gamePausedForEvolution = false; evolutionPendingAfterBoss = false; postPopupImmunityTimer = CONSTANTS.POST_POPUP_IMMUNITY_DURATION;
     currentActiveScreenElement = null;
     showScreen(null, false, gameScreenCallbacks);
     applyMusicPlayStateWrapper();
     lastTime = performance.now();
-    // console.log(`SelectEvo: END - main.js_currentPlayerRadiusGrowthFactor is now: ${currentPlayerRadiusGrowthFactor}`);
     if(!gameOver&&!animationFrameId && gameRunning) {
         animationFrameId = requestAnimationFrame(gameLoop);
     }
@@ -1049,40 +1141,34 @@ function selectLootUpgradeInternal(chosenUpgrade) {
 }
 
 function createFinalStatsSnapshot() {
-    // console.log(`SNAPSHOT ENTRY POINT - Player: ${!!player}, Game Running: ${gameRunning}, Game Over: ${gameOver}, Paused by ESC: ${gamePausedByEsc}`);
-    // console.log(`SNAPSHOT - Main.js Scope: currentPlayerRadiusGrowthFactor: ${currentPlayerRadiusGrowthFactor}, currentEffectiveDefaultGrowthFactor: ${currentEffectiveDefaultGrowthFactor}`);
-
     if (!player) {
-        console.warn("Snapshot: Player is null during createFinalStatsSnapshot call.");
-        return { playerData: { baseRadius: CONSTANTS.PLAYER_BASE_RADIUS, finalRadius: CONSTANTS.PLAYER_BASE_RADIUS, scoreSizeFactor: currentEffectiveDefaultGrowthFactor, scoreOffsetForSizing: 0, scoreBasedSizeActual: 0, maxHp: CONSTANTS.PLAYER_MAX_HP, currentSpeed: CONSTANTS.PLAYER_SPEED_BASE, timesHit:0, totalDamageDealt:0, immuneColorsList:[], activeAbilities:{}, formattedActiveAbilities:[], formattedMouseAbilities:[], displayedUpgrades:[] }, bossTierData: { chaser: 0, reflector: 0, singularity: 0 }, gameplayTimeData: gameplayTimeElapsed };
+        return { playerData: { baseRadius: CONSTANTS.PLAYER_BASE_RADIUS, finalRadius: CONSTANTS.PLAYER_BASE_RADIUS, scoreSizeFactor: currentEffectiveDefaultGrowthFactor, scoreOffsetForSizing: 0, scoreBasedSizeActual: 0, kineticConversionLevelSnapshot: 0, maxHp: CONSTANTS.PLAYER_MAX_HP, currentSpeed: CONSTANTS.PLAYER_SPEED_BASE, timesHit:0, totalDamageDealt:0, immuneColorsList:[], activeAbilities:{}, formattedActiveAbilities:[], formattedMouseAbilities:[], displayedUpgrades:[] }, bossTierData: { chaser: 0, reflector: 0, singularity: 0 }, gameplayTimeData: gameplayTimeElapsed };
     }
 
     player.baseRadius = player.initialBaseRadius + player.bonusBaseRadius;
-    // console.log(`SNAPSHOT - Player Object State: player.radius: ${player.radius}, player.scoreBasedSize: ${player.scoreBasedSize}, player.scoreOffsetForSizing: ${player.scoreOffsetForSizing}, player.baseRadius: ${player.baseRadius}`);
 
     let determinedScoreSizeFactor;
     if (typeof currentPlayerRadiusGrowthFactor === 'number' && !isNaN(currentPlayerRadiusGrowthFactor)) {
         determinedScoreSizeFactor = currentPlayerRadiusGrowthFactor;
-        if (determinedScoreSizeFactor === 0) { 
+        if (determinedScoreSizeFactor === 0 && player.scoreBasedSize > 0) { // If Evasive is active AND has an effect
             determinedScoreSizeFactor = currentEffectiveDefaultGrowthFactor;
+        } else if (determinedScoreSizeFactor === 0 && player.scoreBasedSize === 0){ // If Evasive active but no score size to begin with
+             determinedScoreSizeFactor = 0; // Growth factor effectively zero
         }
     } else {
-        // console.warn(`SNAPSHOT: currentPlayerRadiusGrowthFactor was problematic (${currentPlayerRadiusGrowthFactor}), used default: ${currentEffectiveDefaultGrowthFactor}`);
-        determinedScoreSizeFactor = currentEffectiveDefaultGrowthFactor; 
+        determinedScoreSizeFactor = currentEffectiveDefaultGrowthFactor;
     }
-    
     if (typeof determinedScoreSizeFactor !== 'number' || isNaN(determinedScoreSizeFactor)) {
-        // console.error(`CRITICAL SNAPSHOT: determinedScoreSizeFactor is STILL problematic (${determinedScoreSizeFactor}) before toFixed!`);
-        determinedScoreSizeFactor = 0.000; 
+        determinedScoreSizeFactor = 0.000;
     }
-
 
     const playerDataSnapshot = {
         baseRadius: player.baseRadius,
         finalRadius: player.radius,
-        scoreSizeFactor: determinedScoreSizeFactor, 
+        scoreSizeFactor: determinedScoreSizeFactor,
         scoreOffsetForSizing: player.scoreOffsetForSizing,
         scoreBasedSizeActual: player.scoreBasedSize,
+        kineticConversionLevelSnapshot: player.kineticConversionLevel,
 
         maxHp: player.maxHp, currentSpeed: player.currentSpeed,
         timesHit: player.timesHit, totalDamageDealt: player.totalDamageDealt,
@@ -1093,7 +1179,6 @@ function createFinalStatsSnapshot() {
         formattedMouseAbilities: getFormattedMouseAbilitiesForStats(player),
         displayedUpgrades: prepareDisplayedUpgradesForStats(player)
     };
-    // console.log(`SNAPSHOT DATA: finalRadius: ${playerDataSnapshot.finalRadius}, scoreSizeFactor: ${playerDataSnapshot.scoreSizeFactor}`);
 
     const bossTierSnapshot = bossManager ? { ...bossManager.bossTiers } : { chaser: 0, reflector: 0, singularity: 0 };
     return {
@@ -1106,7 +1191,41 @@ function getFormattedActiveAbilitiesForStats(p) { if (!p || !p.activeAbilities) 
 function getFormattedMouseAbilitiesForStats(p) { if(!p) return []; let abs = []; if (p.hasOmegaLaser) abs.push({name: "Omega Laser", desc: `${(CONSTANTS.OMEGA_LASER_COOLDOWN/1000)}s CD`}); if (p.hasShieldOvercharge) abs.push({name: "Shield Overcharge", desc: `${(CONSTANTS.SHIELD_OVERCHARGE_COOLDOWN/1000)}s CD`}); return abs; }
 function prepareDisplayedUpgradesForStats(p) {
     if (!p) return []; let list = [];
-    evolutionChoices.forEach(e => { if (e.level > 0) { let desc = ""; if (e.id === 'colorImmunity') desc = `${p.immuneColorsList.length} colors`; else if (e.id === 'smallerPlayer') desc = `Lvl ${e.level} (Effective Size)`; else if (e.id === 'reinforcedHull') desc = `${Math.round(p.damageReductionFactor * 100)}%`; else if (e.id === 'vitalitySurge') desc = `+${p.hpRegenBonusFromEvolution} HP/tick`; else if (e.id === 'slowRays') desc = `${currentRaySpeedMultiplier.toFixed(2)}x Speed`; else if (e.id === 'systemOvercharge') desc = `${Math.round(p.evolutionIntervalModifier*100)}% Interval`; else if (e.id === 'enhancedRegen') desc = `+${p.hpPickupBonus} HP`; else if (e.id === 'focusedBeam') desc = `+${p.rayDamageBonus} Dmg`; else if (e.id === 'unstableCore') desc = `${Math.round(p.chainReactionChance * 100)}% AOE Chance`; else if (e.id === 'abilityPotency') desc = `${Math.round(p.abilityDamageMultiplier*100)}% Dmg`; else if (e.id === 'maxHpIncrease') desc = `+${e.level * 10} Max HP`; else if (e.id === 'abilityCooldownReduction') desc = `Applied ${e.level}x`; else if (e.getEffectString) desc = e.getEffectString(); if (desc) list.push({ name: e.text.replace(/\s\(Lvl.*/, ''), description: desc });}});
+    evolutionChoices.forEach(e => {
+        let currentEvoLevel = e.level || 0; // Use the level from the static evolutionChoices array
+        if (e.id === 'kineticConversion' && p.kineticConversionLevelSnapshot !== undefined) { // For saved high scores
+            currentEvoLevel = p.kineticConversionLevelSnapshot;
+        } else if (e.id === 'kineticConversion' && player) { // For live game, use player's tracked level
+            currentEvoLevel = player.kineticConversionLevel;
+        }
+
+        if (currentEvoLevel > 0) {
+            let desc = "";
+            if (e.id === 'colorImmunity') desc = `${p.immuneColorsList.length} colors`;
+            else if (e.id === 'smallerPlayer') desc = `Lvl ${currentEvoLevel} (Effective Size)`;
+            else if (e.id === 'reinforcedHull') desc = `${Math.round(p.damageReductionFactor * 100)}%`;
+            else if (e.id === 'vitalitySurge') desc = `+${p.hpRegenBonusFromEvolution} HP/tick`;
+            else if (e.id === 'kineticConversion') {
+                const maxPotency = p.initialKineticDamageBonus + (Math.max(0,currentEvoLevel - 1) * p.additionalKineticDamageBonusPerLevel);
+                const chargeRate = p.baseKineticChargeRate + (currentEvoLevel * p.kineticChargeRatePerLevel);
+                desc = `Max Dmg +${(maxPotency*100).toFixed(0)}%, Rate ${chargeRate.toFixed(2)}/s`;
+            }
+            else if (e.id === 'systemOvercharge') desc = `${Math.round(p.evolutionIntervalModifier*100)}% Interval`;
+            else if (e.id === 'temporalEcho') desc = `${Math.round(p.temporalEchoChance*100)}% Echo`;
+            else if (e.id === 'focusedBeam') desc = `+${p.rayDamageBonus} Dmg`;
+            else if (e.id === 'unstableCore') desc = `${Math.round(p.chainReactionChance * 100)}% AOE Chance`;
+            else if (e.id === 'abilityPotency') desc = `${Math.round(p.abilityDamageMultiplier*100)}% Dmg`;
+            else if (e.id === 'maxHpIncrease') desc = `+${currentEvoLevel * 10} Max HP`;
+            else if (e.id === 'abilityCooldownReduction') desc = `Applied ${currentEvoLevel}x`;
+            else if (e.getEffectString) {
+                 const originalLevel = e.level; // Backup level on choice object
+                 e.level = currentEvoLevel;    // Temporarily set for getEffectString if it uses this.level
+                 desc = e.getEffectString();
+                 e.level = originalLevel;      // Restore
+            }
+            if (desc) list.push({ name: e.text.replace(/\s\(Lvl.*/, ''), description: desc });
+        }
+    });
     p.acquiredBossUpgrades.forEach(id => { const upg = bossLootPool.find(u => u.id === id); if (upg) { let d = `(${upg.type.charAt(0).toUpperCase() + upg.type.slice(1)})`; if (upg.id === 'adaptiveShield') d = "(Color Immunities)"; else if (upg.type === 'ability' || upg.type === 'ability_mouse') return; list.push({ name: upg.name, description: d });}});
     if (p.pickupAttractionRadius > 0) list.push({name: "Pickup Attraction", description: `Radius ${p.pickupAttractionRadius.toFixed(0)}`});
     if (p.scatterShotLevel > 0) list.push({name: "Scatter Shot", description: `Lvl ${p.scatterShotLevel +1}`});
@@ -1115,9 +1234,7 @@ function prepareDisplayedUpgradesForStats(p) {
     return list;
 }
 function prepareAndShowPauseStats(title) {
-    // console.log(`PAUSE STATS CALL: Player exists: ${!!player}, Radius: ${player ? player.radius.toFixed(1) : 'N/A'}, main.js_currentPlayerRadiusGrowthFactor: ${typeof currentPlayerRadiusGrowthFactor === 'number' ? currentPlayerRadiusGrowthFactor.toFixed(3) : 'N/A (undefined at call)'}`);
     const statsSnapshot = createFinalStatsSnapshot();
-    // console.log("Snapshot for pause/gameover:", JSON.parse(JSON.stringify(statsSnapshot)));
     updatePauseScreenStatsDisplay(
         statsSnapshot,
         getReadableColorNameFromUtils,
@@ -1225,7 +1342,7 @@ const audioDomElementsForInit = {
     musicVolumeSlider: document.getElementById('musicVolumeSlider'), musicVolumeValue: document.getElementById('musicVolumeValue'),
     shootVolumeSlider: document.getElementById('shootVolumeSlider'), shootVolumeValue: document.getElementById('shootVolumeValue'),
     hitVolumeSlider: document.getElementById('hitVolumeSlider'), hitVolumeValue: document.getElementById('hitVolumeValue'),
-    pickupVolumeSlider: document.getElementById('pickupVolumeSlider'), pickupVolumeValue: document.getElementById('pickupVolumeValue'),
+    pickupVolumeSlider: document.getElementById('pickupVolumeSlider'), pickupVolumeValue: document.getElementById('pickupVolumeValue'), 
     uiVolumeSlider: document.getElementById('uiVolumeSlider'), uiVolumeValue: document.getElementById('uiVolumeValue'),
 };
 initializeAudio(audioDomElementsForInit);
@@ -1242,7 +1359,10 @@ const getAbilityContextForPlayer = () => {
         canvasHeight: canvas.height,
         allRays: rays,
         screenShakeParams: {isScreenShaking, screenShakeTimer, currentShakeMagnitude, currentShakeType, hitShakeDx, hitShakeDy},
-        CONSTANTS: CONSTANTS
+        CONSTANTS: CONSTANTS,
+        activeBuffNotificationsArray: activeBuffNotifications,
+        evolutionChoices: evolutionChoices, 
+        ui: { updateKineticChargeUI } 
     };
 };
 

@@ -1,3 +1,4 @@
+<!-- /*html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -134,35 +135,69 @@
         .lootOption p { font-size: 15px; color: #aabbdd; margin-bottom: 8px; flex-grow: 1; }
         .lootOption .optionType { font-size: 13px; color: #99aabb; font-style: italic; margin-top: auto; background-color: rgba(0,0,0,0.2); padding: 3px 8px; border-radius: 4px; }
 
+        /* --- Ability Cooldown UI & Kinetic Charge Bar --- */
+        #kineticChargeUI {
+            position: absolute;
+            bottom: 95px; /* (60px ability slot height + 15px gap + 20px bottom offset) */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 220px; /* Example: 3 slots * 60px + 2 gaps * 15px = 180 + 30 = 210px. Adjust as needed. */
+            height: 15px;
+            background-color: rgba(30, 30, 50, 0.7); /* Match ability slot bg */
+            border: 2px solid #404070; /* Slightly darker than ability slot border */
+            border-radius: 3px;
+            z-index: 14; /* Below abilityCooldownUI if there's overlap, though it shouldn't */
+            box-shadow: 0 0 6px rgba(80, 80, 120, 0.4);
+            overflow: hidden;
+            display: none; /* Initially hidden, shown by JS when Kinetic Conversion is active */
+        }
+        #kineticChargeBarFill {
+            width: 0%;
+            height: 100%;
+            background-color: rgba(0, 85, 170, 0.8); /* Default low charge color */
+            border-radius: 1px; /* Inner radius */
+            transition: width 0.1s linear, background-color 0.3s ease-out;
+            position: relative;
+        }
+        #kineticChargeBarFill.sparkling::after { /* Sparkle effect */
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image:
+                radial-gradient(circle at var(--sparkle1-x, 20%) var(--sparkle1-y, 30%), white 0px, transparent 2px),
+                radial-gradient(circle at var(--sparkle2-x, 70%) var(--sparkle2-y, 60%), white 0px, transparent 2px);
+            background-repeat: no-repeat;
+            animation: kineticSparkleAnim 1s infinite ease-in-out;
+            opacity: 0; /* Managed by JS or animation */
+        }
+        @keyframes kineticSparkleAnim {
+            0%, 100% { opacity: 0; }
+            50% { opacity: 0.6; }
+        }
+        #kineticChargeText {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 10px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 0 0 2px black, 0 0 2px black; /* Stronger shadow for readability */
+            pointer-events: none;
+            z-index: 1;
+            white-space: nowrap;
+        }
+
         #abilityCooldownUI { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; z-index: 15; }
         .ability-slot { width: 60px; height: 60px; background-color: rgba(30, 30, 50, 0.7); border: 2px solid #606090; border-radius: 8px; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; box-shadow: 0 0 8px rgba(100, 100, 150, 0.5); transition: background-color 0.2s, border-color 0.2s; }
         .ability-slot.ready { border-color: #a0a0ff; background-color: rgba(50, 50, 80, 0.8); box-shadow: 0 0 12px rgba(160, 160, 255, 0.7); }
         .ability-slot.on-cooldown { border-color: #505070; background-color: rgba(20, 20, 30, 0.6); }
         .ability-slot.charging { border-color: #FFD700; background-color: rgba(80, 70, 30, 0.8); box-shadow: 0 0 12px rgba(255,215,0, 0.7); }
-        .ability-slot.locked { /* Style for locked/unacquired abilities */
-            background-color: rgba(40, 40, 40, 0.5);
-            border-color: #444;
-            cursor: default;
-        }
-        .ability-slot.locked .icon {
-            opacity: 0.2;
-            color: #888;
-        }
-        .ability-slot .icon.lock-icon-overlay { /* Styles for the lock icon itself */
-            position: absolute;
-            z-index: 4; /* Ensure it's on top */
-            color: #DDD; /* Or a more prominent lock color */
-            opacity: 0.7; /* Slightly transparent lock */
-            font-size: 26px; /* Adjust size if needed */
-            /* No need to set opacity to 0.2 here, as it's for the lock icon itself */
-        }
-
-        .ability-slot.locked .keybind {
-            color: #888;
-        }
-        .ability-slot.locked .cooldown-overlay {
-            background-color: rgba(20, 20, 20, 0.7);
-        }
+        .ability-slot.locked { background-color: rgba(40, 40, 40, 0.5); border-color: #444; cursor: default; }
+        .ability-slot.locked .icon { opacity: 0.2; color: #888; }
+        .ability-slot .icon.lock-icon-overlay { position: absolute; z-index: 4; color: #DDD; opacity: 0.7; font-size: 26px; }
+        .ability-slot.locked .keybind { color: #888; }
+        .ability-slot.locked .cooldown-overlay { background-color: rgba(20, 20, 20, 0.7); }
         .ability-slot .keybind { position: absolute; top: 2px; left: 4px; font-size: 12px; font-weight: bold; color: #ccc; text-shadow: 1px 1px 2px #000; z-index: 3; }
         .ability-slot .icon { font-size: 28px; color: #ddd; opacity: 0.8; transition: opacity 0.2s; z-index: 1; }
         .ability-slot.on-cooldown .icon { opacity: 0.4; }
@@ -171,10 +206,7 @@
         .ability-slot .cooldown-timer { position: absolute; bottom: 4px; left: 0; width: 100%; text-align: center; font-size: 14px; font-weight: bold; color: #fff; text-shadow: 1px 1px 3px #000; z-index: 3; pointer-events: none; opacity: 0; transition: opacity 0.2s; }
         .ability-slot.on-cooldown .cooldown-timer, .ability-slot.charging .cooldown-timer { opacity: 1; }
         .ability-slot .ability-name { display: none; }
-
-        #abilityCooldownUI > .ability-slot:nth-child(3) {
-            margin-left: 25px;
-        }
+        #abilityCooldownUI > .ability-slot:nth-child(3) { margin-left: 25px; }
 
         #evolutionTooltip { display: none; position: absolute; background-color: rgba(20, 20, 50, 0.9); color: #ddeeff; border: 1px solid #55aaff; border-radius: 5px; padding: 8px 12px; font-size: 13px; max-width: 250px; text-align: left; pointer-events: none; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
 
@@ -274,9 +306,9 @@
         #detailedStatsDisplayContainer {
             flex-grow: 1;
             height: 100%;
-            overflow: hidden; /* Important for containing the absolutely positioned panel if it were still absolute */
-            display: flex;   /* Enables flexbox for its direct children */
-            flex-direction: column; /* Stack children vertically */
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
             min-width: 0;
             border: 1px solid #303050;
             border-radius: 8px;
@@ -284,23 +316,20 @@
             box-sizing: border-box;
         }
         #detailedStatsDisplayContainer > #pausePlayerStatsPanel {
-            /* MODIFICATION: Ensure it behaves like a normal block inside its flex container */
-            position: relative; /* Changed from absolute */
+            position: relative;
             display: block;
-            width: 100%;        /* Take full width of its container */
-            height: 100%;       /* Take full height of its container */
+            width: 100%;
+            height: 100%;
             overflow-y: auto;
-            /* Resetting properties that were for absolute positioning */
             right: auto;
             top: auto;
             transform: none;
-            box-shadow: none;   /* Shadow is on the container now if needed */
-            margin: 0;          /* Remove any margin */
-            border: none;       /* Border is on the container */
-            padding: 15px;      /* Keep internal padding */
+            box-shadow: none;
+            margin: 0;
+            border: none;
+            padding: 15px;
             box-sizing: border-box;
         }
-        /* MODIFICATION: Ensure the title within the detailed scores stats panel starts at the top */
         #detailedStatsDisplayContainer > #pausePlayerStatsPanel .stats-header#statsPanelTitle {
             margin-top: 0;
         }
@@ -391,6 +420,11 @@
         <button id="backToMainMenuFromScoresButton" style="margin-top: 20px;">Back to Main Menu</button>
     </div>
 
+    <!-- MODIFIED: Added Kinetic Charge UI elements -->
+    <div id="kineticChargeUI">
+        <div id="kineticChargeBarFill"></div>
+        <span id="kineticChargeText"></span>
+    </div>
     <div id="abilityCooldownUI"></div>
     <div id="evolutionTooltip"></div>
     <audio id="bgMusic" src="space_ambient.mp3" loop></audio>
