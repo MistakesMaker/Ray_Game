@@ -103,6 +103,7 @@ let firstBossDefeatedThisRun = false;
 
 
 // --- Helper Functions & Initialization Data Logic ---
+// ... (getHighScores, addHighScore, updateAllHighScoreDisplays, initializeAllPossibleRayColors, pause/resume functions remain unchanged) ...
 function getHighScores() { const scoresJson = localStorage.getItem(HIGH_SCORES_KEY); return scoresJson ? JSON.parse(scoresJson) : []; }
 function addHighScore(name, scoreValue, finalStatsSnapshot) {
     const scores = getHighScores();
@@ -148,10 +149,10 @@ function resumeAllGameIntervals() {
 
 function rollTier() {
     const rand = Math.random() * 100;
-    if (rand < 5) return 'legendary';  // 5%
-    if (rand < 15) return 'epic';     // 10% (15 - 5)
-    if (rand < 50) return 'rare';     // 35% (50 - 15)
-    return 'common';                  // 50%
+    if (rand < 5) return 'legendary';  
+    if (rand < 15) return 'epic';     
+    if (rand < 50) return 'rare';     
+    return 'common';                  
 }
 
 function reduceAllAbilityCooldowns(playerInstance, reductionFactor) {
@@ -191,13 +192,10 @@ function initEvolutionChoicesInternal() {
     evolutionChoices = [
         // --- NON-TIERED EVOLUTIONS ---
         {
-            id:'colorImmunity', 
-            classType: 'tank', 
-            text:"Chameleon Plating", 
-            level:0, 
+            id:'colorImmunity', classType: 'tank', text:"Chameleon Plating", level:0, 
             maxLevel: ALL_POSSIBLE_RAY_COLORS.length - CONSTANTS.INITIAL_RAY_COLORS.length, 
-            detailedDescription: "Gain immunity to a new random ray color each time this is chosen. Protects against rays of that specific color.", 
-            isTiered: false,
+            detailedDescription: "Gain immunity to a new random ray color. Protects against rays of that specific color.", 
+            isTiered: false, 
             isMaxed:function(p){return !p||p.immuneColorsList.length>=ALL_POSSIBLE_RAY_COLORS.length || this.level >= this.maxLevel;}, 
             apply:function(playerInstance){ 
                 if(!playerInstance)return"";
@@ -210,15 +208,11 @@ function initEvolutionChoicesInternal() {
                 }
                 return"No new colors left!";
             }, 
-            getEffectString: function(playerInstance) { 
-                 return `Immune to ${playerInstance?playerInstance.immuneColorsList.length:0} colors`;
-            }
+            getEffectString: function(playerInstance) { return `Immune to ${playerInstance?playerInstance.immuneColorsList.length:0} colors`; },
+            getCardEffectString: function() { return `Immune to ${player.immuneColorsList.length + 1} colors`;} // Shows next state
         },
         {
-            id: 'smallerPlayer',
-            classType: 'tank',
-            text: "Evasive Maneuver",
-            level: 0,
+            id: 'smallerPlayer', classType: 'tank', text: "Evasive Maneuver", level: 0,
             detailedDescription: "Your effective size from score gain is halved! Growth from score is paused for this evolution cycle. Resumes normally afterwards.",
             isTiered: false,
             isMaxed: function(p) { return shrinkMeCooldown > 0; }, 
@@ -242,14 +236,11 @@ function initEvolutionChoicesInternal() {
                 shrinkMeCooldown = 3;
                 return `Effective size reduced! Growth paused this cycle. (Cooldown: ${shrinkMeCooldown} evos)`;
             },
-            getEffectString: function() { return `Effective size reduced (this cycle)!`; }
+            getEffectString: function() { return `Effective size reduced (this cycle)!`; },
+            getCardEffectString: function() { return `Reduce size, pause growth`; }
         },
         {
-            id:'systemOvercharge', 
-            classType: 'utility', 
-            text:"System Overcharge", 
-            level:0, 
-            maxLevel: 1, 
+            id:'systemOvercharge', classType: 'utility', text:"System Overcharge", level:0, maxLevel: 1, 
             detailedDescription: "Reduces the score needed between evolutions by a massive 30% (one-time upgrade).", 
             isTiered: false,
             isMaxed: function(p){ return (p && p.evolutionIntervalModifier <= 0.70) || this.level >= this.maxLevel; }, 
@@ -260,213 +251,150 @@ function initEvolutionChoicesInternal() {
             }, 
             getEffectString: function(playerInstance) { 
                 return `Evo Interval: ${ (playerInstance && playerInstance.evolutionIntervalModifier <= 0.70) ? '70%' : '100%' }`;
-            }
+            },
+            getCardEffectString: function() { return `Evo Interval: 70%`;}
         },
 
-        // --- TIERED EVOLUTIONS ---
+        // --- TIERED EVOLUTIONS (nameSuffix removed from tier data, base text is used) ---
         {
-            id:'reinforcedHull', 
-            classType: 'tank', 
-            text:"Reinforced Hull", 
-            level:0, 
-            maxLevel: 999, 
+            id:'reinforcedHull', classType: 'tank', text:"Reinforced Hull", level:0, maxLevel: 999, 
             isTiered: true,
             isMaxed: function(p){ return p && p.damageTakenMultiplier < 0.01; }, 
             tiers: {
-                common:    { nameSuffix: "(Common)",    description: `Reduces damage taken by a further ${CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS.common*100}%. Stacks multiplicatively.`,    apply: function(p) { p.damageTakenMultiplier *= (1 - CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS.common); p.damageTakenMultiplier = Math.max(0.001, p.damageTakenMultiplier); }},
-                rare:      { nameSuffix: "(Rare)",      description: `Reduces damage taken by a further ${CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS.rare*100}%. Stacks multiplicatively.`,      apply: function(p) { p.damageTakenMultiplier *= (1 - CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS.rare); p.damageTakenMultiplier = Math.max(0.001, p.damageTakenMultiplier); }},
-                epic:      { nameSuffix: "(Epic)",      description: `Reduces damage taken by a further ${CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS.epic*100}%. Stacks multiplicatively.`,      apply: function(p) { p.damageTakenMultiplier *= (1 - CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS.epic); p.damageTakenMultiplier = Math.max(0.001, p.damageTakenMultiplier); }},
-                legendary: { nameSuffix: "(Legendary)", description: `Reduces damage taken by a further ${CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS.legendary*100}%. Stacks multiplicatively.`, apply: function(p) { p.damageTakenMultiplier *= (1 - CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS.legendary); p.damageTakenMultiplier = Math.max(0.001, p.damageTakenMultiplier); }}
+                common:    { description: `Reduces damage taken by a further ${CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS.common*100}%. Stacks multiplicatively.`,    apply: function(p) { p.damageTakenMultiplier *= (1 - CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS.common); p.damageTakenMultiplier = Math.max(0.001, p.damageTakenMultiplier); }},
+                rare:      { description: `Reduces damage taken by a further ${CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS.rare*100}%. Stacks multiplicatively.`,      apply: function(p) { p.damageTakenMultiplier *= (1 - CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS.rare); p.damageTakenMultiplier = Math.max(0.001, p.damageTakenMultiplier); }},
+                epic:      { description: `Reduces damage taken by a further ${CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS.epic*100}%. Stacks multiplicatively.`,      apply: function(p) { p.damageTakenMultiplier *= (1 - CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS.epic); p.damageTakenMultiplier = Math.max(0.001, p.damageTakenMultiplier); }},
+                legendary: { description: `Reduces damage taken by a further ${CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS.legendary*100}%. Stacks multiplicatively.`, apply: function(p) { p.damageTakenMultiplier *= (1 - CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS.legendary); p.damageTakenMultiplier = Math.max(0.001, p.damageTakenMultiplier); }}
             },
             getEffectString: function(playerInstance) { 
                 const reductionPercent = playerInstance ? (1 - playerInstance.damageTakenMultiplier) * 100 : 0;
                 return `${reductionPercent.toFixed(1)}% Total Dmg Reduction`;
             },
             getCardEffectString: function(tier) { 
-                return `Effectiveness: ${CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS[tier]*100}%`;
+                return `Reduce Dmg by ${CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS[tier]*100}%`;
             }
         },
         {
-            id:'vitalitySurge', 
-            classType: 'tank', 
-            text:"Vitality Surge", 
-            level:0, 
-            maxLevel: 999, 
+            id:'vitalitySurge', classType: 'tank', text:"Vitality Surge", level:0, maxLevel: 999, 
             isTiered: true,
             isMaxed:function(p){return false;}, 
             tiers: {
-                common:    { nameSuffix: "(Common)",    description: `Increases HP regen by ${CONSTANTS.VITALITY_SURGE_TIER_BONUS.common} HP/tick.`, apply: function(p) { p.hpRegenBonusFromEvolution += CONSTANTS.VITALITY_SURGE_TIER_BONUS.common; }},
-                rare:      { nameSuffix: "(Rare)",      description: `Increases HP regen by ${CONSTANTS.VITALITY_SURGE_TIER_BONUS.rare} HP/tick.`, apply: function(p) { p.hpRegenBonusFromEvolution += CONSTANTS.VITALITY_SURGE_TIER_BONUS.rare; }},
-                epic:      { nameSuffix: "(Epic)",      description: `Increases HP regen by ${CONSTANTS.VITALITY_SURGE_TIER_BONUS.epic} HP/tick.`, apply: function(p) { p.hpRegenBonusFromEvolution += CONSTANTS.VITALITY_SURGE_TIER_BONUS.epic; }},
-                legendary: { nameSuffix: "(Legendary)", description: `Increases HP regen by ${CONSTANTS.VITALITY_SURGE_TIER_BONUS.legendary} HP/tick.`, apply: function(p) { p.hpRegenBonusFromEvolution += CONSTANTS.VITALITY_SURGE_TIER_BONUS.legendary; }}
+                common:    { description: `Increases HP regen by ${CONSTANTS.VITALITY_SURGE_TIER_BONUS.common} HP/tick.`, apply: function(p) { p.hpRegenBonusFromEvolution += CONSTANTS.VITALITY_SURGE_TIER_BONUS.common; }},
+                rare:      { description: `Increases HP regen by ${CONSTANTS.VITALITY_SURGE_TIER_BONUS.rare} HP/tick.`, apply: function(p) { p.hpRegenBonusFromEvolution += CONSTANTS.VITALITY_SURGE_TIER_BONUS.rare; }},
+                epic:      { description: `Increases HP regen by ${CONSTANTS.VITALITY_SURGE_TIER_BONUS.epic} HP/tick.`, apply: function(p) { p.hpRegenBonusFromEvolution += CONSTANTS.VITALITY_SURGE_TIER_BONUS.epic; }},
+                legendary: { description: `Increases HP regen by ${CONSTANTS.VITALITY_SURGE_TIER_BONUS.legendary} HP/tick.`, apply: function(p) { p.hpRegenBonusFromEvolution += CONSTANTS.VITALITY_SURGE_TIER_BONUS.legendary; }}
             },
             getEffectString: function(playerInstance) { return `Total +${(playerInstance?playerInstance.hpRegenBonusFromEvolution:0).toFixed(1)} HP/tick Regen`; },
-            getCardEffectString: function(tier) { return `+${CONSTANTS.VITALITY_SURGE_TIER_BONUS[tier].toFixed(1)} HP/tick this pick`; }
+            getCardEffectString: function(tier) { return `+${CONSTANTS.VITALITY_SURGE_TIER_BONUS[tier].toFixed(1)} HP/tick Regen`; }
         },
         {
-            id: 'maxHpIncrease', 
-            classType: 'tank', 
-            text: "Fortified Core", 
-            level: 0, maxLevel: 999, 
+            id: 'maxHpIncrease', classType: 'tank', text: "Fortified Core", level: 0, maxLevel: 999, 
             isTiered: true,
             isMaxed: function(p) { return false; },
             tiers: {
-                common:    { nameSuffix: "(Common)",    description: `Increases Max HP by ${CONSTANTS.FORTIFIED_CORE_TIER_BONUS.common}.`, apply: function(p) { p.maxHp += CONSTANTS.FORTIFIED_CORE_TIER_BONUS.common; p.gainHealth(CONSTANTS.FORTIFIED_CORE_TIER_BONUS.common, uiUpdateHealthDisplay); }},
-                rare:      { nameSuffix: "(Rare)",      description: `Increases Max HP by ${CONSTANTS.FORTIFIED_CORE_TIER_BONUS.rare}.`, apply: function(p) { p.maxHp += CONSTANTS.FORTIFIED_CORE_TIER_BONUS.rare; p.gainHealth(CONSTANTS.FORTIFIED_CORE_TIER_BONUS.rare, uiUpdateHealthDisplay); }},
-                epic:      { nameSuffix: "(Epic)",      description: `Increases Max HP by ${CONSTANTS.FORTIFIED_CORE_TIER_BONUS.epic}.`, apply: function(p) { p.maxHp += CONSTANTS.FORTIFIED_CORE_TIER_BONUS.epic; p.gainHealth(CONSTANTS.FORTIFIED_CORE_TIER_BONUS.epic, uiUpdateHealthDisplay); }},
-                legendary: { nameSuffix: "(Legendary)", description: `Increases Max HP by ${CONSTANTS.FORTIFIED_CORE_TIER_BONUS.legendary}.`, apply: function(p) { p.maxHp += CONSTANTS.FORTIFIED_CORE_TIER_BONUS.legendary; p.gainHealth(CONSTANTS.FORTIFIED_CORE_TIER_BONUS.legendary, uiUpdateHealthDisplay); }}
+                common:    { description: `Increases Max HP by ${CONSTANTS.FORTIFIED_CORE_TIER_BONUS.common}.`, apply: function(p) { p.maxHp += CONSTANTS.FORTIFIED_CORE_TIER_BONUS.common; p.gainHealth(CONSTANTS.FORTIFIED_CORE_TIER_BONUS.common, uiUpdateHealthDisplay); }},
+                rare:      { description: `Increases Max HP by ${CONSTANTS.FORTIFIED_CORE_TIER_BONUS.rare}.`, apply: function(p) { p.maxHp += CONSTANTS.FORTIFIED_CORE_TIER_BONUS.rare; p.gainHealth(CONSTANTS.FORTIFIED_CORE_TIER_BONUS.rare, uiUpdateHealthDisplay); }},
+                epic:      { description: `Increases Max HP by ${CONSTANTS.FORTIFIED_CORE_TIER_BONUS.epic}.`, apply: function(p) { p.maxHp += CONSTANTS.FORTIFIED_CORE_TIER_BONUS.epic; p.gainHealth(CONSTANTS.FORTIFIED_CORE_TIER_BONUS.epic, uiUpdateHealthDisplay); }},
+                legendary: { description: `Increases Max HP by ${CONSTANTS.FORTIFIED_CORE_TIER_BONUS.legendary}.`, apply: function(p) { p.maxHp += CONSTANTS.FORTIFIED_CORE_TIER_BONUS.legendary; p.gainHealth(CONSTANTS.FORTIFIED_CORE_TIER_BONUS.legendary, uiUpdateHealthDisplay); }}
             },
             getEffectString: function(playerInstance) { return `Current Max HP: ${playerInstance ? playerInstance.maxHp : CONSTANTS.PLAYER_MAX_HP}`; },
-            getCardEffectString: function(tier) { return `+${CONSTANTS.FORTIFIED_CORE_TIER_BONUS[tier]} Max HP this pick`;}
+            getCardEffectString: function(tier) { return `+${CONSTANTS.FORTIFIED_CORE_TIER_BONUS[tier]} Max HP`;}
         },
         {
-            id: 'kineticConversion',
-            classType: 'utility',
-            text: "Kinetic Conversion",
-            level: 0, 
-            maxLevel: 999,
+            id: 'kineticConversion', classType: 'utility', text: "Kinetic Conversion", level: 0, maxLevel: 999,
             isTiered: true,
             isMaxed: function(p) { return false; }, 
             tiers: { 
-                common: {
-                    nameSuffix: "(Common)",
-                    description: "Increases Kinetic Conversion level. Standard per-level scaling for charge rate and damage potential.",
-                    apply: function(p) { 
-                        p.kineticConversionLevel++; 
-                        p.effectiveKineticChargeRatePerLevel = Math.max(p.effectiveKineticChargeRatePerLevel, CONSTANTS.DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.common.rateBonus);
-                        p.effectiveKineticAdditionalDamageBonusPerLevel = Math.max(p.effectiveKineticAdditionalDamageBonusPerLevel, CONSTANTS.DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.common.dmgBonus);
-                    }
-                },
-                rare: {
-                    nameSuffix: "(Rare)",
-                    description: "Increases Kinetic Conversion level. Slightly enhances its per-level scaling.",
-                    apply: function(p) {
-                        p.kineticConversionLevel++;
-                        p.effectiveKineticChargeRatePerLevel = Math.max(p.effectiveKineticChargeRatePerLevel, CONSTANTS.DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.rare.rateBonus);
-                        p.effectiveKineticAdditionalDamageBonusPerLevel = Math.max(p.effectiveKineticAdditionalDamageBonusPerLevel, CONSTANTS.DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.rare.dmgBonus);
-                    }
-                },
-                epic: {
-                    nameSuffix: "(Epic)",
-                    description: "Increases Kinetic Conversion level. Moderately enhances its per-level scaling.",
-                    apply: function(p) {
-                        p.kineticConversionLevel++;
-                        p.effectiveKineticChargeRatePerLevel = Math.max(p.effectiveKineticChargeRatePerLevel, CONSTANTS.DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.epic.rateBonus);
-                        p.effectiveKineticAdditionalDamageBonusPerLevel = Math.max(p.effectiveKineticAdditionalDamageBonusPerLevel, CONSTANTS.DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.epic.dmgBonus);
-                    }
-                },
-                legendary: {
-                    nameSuffix: "(Legendary)",
-                    description: "Increases Kinetic Conversion level. Greatly enhances its per-level scaling.",
-                    apply: function(p) {
-                        p.kineticConversionLevel++;
-                        p.effectiveKineticChargeRatePerLevel = Math.max(p.effectiveKineticChargeRatePerLevel, CONSTANTS.DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.legendary.rateBonus);
-                        p.effectiveKineticAdditionalDamageBonusPerLevel = Math.max(p.effectiveKineticAdditionalDamageBonusPerLevel, CONSTANTS.DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.legendary.dmgBonus);
-                    }
-                }
+                common:    { description: "Increases Kinetic Conversion level. Standard per-level scaling for charge rate and damage potential.", apply: function(p) { p.kineticConversionLevel++; p.effectiveKineticChargeRatePerLevel = Math.max(p.effectiveKineticChargeRatePerLevel, CONSTANTS.DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.common.rateBonus); p.effectiveKineticAdditionalDamageBonusPerLevel = Math.max(p.effectiveKineticAdditionalDamageBonusPerLevel, CONSTANTS.DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.common.dmgBonus); }},
+                rare:      { description: "Increases Kinetic Conversion level. Slightly enhances its per-level scaling.", apply: function(p) { p.kineticConversionLevel++; p.effectiveKineticChargeRatePerLevel = Math.max(p.effectiveKineticChargeRatePerLevel, CONSTANTS.DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.rare.rateBonus); p.effectiveKineticAdditionalDamageBonusPerLevel = Math.max(p.effectiveKineticAdditionalDamageBonusPerLevel, CONSTANTS.DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.rare.dmgBonus); }},
+                epic:      { description: "Increases Kinetic Conversion level. Moderately enhances its per-level scaling.", apply: function(p) { p.kineticConversionLevel++; p.effectiveKineticChargeRatePerLevel = Math.max(p.effectiveKineticChargeRatePerLevel, CONSTANTS.DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.epic.rateBonus); p.effectiveKineticAdditionalDamageBonusPerLevel = Math.max(p.effectiveKineticAdditionalDamageBonusPerLevel, CONSTANTS.DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.epic.dmgBonus); }},
+                legendary: { description: "Increases Kinetic Conversion level. Greatly enhances its per-level scaling.", apply: function(p) { p.kineticConversionLevel++; p.effectiveKineticChargeRatePerLevel = Math.max(p.effectiveKineticChargeRatePerLevel, CONSTANTS.DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.legendary.rateBonus); p.effectiveKineticAdditionalDamageBonusPerLevel = Math.max(p.effectiveKineticAdditionalDamageBonusPerLevel, CONSTANTS.DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.legendary.dmgBonus); }}
             },
             getEffectString: function(playerInstance) { 
                 const KCL = playerInstance.kineticConversionLevel || 0;
                 const maxPotencyBonus = playerInstance.initialKineticDamageBonus + (Math.max(0, KCL - 1) * playerInstance.effectiveKineticAdditionalDamageBonusPerLevel);
                 const chargeRate = playerInstance.baseKineticChargeRate + (KCL * playerInstance.effectiveKineticChargeRatePerLevel);
-                if (KCL > 0) { // Only show if player has at least one level
+                if (KCL > 0) {
                     return `Lvl ${KCL}: Max Dmg +${(maxPotencyBonus * 100).toFixed(0)}%, Rate ${chargeRate.toFixed(2)}/s`;
                 }
-                return "Charge Rate/Potency Up"; // Default text if level is 0 (e.g., for a new card)
+                const previewRate = playerInstance.baseKineticChargeRate + (1 * (playerInstance.effectiveKineticChargeRatePerLevel || CONSTANTS.DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL)); 
+                const previewDmg = playerInstance.initialKineticDamageBonus;
+                return `Next Lvl Max Dmg: +${(previewDmg * 100).toFixed(0)}%, Rate: ${previewRate.toFixed(2)}/s`;
             },
-            getCardEffectString: function(tier, playerInstance) { 
-                 const rateBonus = CONSTANTS.KINETIC_CONVERSION_TIER_SCALING[tier]?.rateBonus || 0;
-                 const dmgBonus = CONSTANTS.KINETIC_CONVERSION_TIER_SCALING[tier]?.dmgBonus || 0;
-                 const nextRatePerLvl = CONSTANTS.DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL + rateBonus;
-                 const nextDmgPerLvl = CONSTANTS.DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL + dmgBonus;
-                 return `Sets Scaling: +${nextRatePerLvl.toFixed(2)} Rate/Lvl, +${(nextDmgPerLvl*100).toFixed(0)}% Dmg/Lvl`;
+            getCardEffectString: function(tier) { 
+                 const rateBonusPercent = (CONSTANTS.KINETIC_CONVERSION_TIER_SCALING[tier]?.rateBonus || 0) * 100;
+                 const dmgBonusPercent = (CONSTANTS.KINETIC_CONVERSION_TIER_SCALING[tier]?.dmgBonus || 0) * 100;
+                 return `Tier Bonus: +${rateBonusPercent.toFixed(0)}% Rate, +${dmgBonusPercent.toFixed(0)}% Dmg`;
             }
         },
         {
-            id: 'temporalEcho',
-            classType: 'utility',
-            text: "Temporal Echo",
-            level: 0, maxLevel: 999, 
+            id: 'temporalEcho', classType: 'utility', text: "Temporal Echo", level: 0, maxLevel: 999, 
             isTiered: true,
             isMaxed: function(p) { return p && p.temporalEchoChance >= 1.0; },
             tiers: {
-                common:    { nameSuffix: "(Common)",    description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.common}%.`,   apply: function(p) { p.temporalEchoChance = Math.min(1.0, p.temporalEchoChance + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.common / 100); }},
-                rare:      { nameSuffix: "(Rare)",      description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.rare}%.`,     apply: function(p) { p.temporalEchoChance = Math.min(1.0, p.temporalEchoChance + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.rare / 100); }},
-                epic:      { nameSuffix: "(Epic)",      description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.epic}%.`,     apply: function(p) { p.temporalEchoChance = Math.min(1.0, p.temporalEchoChance + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.epic / 100); }},
-                legendary: { nameSuffix: "(Legendary)", description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.legendary}%.`, apply: function(p) { p.temporalEchoChance = Math.min(1.0, p.temporalEchoChance + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.legendary / 100); }}
+                common:    { description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.common}%.`,   apply: function(p) { p.temporalEchoChance = Math.min(1.0, p.temporalEchoChance + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.common / 100); }},
+                rare:      { description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.rare}%.`,     apply: function(p) { p.temporalEchoChance = Math.min(1.0, p.temporalEchoChance + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.rare / 100); }},
+                epic:      { description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.epic}%.`,     apply: function(p) { p.temporalEchoChance = Math.min(1.0, p.temporalEchoChance + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.epic / 100); }},
+                legendary: { description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.legendary}%.`, apply: function(p) { p.temporalEchoChance = Math.min(1.0, p.temporalEchoChance + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.legendary / 100); }}
             },
             getEffectString: function(playerInstance) { return `Total Echo Chance: ${Math.round((playerInstance ? playerInstance.temporalEchoChance : 0) * 100)}%`; },
-            getCardEffectString: function(tier) { return `+${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE[tier]}% Chance this pick`;}
+            getCardEffectString: function(tier) { return `+${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE[tier]}% Echo Chance`;}
         },
         {
-            id: 'streamlinedSystems', 
-            classType: 'utility', 
-            text: "Streamlined Systems", 
-            level: 0, maxLevel: 999,
+            id: 'streamlinedSystems', classType: 'utility', text: "Streamlined Systems", level: 0, maxLevel: 999,
             isTiered: true,
             isMaxed: function(p) { return false; }, 
             tiers: {
-                common:    { nameSuffix: "(Common)",    description: `Reduces current ability cooldowns by ${CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.common}%.`, apply: function(p) { reduceAllAbilityCooldowns(p, CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.common / 100); }},
-                rare:      { nameSuffix: "(Rare)",      description: `Reduces current ability cooldowns by ${CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.rare}%.`, apply: function(p) { reduceAllAbilityCooldowns(p, CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.rare / 100); }},
-                epic:      { nameSuffix: "(Epic)",      description: `Reduces current ability cooldowns by ${CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.epic}%.`, apply: function(p) { reduceAllAbilityCooldowns(p, CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.epic / 100); }},
-                legendary: { nameSuffix: "(Legendary)", description: `Reduces current ability cooldowns by ${CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.legendary}%.`, apply: function(p) { reduceAllAbilityCooldowns(p, CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.legendary / 100); }}
+                common:    { description: `Reduces current ability cooldowns by ${CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.common}%.`, apply: function(p) { reduceAllAbilityCooldowns(p, CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.common / 100); }},
+                rare:      { description: `Reduces current ability cooldowns by ${CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.rare}%.`, apply: function(p) { reduceAllAbilityCooldowns(p, CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.rare / 100); }},
+                epic:      { description: `Reduces current ability cooldowns by ${CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.epic}%.`, apply: function(p) { reduceAllAbilityCooldowns(p, CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.epic / 100); }},
+                legendary: { description: `Reduces current ability cooldowns by ${CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.legendary}%.`, apply: function(p) { reduceAllAbilityCooldowns(p, CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.legendary / 100); }}
             },
             getEffectString: function(playerInstance, currentChoiceLevel) { return `Applied ${currentChoiceLevel || 0} time(s)`; }, 
             getCardEffectString: function(tier) { return `Reduce current CDs by ${CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION[tier]}%`; }
         },
         {
-            id:'focusedBeam', 
-            classType: 'attack', 
-            text:"Focused Beam", 
-            level:0, maxLevel: 999 , 
+            id:'focusedBeam', classType: 'attack', text:"Focused Beam", level:0, maxLevel: 999 , 
             isTiered: true,
             isMaxed:function(p){return false;}, 
             tiers: {
-                common:    { nameSuffix: "(Common)",    description: `Increases ray damage by ${CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE.common}.`, apply: function(p) { p.rayDamageBonus += CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE.common; }},
-                rare:      { nameSuffix: "(Rare)",      description: `Increases ray damage by ${CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE.rare}.`, apply: function(p) { p.rayDamageBonus += CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE.rare; }},
-                epic:      { nameSuffix: "(Epic)",      description: `Increases ray damage by ${CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE.epic}.`, apply: function(p) { p.rayDamageBonus += CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE.epic; }},
-                legendary: { nameSuffix: "(Legendary)", description: `Increases ray damage by ${CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE.legendary}.`, apply: function(p) { p.rayDamageBonus += CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE.legendary; }}
+                common:    { description: `Increases ray damage by ${CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE.common}.`, apply: function(p) { p.rayDamageBonus += CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE.common; }},
+                rare:      { description: `Increases ray damage by ${CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE.rare}.`, apply: function(p) { p.rayDamageBonus += CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE.rare; }},
+                epic:      { description: `Increases ray damage by ${CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE.epic}.`, apply: function(p) { p.rayDamageBonus += CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE.epic; }},
+                legendary: { description: `Increases ray damage by ${CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE.legendary}.`, apply: function(p) { p.rayDamageBonus += CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE.legendary; }}
             },
             getEffectString: function(playerInstance) { return `Total +${(playerInstance?playerInstance.rayDamageBonus:0).toFixed(1)} Ray Damage`;},
-            getCardEffectString: function(tier) { return `+${CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE[tier].toFixed(1)} Dmg this pick`;}
+            getCardEffectString: function(tier) { return `+${CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE[tier].toFixed(1)} Ray Damage`;}
         },
         {
-            id: 'unstableCore',
-            classType: 'attack',
-            text: "Unstable Core",
-            level: 0, maxLevel: 999, 
+            id: 'unstableCore', classType: 'attack', text: "Unstable Core", level: 0, maxLevel: 999, 
             isTiered: true,
             isMaxed: function(p) { return p && p.chainReactionChance >= 1.0; },
             tiers: {
-                common:    { nameSuffix: "(Common)",    description: `Increases AOE chance by ${CONSTANTS.UNSTABLE_CORE_TIER_CHANCE.common}%.`,   apply: function(p) { p.chainReactionChance = Math.min(1.0, p.chainReactionChance + CONSTANTS.UNSTABLE_CORE_TIER_CHANCE.common / 100); }},
-                rare:      { nameSuffix: "(Rare)",      description: `Increases AOE chance by ${CONSTANTS.UNSTABLE_CORE_TIER_CHANCE.rare}%.`,     apply: function(p) { p.chainReactionChance = Math.min(1.0, p.chainReactionChance + CONSTANTS.UNSTABLE_CORE_TIER_CHANCE.rare / 100); }},
-                epic:      { nameSuffix: "(Epic)",      description: `Increases AOE chance by ${CONSTANTS.UNSTABLE_CORE_TIER_CHANCE.epic}%.`,     apply: function(p) { p.chainReactionChance = Math.min(1.0, p.chainReactionChance + CONSTANTS.UNSTABLE_CORE_TIER_CHANCE.epic / 100); }},
-                legendary: { nameSuffix: "(Legendary)", description: `Increases AOE chance by ${CONSTANTS.UNSTABLE_CORE_TIER_CHANCE.legendary}%.`, apply: function(p) { p.chainReactionChance = Math.min(1.0, p.chainReactionChance + CONSTANTS.UNSTABLE_CORE_TIER_CHANCE.legendary / 100); }}
+                common:    { description: `Increases AOE chance by ${CONSTANTS.UNSTABLE_CORE_TIER_CHANCE.common}%.`,   apply: function(p) { p.chainReactionChance = Math.min(1.0, p.chainReactionChance + CONSTANTS.UNSTABLE_CORE_TIER_CHANCE.common / 100); }},
+                rare:      { description: `Increases AOE chance by ${CONSTANTS.UNSTABLE_CORE_TIER_CHANCE.rare}%.`,     apply: function(p) { p.chainReactionChance = Math.min(1.0, p.chainReactionChance + CONSTANTS.UNSTABLE_CORE_TIER_CHANCE.rare / 100); }},
+                epic:      { description: `Increases AOE chance by ${CONSTANTS.UNSTABLE_CORE_TIER_CHANCE.epic}%.`,     apply: function(p) { p.chainReactionChance = Math.min(1.0, p.chainReactionChance + CONSTANTS.UNSTABLE_CORE_TIER_CHANCE.epic / 100); }},
+                legendary: { description: `Increases AOE chance by ${CONSTANTS.UNSTABLE_CORE_TIER_CHANCE.legendary}%.`, apply: function(p) { p.chainReactionChance = Math.min(1.0, p.chainReactionChance + CONSTANTS.UNSTABLE_CORE_TIER_CHANCE.legendary / 100); }}
             },
             getEffectString: function(playerInstance) { return `Total ${Math.round((playerInstance ? playerInstance.chainReactionChance : 0) * 100)}% AOE Chance`; },
-            getCardEffectString: function(tier) { return `+${CONSTANTS.UNSTABLE_CORE_TIER_CHANCE[tier]}% Chance this pick`;}
+            getCardEffectString: function(tier) { return `+${CONSTANTS.UNSTABLE_CORE_TIER_CHANCE[tier]}% AOE Chance`;}
         },
         {
-            id: 'abilityPotency',
-            classType: 'attack',
-            text: "Empowered Abilities",
-            level: 0, maxLevel: 999,
+            id: 'abilityPotency', classType: 'attack', text: "Empowered Abilities", level: 0, maxLevel: 999,
             isTiered: true,
             isMaxed: function(p) { return false; },
             tiers: {
-                common:    { nameSuffix: "(Common)",    description: `Multiplies ability damage by ${CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER.common.toFixed(2)}x.`, apply: function(p) { p.abilityDamageMultiplier *= CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER.common; }},
-                rare:      { nameSuffix: "(Rare)",      description: `Multiplies ability damage by ${CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER.rare.toFixed(2)}x.`, apply: function(p) { p.abilityDamageMultiplier *= CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER.rare; }},
-                epic:      { nameSuffix: "(Epic)",      description: `Multiplies ability damage by ${CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER.epic.toFixed(2)}x.`, apply: function(p) { p.abilityDamageMultiplier *= CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER.epic; }},
-                legendary: { nameSuffix: "(Legendary)", description: `Multiplies ability damage by ${CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER.legendary.toFixed(2)}x.`, apply: function(p) { p.abilityDamageMultiplier *= CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER.legendary; }}
+                common:    { description: `Multiplies ability damage by ${CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER.common.toFixed(2)}x.`, apply: function(p) { p.abilityDamageMultiplier *= CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER.common; }},
+                rare:      { description: `Multiplies ability damage by ${CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER.rare.toFixed(2)}x.`, apply: function(p) { p.abilityDamageMultiplier *= CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER.rare; }},
+                epic:      { description: `Multiplies ability damage by ${CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER.epic.toFixed(2)}x.`, apply: function(p) { p.abilityDamageMultiplier *= CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER.epic; }},
+                legendary: { description: `Multiplies ability damage by ${CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER.legendary.toFixed(2)}x.`, apply: function(p) { p.abilityDamageMultiplier *= CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER.legendary; }}
             },
             getEffectString: function(playerInstance) { return `Total Ability Dmg: ${Math.round((playerInstance ? playerInstance.abilityDamageMultiplier : 1) * 100)}%`; },
-            getCardEffectString: function(tier) { return `x${CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER[tier].toFixed(2)} Dmg this pick`;}
+            getCardEffectString: function(tier) { return `Ability Dmg x${CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER[tier].toFixed(2)}`;}
         }
     ];
 }
 
-
-// ... (populateBossLootPoolInternal and other functions remain the same as the last full version)
 function populateBossLootPoolInternal() {
     bossLootPool = [
          { id: 'momentumInjectors', type: 'gear', name: 'Momentum Injectors', description: 'Your rays deal +5% damage per wall bounce (max +25%).', apply: () => { if(player) { player.momentumDamageBonus = (player.momentumDamageBonus || 0) + 0.05; player.visualModifiers.momentumInjectors = true;} } },
@@ -864,10 +792,7 @@ function updateGame(deltaTime) {
                                  abilityBaseDamage *= player.abilityDamageMultiplier;
                             }
                             if (player.hasUltimateConfigurationHelm) { 
-                                // Check if it's specifically a Mini Gravity Well launched ray
-                                // This requires the ray to have a source identifier.
-                                // For now, let's assume r.sourceAbility === 'miniGravityWell' exists if it's a well ray.
-                                if (r.sourceAbility === 'miniGravityWell') { // You'll need to set r.sourceAbility in PlayerGravityWell.detonate
+                                if (r.sourceAbility === 'miniGravityWell') { 
                                    abilityBaseDamage *= 2; 
                                 }
                             }
@@ -1146,7 +1071,22 @@ function triggerEvolutionInternal() {
     pauseAllGameIntervals(); gamePausedForEvolution = true;
     currentActiveScreenElement = evolutionScreen;
     applyMusicPlayStateWrapper(); playSound(evolutionSound);
-    const available = evolutionChoices.filter(c => !c.isMaxed(player));
+    
+    const hasAtLeastOneOtherAbility = 
+        (player.activeAbilities['1'] !== null) ||
+        (player.activeAbilities['2'] !== null) ||
+        (player.activeAbilities['3'] !== null) ||
+        player.hasOmegaLaser ||
+        player.hasShieldOvercharge;
+
+    const available = evolutionChoices.filter(c => {
+        if (c.id === 'temporalEcho' && !hasAtLeastOneOtherAbility) {
+            return false; 
+        }
+        const isChoiceMaxed = c.isMaxed ? c.isMaxed(player) : false;
+        return !isChoiceMaxed;
+    });
+
     let choicesForUI = [];
     if(available.length > 0){ 
         let shuffledAvailable = [...available].sort(() => 0.5 - Math.random());
@@ -1157,24 +1097,35 @@ function triggerEvolutionInternal() {
             if (baseEvo.isTiered) {
                 rolledTier = rollTier();
             }
-            const tierData = baseEvo.isTiered ? baseEvo.tiers[rolledTier] : baseEvo; 
+            const tierSpecificData = baseEvo.isTiered ? baseEvo.tiers[rolledTier] : baseEvo; 
 
             choicesForUI.push({
                 baseId: baseEvo.id,
                 classType: baseEvo.classType,
-                rolledTier: baseEvo.isTiered ? rolledTier : null,
-                text: `${baseEvo.text} ${baseEvo.isTiered ? (tierData.nameSuffix || '') : ''}`,
-                detailedDescription: baseEvo.isTiered ? tierData.description : baseEvo.detailedDescription,
-                applyEffect: baseEvo.isTiered ? tierData.apply : baseEvo.apply,
+                rolledTier: baseEvo.isTiered ? rolledTier : null, 
+                text: baseEvo.text, 
+                detailedDescription: baseEvo.isTiered ? tierSpecificData.description : baseEvo.detailedDescription,
+                applyEffect: baseEvo.isTiered ? tierSpecificData.apply : baseEvo.apply,
                 cardEffectString: (typeof baseEvo.getCardEffectString === 'function') 
                                     ? baseEvo.getCardEffectString(rolledTier, player) 
-                                    : (baseEvo.isTiered && tierData.potency ? `Value: ${tierData.potency}` : (baseEvo.getEffectString ? baseEvo.getEffectString(player) : 'Effect Varies')),
+                                    : (baseEvo.getEffectString ? baseEvo.getEffectString(player, baseEvo.level) : 'Effect details vary'), 
                 originalEvolution: baseEvo 
             });
         });
-    } else {
-        choicesForUI.push({ id:'noMoreEvolutions', baseId: 'noMoreEvolutions', classType: 'utility', text:"All evolutions maxed! Good luck!", applyEffect:()=>"No more evolutions!", isMaxed: ()=> true, originalEvolution: {id:'noMoreEvolutions', isMaxed:()=>true, isTiered: false} });
+    } 
+    
+    if (choicesForUI.length === 0) {
+        choicesForUI.push({ 
+            id:'noMoreEvolutions', 
+            baseId: 'noMoreEvolutions', 
+            classType: 'utility', 
+            text:"All evolutions maxed or no valid options!",
+            applyEffect:()=>"No more evolutions!", 
+            isMaxed: ()=> true, 
+            originalEvolution: {id:'noMoreEvolutions', isMaxed:()=>true, isTiered: false, detailedDescription: "No further upgrades available at this time."} 
+        });
     }
+
     populateEvolutionOptionsUI( choicesForUI, player, selectEvolutionInternal, shrinkMeCooldown, getReadableColorNameFromUtils );
     showScreen(evolutionScreen, true, gameScreenCallbacks);
 }
@@ -1191,7 +1142,9 @@ function selectEvolutionInternal(uiSelectedChoice) {
     }
 
     if (uiSelectedChoice.applyEffect) {
-        uiSelectedChoice.applyEffect(player); 
+        const effectMessage = uiSelectedChoice.applyEffect(player); 
+        if (effectMessage && typeof effectMessage === 'string' && activeBuffNotifications) {
+        }
     } else {
         console.error("Error: applyEffect not found for choice:", uiSelectedChoice);
     }
@@ -1208,6 +1161,12 @@ function selectEvolutionInternal(uiSelectedChoice) {
         currentPlayerRadiusGrowthFactor = currentEffectiveDefaultGrowthFactor;
     }
     
+    if (uiSelectedChoice.baseId === 'kineticConversion' && kineticChargeUIElement && player) {
+        let maxPotencyBonusAtFullCharge = player.initialKineticDamageBonus + (Math.max(0, player.kineticConversionLevel - 1) * player.effectiveKineticAdditionalDamageBonusPerLevel);
+        updateKineticChargeUI(player.kineticCharge, player.kineticChargeConsumption, maxPotencyBonusAtFullCharge, player.kineticConversionLevel > 0);
+    }
+
+
     gamePausedForEvolution = false; evolutionPendingAfterBoss = false; postPopupImmunityTimer = CONSTANTS.POST_POPUP_IMMUNITY_DURATION;
     currentActiveScreenElement = null;
     showScreen(null, false, gameScreenCallbacks);
@@ -1489,7 +1448,7 @@ function prepareDisplayedUpgradesForStats(p) {
             }
             
             if (desc) {
-                let nameToDisplay = e.text.replace(/\s\(Lvl.*/, ''); 
+                let nameToDisplay = e.text; 
                 list.push({ name: nameToDisplay, description: desc });
             }
         }

@@ -60,195 +60,176 @@
             display: flex;
             flex-wrap: wrap; 
             justify-content: space-around;
-            align-items: stretch;
-            gap: 15px;
+            align-items: flex-start; /* Align wrappers to the top */
+            gap: 20px; 
             width:100%;
         }
+
+        .evolution-choice-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center; 
+            flex: 1 1 180px; 
+            min-width: 170px; 
+        }
+        .evolution-tier-label {
+            font-size: 13px; 
+            font-weight: bold;
+            margin-bottom: 6px; 
+            padding: 2px 10px;
+            border-radius: 10px; 
+            background-color: rgba(0,0,0,0.35);
+            text-shadow: 0 0 3px black;
+            letter-spacing: 0.5px;
+            line-height: 1.4;
+            display: inline-block; 
+            visibility: hidden; /* Default to hidden */
+            min-height: 1.5em; /* Reserve space even if empty, adjust as needed */
+        }
+        .evolution-tier-label.has-tier { /* JS adds this class if there's text */
+            visibility: visible;
+        }
+        
+        /* BASE STYLING FOR ALL EVOLUTION OPTIONS */
         #evolutionScreen .evolutionOption,
         #freeUpgradeScreen .freeUpgradeOption {
-            background-color: #282850;
-            border: 2px solid #555588;
+            background-color: #101018; /* Darkest neutral base for all cards */
+            border: 2px solid #444466; 
             padding: 15px;
             border-radius: 10px;
             cursor: pointer;
             transition: background-color 0.3s, transform 0.2s, box-shadow 0.3s, border-color 0.3s;
-            flex: 1; 
+            width: 100%; 
             display: flex; flex-direction: column;
             justify-content: center; align-items: center;
             min-height: 100px; 
-            min-width: 150px; 
             text-align: center;
             box-sizing: border-box; 
         }
-        #evolutionScreen .evolutionOption .evolution-details {
+        
+        /* TEXT STYLING (consistent for all cards) */
+        #evolutionScreen .evolutionOption h3, 
+        #freeUpgradeScreen .freeUpgradeOption h3 { 
+            margin-top: 0; 
+            color: #ddeeff; 
+            font-size: 18px; 
+        }
+        #evolutionScreen .evolutionOption .evolution-details,
+        #freeUpgradeScreen .freeUpgradeOption p { 
             font-size: 12px;
-            color: #88aaff;
+            color: #aabbcc;
             margin-top: 5px;
+            margin-bottom: 0;
         }
 
-        /* --- Tiered Evolution Option Styling --- */
-        /* COMMON (Subtle class-colored glow) */
-        .evolutionOption[data-tier="common"] {
+        /* --- CLASS-BASED BACKGROUNDS (scoped to #evolutionScreen for specificity) --- */
+        #evolutionScreen .evolutionOption[data-class="attack"] { background-color: rgba(220, 50, 50, 0.35); } 
+        #evolutionScreen .evolutionOption[data-class="tank"]   { background-color: rgba(50, 220, 50, 0.35); } 
+        #evolutionScreen .evolutionOption[data-class="utility"]{ background-color: rgba(50, 100, 220, 0.35); }
+
+        #evolutionScreen .evolutionOption[data-class="attack"]:hover { background-color: rgba(240, 70, 70, 0.45); }
+        #evolutionScreen .evolutionOption[data-class="tank"]:hover   { background-color: rgba(70, 240, 70, 0.45); }
+        #evolutionScreen .evolutionOption[data-class="utility"]:hover{ background-color: rgba(70, 120, 240, 0.45); }
+
+        /* --- TIER-BASED GLOWS & BORDERS (CORE background is special) --- */
+        /* CORE */
+        #evolutionScreen .evolutionOption[data-tier="core"] {
+            border-color: #40A0D0; 
+            box-shadow: 0 0 20px 7px rgba(60,180,255,0.6), 0 0 7px rgba(100,200,255,0.4) inset;
+            animation: corePulse 1.8s infinite ease-in-out;
+            background-color: rgba(30, 70, 130, 0.50) !important; /* CORE items always have this blue bg */
+        }
+        #evolutionScreen .evolutionOption[data-tier="core"]:hover {
+            border-color: #60C0F0;
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 0 30px 9px rgba(80,200,255,0.8), 0 0 12px rgba(120,220,255,0.6) inset;
+            background-color: rgba(40, 90, 160, 0.65) !important; 
+        }
+
+        /* COMMON */
+        #evolutionScreen .evolutionOption[data-tier="common"] {
             border-color: #78788f; 
+            box-shadow: 0 0 10px 2px rgba(120,150,150,0.3), 0 0 3px rgba(150,180,180,0.2) inset;
+            animation: commonPulse 2.5s infinite ease-in-out;
         }
-        .evolutionOption[data-tier="common"][data-class="attack"] {
-            box-shadow: 0 0 10px 2px rgba(255,100,100,0.3), 0 0 4px rgba(255,120,120,0.2) inset; 
-            border-color: #B33A3A; 
-        }
-        .evolutionOption[data-tier="common"][data-class="tank"] {
-            box-shadow: 0 0 10px 2px rgba(100,255,100,0.3), 0 0 4px rgba(120,255,120,0.2) inset;
-            border-color: #3AB33A; 
-        }
-        .evolutionOption[data-tier="common"][data-class="utility"] {
-            box-shadow: 0 0 10px 2px rgba(190,100,255,0.3), 0 0 4px rgba(210,120,255,0.2) inset;
-            border-color: #8A3AB3; 
-        }
-        .evolutionOption[data-tier="common"]:hover {
-            background-color: #323260;
+        #evolutionScreen .evolutionOption[data-tier="common"]:hover {
+            border-color: #90a8a7;
             transform: translateY(-2px) scale(1.01);
-            border-color: #9090aa;
+            box-shadow: 0 0 12px 3px rgba(120,150,150,0.35), 0 0 4px rgba(150,180,180,0.25) inset;
         }
-        .evolutionOption[data-tier="common"][data-class="attack"]:hover { border-color: #cc5c5c; background-color: #432525; }
-        .evolutionOption[data-tier="common"][data-class="tank"]:hover   { border-color: #5ccc5c; background-color: #254325; }
-        .evolutionOption[data-tier="common"][data-class="utility"]:hover{ border-color: #a55ccc; background-color: #322543; }
-
         
         /* RARE */
-        .evolutionOption[data-tier="rare"][data-class="attack"],
-        .evolutionOption[data-class="attack"]:not([data-tier="common"]):not([data-tier="epic"]):not([data-tier="legendary"]) { 
-            box-shadow: 0 0 20px 7px rgba(255,60,60,0.6), 0 0 10px rgba(255,100,100,0.4) inset; 
-            border-color: #FF5555; 
-        }
-        .evolutionOption[data-tier="rare"][data-class="attack"]:hover,
-        .evolutionOption[data-class="attack"]:not([data-tier="common"]):not([data-tier="epic"]):not([data-tier="legendary"]):hover {
-            background-color: #582828; transform: translateY(-3px) scale(1.02); 
-            box-shadow: 0 0 30px 9px rgba(255,50,50,0.8), 0 0 15px rgba(255,120,120,0.6) inset;
-        }
-
-        .evolutionOption[data-tier="rare"][data-class="tank"],
-        .evolutionOption[data-class="tank"]:not([data-tier="common"]):not([data-tier="epic"]):not([data-tier="legendary"]) {
+        #evolutionScreen .evolutionOption[data-tier="rare"] { 
+            border-color: #30aa30; 
             box-shadow: 0 0 20px 7px rgba(60,255,60,0.6), 0 0  7px rgba(80,255,80,0.4) inset; 
-            border-color: #55FF55; 
+            animation: rarePulse 2s infinite ease-in-out;
         }
-        .evolutionOption[data-tier="rare"][data-class="tank"]:hover,
-        .evolutionOption[data-class="tank"]:not([data-tier="common"]):not([data-tier="epic"]):not([data-tier="legendary"]):hover {
-            background-color: #285828; transform: translateY(-3px) scale(1.02); 
+        #evolutionScreen .evolutionOption[data-tier="rare"]:hover {
+            border-color: #55FF55; 
+            transform: translateY(-3px) scale(1.02); 
             box-shadow: 0 0 30px 9px rgba(50,255,50,0.8), 0 0 12px rgba(100,255,100,0.6) inset;
         }
 
-        .evolutionOption[data-tier="rare"][data-class="utility"],
-        .evolutionOption[data-class="utility"]:not([data-tier="common"]):not([data-tier="epic"]):not([data-tier="legendary"]) {
-            box-shadow: 0 0 20px 7px rgba(180,60,255,0.6), 0 0 7px rgba(210,100,255,0.4) inset; 
-            border-color: #C077FF; 
-        }
-        .evolutionOption[data-tier="rare"][data-class="utility"]:hover,
-        .evolutionOption[data-class="utility"]:not([data-tier="common"]):not([data-tier="epic"]):not([data-tier="legendary"]):hover {
-            background-color: #382058; transform: translateY(-3px) scale(1.02); 
-            box-shadow: 0 0 30px 9px rgba(190,80,255,0.8), 0 0 12px rgba(220,120,255,0.6) inset;
-        }
-
         /* EPIC */
-        .evolutionOption[data-tier="epic"] {
-             border-width: 2px; 
-        }
-        .evolutionOption[data-tier="epic"][data-class="attack"] {
-            box-shadow: 0 0 35px 10px rgba(255,30,30,0.95), 0 0 18px rgba(255,80,80,0.8) inset;
-            border-color: #FF2222;
-            animation: epicPulseAttack 1.5s infinite ease-in-out;
-        }
-        .evolutionOption[data-tier="epic"][data-class="tank"] {
-            box-shadow: 0 0 35px 10px rgba(30,255,30,0.95), 0 0 12px rgba(60,255,60,0.8) inset;
-            border-color: #22FF22;
-            animation: epicPulseTank 1.5s infinite ease-in-out;
-        }
-        .evolutionOption[data-tier="epic"][data-class="utility"] {
+        #evolutionScreen .evolutionOption[data-tier="epic"] {
+            border-width: 2px; 
+            border-color: #a050d0; 
             box-shadow: 0 0 35px 10px rgba(200,60,255,0.95), 0 0 12px rgba(220,100,255,0.8) inset;
+            animation: epicPulse 1.5s infinite ease-in-out;
+        }
+        #evolutionScreen .evolutionOption[data-tier="epic"]:hover {
             border-color: #D055FF;
-            animation: epicPulseUtility 1.5s infinite ease-in-out;
+            transform: translateY(-5px) scale(1.05); 
+            box-shadow: 0 0 50px 14px rgba(200,60,255,1), 0 0 18px rgba(220,100,255,0.9) inset, 0 0 5px #fff;
         }
 
         /* LEGENDARY */
-        .evolutionOption[data-tier="legendary"] {
+        #evolutionScreen .evolutionOption[data-tier="legendary"] {
             border-width: 3px; 
-            transform: scale(1.01); 
+            border-color: #FFC000; 
+            box-shadow: 0 0 50px 15px rgba(255,180,0,1), 0 0 25px rgba(255,200,50,0.95) inset, 0 0 10px #FFD700; 
+            animation: legendaryPulse 1s infinite ease-in-out;
         }
-        .evolutionOption[data-tier="legendary"][data-class="attack"] {
-            box-shadow: 0 0 50px 15px rgba(255,100,0,1), 0 0 25px rgba(255,150,50,0.95) inset, 0 0 10px #FFD700; 
-            border-color: #FFD700; 
-            animation: legendaryPulseAttack 1s infinite ease-in-out;
-        }
-        .evolutionOption[data-tier="legendary"][data-class="tank"] {
-            box-shadow: 0 0 50px 15px rgba(0,200,0,1), 0 0 20px rgba(100,255,100,0.95) inset, 0 0 10px #DDFFDD; 
-            border-color: #7CFC00; 
-            animation: legendaryPulseTank 1s infinite ease-in-out;
-        }
-        .evolutionOption[data-tier="legendary"][data-class="utility"] {
-            box-shadow: 0 0 50px 15px rgba(180,0,255,1), 0 0 20px rgba(220,100,255,0.95) inset, 0 0 10px #F0CCFF; 
-            border-color: #DA70D6; 
-            animation: legendaryPulseUtility 1s infinite ease-in-out;
-        }
-
-        #evolutionScreen .evolutionOption[data-tier="epic"]:hover,
-        #evolutionScreen .evolutionOption[data-tier="legendary"]:hover {
+        #evolutionScreen .evolutionOption[data-tier="legendary"]:hover { 
+            border-color: #FFD700;
             transform: translateY(-5px) scale(1.05); 
-        }
-        .evolutionOption[data-tier="epic"][data-class="attack"]:hover { box-shadow: 0 0 50px 14px rgba(255,30,30,1), 0 0 22px rgba(255,100,100,0.9) inset, 0 0 5px #fff; }
-        .evolutionOption[data-tier="epic"][data-class="tank"]:hover   { box-shadow: 0 0 50px 14px rgba(30,255,30,1), 0 0 18px rgba(80,255,80,0.9) inset, 0 0 5px #fff; }
-        .evolutionOption[data-tier="epic"][data-class="utility"]:hover{ box-shadow: 0 0 50px 14px rgba(200,60,255,1), 0 0 18px rgba(220,100,255,0.9) inset, 0 0 5px #fff; }
-        
-        .evolutionOption[data-tier="legendary"][data-class="attack"]:hover { 
-            box-shadow: 0 0 70px 20px rgba(255,100,0,1), 0 0 30px rgba(255,165,0,1) inset, 0 0 15px #FFFACD; 
-        }
-         .evolutionOption[data-tier="legendary"][data-class="tank"]:hover { 
-            box-shadow: 0 0 70px 20px rgba(0,220,0,1), 0 0 25px rgba(120,255,120,1) inset, 0 0 15px #FFFFFF;
-        }
-         .evolutionOption[data-tier="legendary"][data-class="utility"]:hover { 
-            box-shadow: 0 0 70px 20px rgba(200,0,220,1), 0 0 25px rgba(240,100,240,1) inset, 0 0 15px #FFFFFF;
+            box-shadow: 0 0 70px 20px rgba(255,180,0,1), 0 0 30px rgba(255,215,0,1) inset, 0 0 15px #FFFACD; 
         }
         /* --- End Tiered Styling --- */
 
-
-        #evolutionScreen .evolutionOption.disabled,
-        #freeUpgradeScreen .freeUpgradeOption.disabled {
-            background-color: #404040; border-color: #606060;
+        #evolutionScreen .evolutionOption.disabled { /* More specific for disabled */
+            background-color: #303030 !important; /* Ensure this overrides class and base */
+            border-color: #505050 !important; 
             cursor: not-allowed; opacity: 0.6;
-            box-shadow: none; 
-            animation: none; 
+            box-shadow: 0 2px #111 !important; 
+            animation: none !important; 
         }
-        #evolutionScreen .evolutionOption.disabled:hover,
-        #freeUpgradeScreen .freeUpgradeOption.disabled:hover {
+        #evolutionScreen .evolutionOption.disabled:hover {
             transform: none;
-            background-color: #404040;
         }
-        #evolutionScreen .evolutionOption h3, #freeUpgradeScreen .freeUpgradeOption h3 { margin-top: 0; color: #ddeeff; font-size: 18px; }
-        #evolutionScreen .evolutionOption p, #freeUpgradeScreen .freeUpgradeOption p { font-size: 14px; color: #aabbcc; margin-bottom: 0;}
 
-        @keyframes epicPulseAttack {
-            0%, 100% { box-shadow: 0 0 35px 10px rgba(255,30,30,0.95), 0 0 18px rgba(255,80,80,0.8) inset; }
-            50% { box-shadow: 0 0 40px 12px rgba(255,50,50,1), 0 0 20px rgba(255,100,100,0.9) inset; }
+
+        /* --- KEYFRAMES FOR TIER PULSES --- */
+        @keyframes corePulse {
+            0%, 100% { box-shadow: 0 0 20px 7px rgba(60,180,255,0.55), 0 0 7px rgba(100,200,255,0.35) inset; }
+            50% { box-shadow: 0 0 25px 9px rgba(80,200,255,0.7), 0 0 10px rgba(120,220,255,0.5) inset; }
         }
-        @keyframes epicPulseTank {
-            0%, 100% { box-shadow: 0 0 35px 10px rgba(30,255,30,0.95), 0 0 12px rgba(60,255,60,0.8) inset; }
-            50% { box-shadow: 0 0 40px 12px rgba(50,255,50,1), 0 0 15px rgba(80,255,80,0.9) inset; }
+        @keyframes commonPulse {
+            0%, 100% { box-shadow: 0 0 10px 2px rgba(120,150,150,0.3), 0 0 3px rgba(150,180,180,0.2) inset; }
+            50% { box-shadow: 0 0 12px 3px rgba(120,150,150,0.35), 0 0 4px rgba(150,180,180,0.25) inset; }
         }
-        @keyframes epicPulseUtility {
+        @keyframes rarePulse {
+            0%, 100% { box-shadow: 0 0 20px 7px rgba(60,255,60,0.6), 0 0  7px rgba(80,255,80,0.4) inset;  }
+            50% { box-shadow: 0 0 25px 8px rgba(60,255,60,0.7), 0 0 9px rgba(80,255,80,0.5) inset; }
+        }
+        @keyframes epicPulse { 
             0%, 100% { box-shadow: 0 0 35px 10px rgba(200,60,255,0.95), 0 0 12px rgba(220,100,255,0.8) inset; }
             50% { box-shadow: 0 0 40px 12px rgba(210,80,255,1), 0 0 15px rgba(230,120,255,0.9) inset; }
         }
-
-        @keyframes legendaryPulseAttack {
-            0%, 100% { box-shadow: 0 0 50px 15px rgba(255,100,0,1), 0 0 25px rgba(255,150,50,0.95) inset, 0 0 10px #FFD700; }
-            50% { box-shadow: 0 0 65px 18px rgba(255,120,0,1), 0 0 30px rgba(255,175,70,1) inset, 0 0 20px #FFFACD; }
+        @keyframes legendaryPulse { 
+            0%, 100% { box-shadow: 0 0 50px 15px rgba(255,180,0,1), 0 0 25px rgba(255,200,50,0.95) inset, 0 0 10px #FFD700; }
+            50% { box-shadow: 0 0 65px 18px rgba(255,200,0,1), 0 0 30px rgba(255,225,70,1) inset, 0 0 20px #FFFACD; }
         }
-        @keyframes legendaryPulseTank {
-            0%, 100% { box-shadow: 0 0 50px 15px rgba(0,200,0,1), 0 0 20px rgba(100,255,100,0.95) inset, 0 0 10px #DDFFDD; }
-            50% { box-shadow: 0 0 65px 18px rgba(50,220,50,1), 0 0 25px rgba(120,255,120,1) inset, 0 0 20px white; }
-        }
-        @keyframes legendaryPulseUtility {
-            0%, 100% { box-shadow: 0 0 50px 15px rgba(180,0,255,1), 0 0 20px rgba(220,100,255,0.95) inset, 0 0 10px #F0CCFF; }
-            50% { box-shadow: 0 0 65px 18px rgba(200,50,255,1), 0 0 25px rgba(240,120,255,1) inset, 0 0 20px white; }
-        }
-
 
         #countdownOverlay {
             position: absolute;

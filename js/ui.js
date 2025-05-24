@@ -112,7 +112,6 @@ export function updateAbilityCooldownUI(playerInstance) {
         let isUnlocked = false;
         let isReady = false;
         let isChargingOrActive = false;
-        // let currentTimer = 0; // Not used directly for overlay height, displayCooldownTimerValue is used
         let maxTimer = 0; 
         let displayCooldownTimerValue = 0; 
 
@@ -192,11 +191,11 @@ export function updateAbilityCooldownUI(playerInstance) {
             cooldownOverlayDiv.style.backgroundColor = 'rgba(50,50,50,0.8)';
         } else if (isChargingOrActive) {
             slotDiv.classList.add('charging');
-            if (maxTimer > 0 && displayCooldownTimerValue >= 0) { // ensure displayCooldownTimerValue is not negative
+            if (maxTimer > 0 && displayCooldownTimerValue >= 0) { 
                 cooldownOverlayDiv.style.height = `${Math.max(0, (1 - (displayCooldownTimerValue / maxTimer)) * 100)}%`;
                 cooldownTimerSpan.textContent = (displayCooldownTimerValue / 1000).toFixed(1) + 's';
-            } else if (maxTimer > 0 && displayCooldownTimerValue < 0) { // Handles case where timer might have overshot due to large dt
-                 cooldownOverlayDiv.style.height = '100%'; // Or 0% depending on desired full charge visual
+            } else if (maxTimer > 0 && displayCooldownTimerValue < 0) { 
+                 cooldownOverlayDiv.style.height = '100%'; 
                  cooldownTimerSpan.textContent = '0.0s';
             }
         } else if (!isReady && displayCooldownTimerValue > 0) {
@@ -296,6 +295,19 @@ export function showScreen(screenElementToShow, cameFromPauseMenu = false, callb
             gameIsNowPaused = true;
         }
     }
+
+    // Call height equalization logic if the evolution screen is being shown
+    if (screenElementToShow === evolutionScreen) {
+        equalizeEvolutionCardHeights();
+    }
+    if (screenElementToShow === freeUpgradeScreen) {
+        equalizeFreeUpgradeCardHeights();
+    }
+    if (screenElementToShow === lootChoiceScreen) {
+        equalizeLootCardHeights();
+    }
+
+
     if (gameIsNowPaused && callbacks.onPauseGame) {
         callbacks.onPauseGame(screenElementToShow);
     } else if (!gameIsNowPaused && callbacks.onResumeGame) {
@@ -310,36 +322,132 @@ export function getPreviousScreenForSettings() { return previousScreenForSetting
 export function setPreviousScreenForSettings(screenRef) { previousScreenForSettings = screenRef; }
 
 // --- UI Population Functions ---
+function getTierStyling(tier) {
+    switch(tier) {
+        case 'core': return { color: '#00E0FF', text: 'CORE' }; 
+        case 'common': return { color: '#9DB8B7', text: 'COMMON' }; 
+        case 'rare': return { color: '#55FF55', text: 'RARE' }; // Changed to Green
+        case 'epic': return { color: '#C077FF', text: 'EPIC' };   
+        case 'legendary': return { color: '#FFB000', text: 'LEGENDARY' }; 
+        default: return { color: '#FFFFFF', text: tier ? tier.toUpperCase() : ''};
+    }
+}
+
+function equalizeEvolutionCardHeights() {
+    if (!evolutionOptionsContainer) return;
+    const optionElements = evolutionOptionsContainer.querySelectorAll('.evolutionOption');
+    if (optionElements.length > 0) {
+        requestAnimationFrame(() => { // Ensure calculations happen after layout
+            let maxHeight = 0;
+            optionElements.forEach(opt => {
+                opt.style.minHeight = '0'; 
+                opt.style.height = 'auto';
+                if (opt.offsetHeight > maxHeight) {
+                    maxHeight = opt.offsetHeight;
+                }
+            });
+
+            if (maxHeight > 0) {
+                optionElements.forEach(opt => {
+                    opt.style.minHeight = `${maxHeight}px`;
+                });
+            }
+        });
+    }
+}
+function equalizeFreeUpgradeCardHeights() {
+    if (!freeUpgradeOptionContainer) return;
+    const optionElements = freeUpgradeOptionContainer.querySelectorAll('.freeUpgradeOption');
+     if (optionElements.length > 0) {
+        requestAnimationFrame(() => {
+            let maxHeight = 0;
+            optionElements.forEach(opt => {
+                opt.style.minHeight = '0';
+                opt.style.height = 'auto';
+                if (opt.offsetHeight > maxHeight) {
+                    maxHeight = opt.offsetHeight;
+                }
+            });
+            if (maxHeight > 0) {
+                optionElements.forEach(opt => {
+                    opt.style.minHeight = `${maxHeight}px`;
+                });
+            }
+        });
+    }
+}
+function equalizeLootCardHeights() {
+     if (!lootOptionsContainer) return;
+    const optionElements = lootOptionsContainer.querySelectorAll('.lootOption');
+    if (optionElements.length > 0) {
+        requestAnimationFrame(() => {
+            let maxHeight = 0;
+            optionElements.forEach(opt => {
+                opt.style.minHeight = '0';
+                opt.style.height = 'auto';
+                if (opt.offsetHeight > maxHeight) {
+                    maxHeight = opt.offsetHeight;
+                }
+            });
+            if (maxHeight > 0) {
+                optionElements.forEach(opt => {
+                    opt.style.minHeight = `${maxHeight}px`;
+                });
+            }
+        });
+    }
+}
+
+
 export function populateEvolutionOptionsUI(choices, playerInstance, evolutionSelectCallback, currentShrinkMeCooldown, getReadableColorNameFunc) {
     if (!evolutionOptionsContainer || !playerInstance) return;
     evolutionOptionsContainer.innerHTML = '';
 
     choices.forEach(uiChoiceData => { 
+        const choiceWrapper = document.createElement('div');
+        choiceWrapper.classList.add('evolution-choice-wrapper');
+
         const optionDiv = document.createElement('div');
         optionDiv.classList.add('evolutionOption');
         optionDiv.dataset.class = uiChoiceData.classType;
 
-        if (uiChoiceData.originalEvolution.isTiered && uiChoiceData.rolledTier) {
+        const tierLabel = document.createElement('span');
+        tierLabel.classList.add('evolution-tier-label'); 
+
+        if (!uiChoiceData.originalEvolution.isTiered) {
+            optionDiv.dataset.tier = "core";
+            const tierStyle = getTierStyling("core"); 
+            tierLabel.textContent = tierStyle.text;
+            tierLabel.style.color = tierStyle.color;
+            tierLabel.classList.add('has-tier');
+        } else if (uiChoiceData.originalEvolution.isTiered && uiChoiceData.rolledTier && uiChoiceData.rolledTier !== "none") {
+            const tierStyle = getTierStyling(uiChoiceData.rolledTier);
+            tierLabel.textContent = tierStyle.text;
+            tierLabel.style.color = tierStyle.color;
+            tierLabel.classList.add('has-tier');
             optionDiv.dataset.tier = uiChoiceData.rolledTier; 
-        } else {
-            optionDiv.dataset.tier = "none"; // For non-tiered or if tier somehow missing (applies default .evolutionOption styles)
         }
         
-        let displayText = uiChoiceData.text; // Should include tier from main.js, e.g., "Focused Beam (Rare)"
+        choiceWrapper.appendChild(tierLabel); 
         
-        if (uiChoiceData.cardEffectString) { // This is the string describing THIS PICK's effect
-             displayText += `<br><span class="evolution-details">${uiChoiceData.cardEffectString}</span>`;
+        let displayText = `<h3>${uiChoiceData.text}</h3>`; 
+        if (uiChoiceData.cardEffectString) {
+             displayText += `<span class="evolution-details">${uiChoiceData.cardEffectString}</span>`;
         }
-        
-        optionDiv.innerHTML = `<h3>${displayText}</h3>`;
+        optionDiv.innerHTML = displayText;
 
         if (uiChoiceData.detailedDescription && evolutionTooltip) {
             optionDiv.onmouseover = (event) => { 
                 let tooltipText = "";
-                if (uiChoiceData.originalEvolution.isTiered && uiChoiceData.rolledTier) {
-                    tooltipText = `<span style="text-transform: capitalize; font-weight: bold; color: ${getTierColor(uiChoiceData.rolledTier)};">${uiChoiceData.rolledTier} Tier</span><br>`;
+                let effectiveTierForTooltip = "core"; 
+                if (uiChoiceData.originalEvolution.isTiered && uiChoiceData.rolledTier && uiChoiceData.rolledTier !== "none") {
+                    effectiveTierForTooltip = uiChoiceData.rolledTier;
                 }
+                
+                const tierStyle = getTierStyling(effectiveTierForTooltip);
+                tooltipText = `<span style="text-transform: capitalize; font-weight: bold; color: ${tierStyle.color};">${tierStyle.text} TIER</span><br>`;
                 tooltipText += uiChoiceData.detailedDescription;
+
                 evolutionTooltip.innerHTML = tooltipText; 
                 evolutionTooltip.style.left = `${event.pageX + 15}px`; 
                 evolutionTooltip.style.top = `${event.pageY + 15}px`; 
@@ -353,32 +461,32 @@ export function populateEvolutionOptionsUI(choices, playerInstance, evolutionSel
         }
 
         const baseEvoForMaxCheck = uiChoiceData.originalEvolution;
-        // Pass the player instance to isMaxed if it needs it
         const isMaxed = baseEvoForMaxCheck.isMaxed ? baseEvoForMaxCheck.isMaxed(playerInstance) : false;
 
         if (baseEvoForMaxCheck.id === 'noMoreEvolutions' || isMaxed ) {
             optionDiv.classList.add('disabled');
+            if (optionDiv.dataset.tier !== "core" || !isMaxed) { 
+                 optionDiv.dataset.tier = 'disabled';
+            } else if (optionDiv.dataset.tier === "core" && isMaxed) {
+            }
+
+
             if (baseEvoForMaxCheck.id === 'smallerPlayer' && currentShrinkMeCooldown > 0) {
-                optionDiv.innerHTML += `<p>(Available in ${currentShrinkMeCooldown} more evolution${currentShrinkMeCooldown !== 1 ? 's' : ''})</p>`;
+                const h3 = optionDiv.querySelector('h3');
+                if (h3) {
+                    h3.innerHTML += `<p style="font-size:10px; color:#aaa;">(Available in ${currentShrinkMeCooldown} more evolution${currentShrinkMeCooldown !== 1 ? 's' : ''})</p>`;
+                }
             }
         } else {
             optionDiv.onclick = () => evolutionSelectCallback(uiChoiceData); 
         }
-        evolutionOptionsContainer.appendChild(optionDiv);
+        
+        choiceWrapper.appendChild(optionDiv); 
+        evolutionOptionsContainer.appendChild(choiceWrapper); 
     });
-}
 
-// Helper for tooltip tier color
-function getTierColor(tier) {
-    switch(tier) {
-        case 'common': return '#9db8b7'; // Dull cyan/grey
-        case 'rare': return '#598cd0';   // Blue
-        case 'epic': return '#c077ff';   // Purple
-        case 'legendary': return '#ffb000';// Orange/Gold
-        default: return '#ffffff';
-    }
+    // Height equalization is now called from showScreen after this screen is made visible
 }
-
 
 export function populateFreeUpgradeOptionUI(chosenUpgrade, onContinueCallback) {
     if (!freeUpgradeOptionContainer || !closeFreeUpgradeButton) return;
@@ -388,6 +496,8 @@ export function populateFreeUpgradeOptionUI(chosenUpgrade, onContinueCallback) {
     optionDiv.innerHTML = `<h3>${chosenUpgrade.text}</h3><p>${chosenUpgrade.id === 'noMoreFreeUpgrades' ? 'Continue playing!' : 'Claim this free bonus!'}</p>`;
     freeUpgradeOptionContainer.appendChild(optionDiv);
     closeFreeUpgradeButton.onclick = () => onContinueCallback(chosenUpgrade);
+
+    // Height equalization is now called from showScreen
 }
 
 export function populateLootOptionsUI(choices, playerInstance, onSelectLootCallback, allPossibleColors, getReadableColorNameFunc) {
@@ -398,7 +508,10 @@ export function populateLootOptionsUI(choices, playerInstance, onSelectLootCallb
         optionDiv.classList.add('lootOption');
         let colorsToOffer = [];
 
-        if (choice.id === 'adaptiveShield') {
+        if (choice.type === 'path_buff') { // Handle Path Buffs for first boss
+             optionDiv.innerHTML = `<h3>${choice.name}</h3> <p>${choice.description}</p><span class="optionType" style="color: #FFD700; font-weight:bold;">Path Defining</span>`;
+             optionDiv.onclick = () => onSelectLootCallback(choice); 
+        } else if (choice.id === 'adaptiveShield') {
            let availableColors = allPossibleColors.filter(c => !playerInstance.immuneColorsList.includes(c));
            let offeredColorsText = [];
            if (availableColors.length > 0) {
@@ -420,6 +533,7 @@ export function populateLootOptionsUI(choices, playerInstance, onSelectLootCallb
         }
         lootOptionsContainer.appendChild(optionDiv);
     });
+    // Height equalization is now called from showScreen
 }
 
 
