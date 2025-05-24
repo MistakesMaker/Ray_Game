@@ -5,7 +5,7 @@ export const PLAYER_BASE_RADIUS = 12;
 export const MIN_PLAYER_BASE_RADIUS = 5;
 export const PLAYER_BASE_COLOR = '#FFFFFF';
 export const PLAYER_MAX_HP = 100;
-export const RAY_DAMAGE_TO_PLAYER = 10;
+export const RAY_DAMAGE_TO_PLAYER = 10; // Base damage from a generic enemy ray
 export const HP_REGEN_PER_PICKUP = 25;
 export const HP_REGEN_NO_DAMAGE_THRESHOLD = 10000;
 export const HP_REGEN_INTERVAL = 5000;
@@ -101,7 +101,7 @@ export const SCREEN_SHAKE_DURATION_BONUS = 8000;
 export const SCREEN_SHAKE_MAGNITUDE_BONUS = 6;
 export const SHAKE_DECAY_FACTOR_BASE = 0.93;
 
-// Boss Constants
+// Boss Constants (General)
 export const BOSS_PROJECTILE_COLOR_DEFAULT = '#AA0000';
 export const REFLECTED_RAY_COLOR = '#A0A0FF';
 export const SCATTERED_ABSORBED_RAY_COLOR = '#FF8C00';
@@ -114,7 +114,64 @@ export const BOSS_WARNING_DURATION = 2500;
 export const BOSS_SPAWN_START_SCORE = 300;
 export const BOSS_SPAWN_SCORE_INTERVAL = 300;
 export const MAX_TOTAL_ACTIVE_RAYS_BEFORE_BOSS_THROTTLE = 75;
-export const MAX_BOSSES_IN_WAVE_CAP = 1000;
+export const MAX_BOSSES_IN_WAVE_CAP = 1000; // Max bosses that can spawn *within a single wave event*
+
+// ---- Nexus Weaver Boss Constants ----
+export const NEXUS_WEAVER_BASE_HP = 100;
+export const NEXUS_WEAVER_HP_PER_TIER_FACTOR = 0.45;
+export const NEXUS_WEAVER_RADIUS_BASE = 35;
+export const NEXUS_WEAVER_RADIUS_PER_TIER = 2;
+export const NEXUS_WEAVER_COLOR = '#4B0082'; // Indigo
+export const NEXUS_WEAVER_BASE_SPEED = 0.3;
+export const NEXUS_WEAVER_SPEED_PER_TIER = 0.02;
+export const NEXUS_WEAVER_MAX_MINIONS_BASE = 5;
+export const NEXUS_WEAVER_MAX_MINIONS_PER_TIER = 2;
+export const NEXUS_WEAVER_SPAWN_COOLDOWN_BASE = 5500; // ms
+export const NEXUS_WEAVER_SPAWN_COOLDOWN_REDUCTION_PER_TIER = 200; // ms
+export const NEXUS_WEAVER_SPAWN_TELL_DURATION = 1000; // ms
+// Pulse Nova (Nexus Weaver Attack)
+export const PULSE_NOVA_DAMAGE = 10;
+export const PULSE_NOVA_RADIUS_FACTOR = 4; // Multiplier of boss's current radius
+export const PULSE_NOVA_DURATION = 600; // ms for expansion
+export const PULSE_NOVA_COOLDOWN = 8000; // ms
+export const PULSE_NOVA_CLOSE_RANGE_THRESHOLD_FACTOR = 2.5; // Player closer than boss.radius * this
+export const PULSE_NOVA_CLOSE_RANGE_DURATION_TRIGGER = 2000; // Player must be close for this long
+
+// ---- Minion Constants (for Nexus Weaver) ----
+// Drone Minion
+export const DRONE_HP = 30;
+export const DRONE_DAMAGE = 25; // Damage dealt to player on contact
+export const DRONE_BASE_SPEED = 3;
+export const DRONE_SPEED_PER_TIER = 0.1;
+export const DRONE_RADIUS = 10;
+export const DRONE_COLOR = '#C71585'; // MediumVioletRed
+// Lancer Minion
+export const LANCER_HP = 30;
+export const LANCER_DAMAGE = 20; // Damage dealt to player on contact
+export const LANCER_BASE_SPEED = 2; // Roaming speed
+export const LANCER_SPEED_PER_TIER = 0.25;
+export const LANCER_DASH_SPEED_BASE = 6;
+export const LANCER_DASH_SPEED_PER_TIER = 0.25;
+export const LANCER_RADIUS = 11;
+export const LANCER_COLOR = '#8A2BE2'; // BlueViolet
+export const LANCER_AIM_TIME = 800; // ms
+export const LANCER_DASH_DURATION = 600; // ms
+export const LANCER_POST_DASH_COOLDOWN = 1000; // ms
+// Orbiter Minion
+export const ORBITER_HP = 15;
+export const ORBITER_RADIUS = 12;
+export const ORBITER_COLOR = '#DA70D6'; // Orchid
+export const ORBITER_ORBIT_DISTANCE_BASE = 120;
+export const ORBITER_ORBIT_DISTANCE_PER_TIER = 15;
+export const ORBITER_ORBIT_SPEED = 0.0015; // Radians per ms
+export const ORBITER_SHOOT_COOLDOWN_BASE = 3500; // ms
+export const ORBITER_SHOOT_COOLDOWN_REDUCTION_PER_TIER = 150; // ms
+export const ORBITER_PROJECTILE_RADIUS = 5;
+export const ORBITER_PROJECTILE_SPEED = 2.8; // Absolute speed, will be converted to multiplier in main.js
+export const ORBITER_PROJECTILE_DAMAGE = 10;
+export const ORBITER_PROJECTILE_COLOR = '#FF00FF'; // Magenta
+export const ORBITER_PROJECTILE_LIFETIME = 2500; // ms
+
 
 // Evolution Upgrade Constants
 export const BASE_PICKUP_ATTRACTION_RADIUS = 0;
@@ -132,7 +189,7 @@ export const HP_PICKUP_BONUS_PER_LEVEL = 10;
 // ---- NEW EVOLUTION INTERACTION CONSTANTS ----
 export const MAX_EVOLUTION_REROLLS = 5;
 export const MAX_EVOLUTION_BLOCKS = 3;
-export const MAX_EVOLUTION_FREEZES_PER_RUN = 3; // <-- New Constant
+export const MAX_EVOLUTION_FREEZES_PER_RUN = 3;
 
 
 // ---- Tiered Evolution Values ----

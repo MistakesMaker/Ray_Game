@@ -14,6 +14,7 @@ import {
     chaserSpawnSound as audioChaserSpawnSound,
     reflectorSpawnSound as audioReflectorSpawnSound,
     singularitySpawnSound as audioSingularitySpawnSound,
+    nexusWeaverSpawnSound as audioNexusWeaverSpawnSound,
 } from './audio.js';
 import {
     canvas as gameCanvasElement,
@@ -44,6 +45,7 @@ import { Target, Heart, BonusPoint, LootDrop } from './entities.js';
 import { BossManager } from './bossManager.js';
 import { GravityWellBoss } from './gravityWellBoss.js';
 import { MirrorShieldBoss } from './mirrorShieldBoss.js';
+import { NexusWeaverBoss } from './nexusWeaverBoss.js';
 
 
 // --- Canvas and Context ---
@@ -615,7 +617,13 @@ function initGame() {
     }
 
     if (pausePlayerStatsPanel) pausePlayerStatsPanel.style.display = 'none';
-    const bossManagerAudioContext = { playSound, audioChaserSpawnSound, audioReflectorSpawnSound, audioSingularitySpawnSound };
+    const bossManagerAudioContext = {
+        playSound,
+        audioChaserSpawnSound,
+        audioReflectorSpawnSound,
+        audioSingularitySpawnSound,
+        audioNexusWeaverSpawnSound
+    };
     bossManager = new BossManager(CONSTANTS.BOSS_SPAWN_START_SCORE, CONSTANTS.BOSS_SPAWN_SCORE_INTERVAL, bossManagerAudioContext);
 
     pauseAllGameIntervals();
@@ -776,6 +784,90 @@ function updateGame(deltaTime) {
                             }
                         }
                     },
+                    onPlayerMinionCollision: (collidingMinion) => {
+                         console.log("Player collided with minion:", collidingMinion, "Minion Damage:", collidingMinion.damage); // <<< DEBUG LINE 1
+                        if (player && typeof player.takeDamage === 'function' && collidingMinion) {
+                            const damageContext = {
+                                postPopupImmunityTimer: postPopupImmunityTimer,
+                                postDamageImmunityTimer: postDamageImmunityTimer,
+                                score: score,
+                                updateScoreCallback: (amt) => { score += amt; updateScoreDisplay(score); checkForNewColorUnlock(); },
+                                checkForNewColorCallback: checkForNewColorUnlock,
+                                endGameCallback: endGameInternal,
+                                updateHealthDisplayCallback: (hp, maxHp) => uiUpdateHealthDisplay(hp, maxHp),
+                                activeBuffNotificationsArray: activeBuffNotifications
+                            };
+                            const screenShakeContext = {
+                                screenShakeParams: {isScreenShaking, screenShakeTimer, currentShakeMagnitude, currentShakeType, hitShakeDx, hitShakeDy}
+                            };
+                            const pseudoRay = { damageValue: collidingMinion.damage || 5, isBossProjectile: true, dx: (player.x-collidingMinion.x), dy: (player.y-collidingMinion.y) };
+                            console.log("PseudoRay for minion collision:", pseudoRay); // <<< DEBUG LINE 2
+                            const damageTaken = player.takeDamage(pseudoRay, damageContext, screenShakeContext);
+                            console.log("Damage taken from minion:", damageTaken); // <<< DEBUG LINE 3
+
+                            if (damageTaken > 0) {
+                                postDamageImmunityTimer = CONSTANTS.POST_DAMAGE_IMMUNITY_DURATION;
+                                const bounceAngle = Math.atan2(player.y - collidingMinion.y, player.x - collidingMinion.x);
+                                player.velX = Math.cos(bounceAngle) * CONSTANTS.PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.5;
+                                player.velY = Math.sin(bounceAngle) * CONSTANTS.PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.5;
+                            }
+                        }
+                    },
+                    onPlayerBossAttackCollision: (attackData) => {
+                         if (player && typeof player.takeDamage === 'function' && attackData) {
+                            const damageContext = {
+                                postPopupImmunityTimer: postPopupImmunityTimer, postDamageImmunityTimer: postDamageImmunityTimer, score: score,
+                                updateScoreCallback: (amt) => { score += amt; updateScoreDisplay(score); checkForNewColorUnlock(); },
+                                checkForNewColorCallback: checkForNewColorUnlock, endGameCallback: endGameInternal,
+                                updateHealthDisplayCallback: (hp, maxHp) => uiUpdateHealthDisplay(hp, maxHp),
+                                activeBuffNotificationsArray: activeBuffNotifications
+                            };
+                            const screenShakeContext = {
+                                screenShakeParams: {isScreenShaking, screenShakeTimer, currentShakeMagnitude, currentShakeType, hitShakeDx, hitShakeDy}
+                            };
+                            const pseudoRayForAttack = { damageValue: attackData.damage || 10, isBossProjectile: true, dx:(player.x-attackData.sourceBoss.x), dy:(player.y-attackData.sourceBoss.y) };
+                            const damageTaken = player.takeDamage(pseudoRayForAttack, damageContext, screenShakeContext);
+
+                            if (damageTaken > 0) {
+                                postDamageImmunityTimer = CONSTANTS.POST_DAMAGE_IMMUNITY_DURATION;
+                                if (attackData.type === 'pulse_nova') {
+                                    const bounceAngle = Math.atan2(player.y - attackData.sourceBoss.y, player.x - attackData.sourceBoss.x);
+                                    player.velX = Math.cos(bounceAngle) * CONSTANTS.PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.8;
+                                    player.velY = Math.sin(bounceAngle) * CONSTANTS.PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.8;
+                                }
+                            }
+                        }
+                    },
+                    nexusWeaverShootsOrbiterProjectile: (orbiter, targetPlayer) => {
+                        if (!orbiter || !targetPlayer || !player) return; // Added player check for safety
+
+                        const angle = Math.atan2(targetPlayer.y - orbiter.y, targetPlayer.x - orbiter.x);
+                        let proj = getPooledRay();
+                        if (proj) {
+                            // Ensure constants are available or use defaults
+                            const projColor = CONSTANTS.ORBITER_PROJECTILE_COLOR || '#FF00FF';
+                            const projRadius = CONSTANTS.ORBITER_PROJECTILE_RADIUS || 5;
+                            // Convert absolute speed to a multiplier based on BASE_RAY_SPEED
+                            const projSpeedMultiplier = (CONSTANTS.ORBITER_PROJECTILE_SPEED || 2.8) / CONSTANTS.BASE_RAY_SPEED;
+                            const projDamage = CONSTANTS.ORBITER_PROJECTILE_DAMAGE || 4;
+                            const projLifetime = CONSTANTS.ORBITER_PROJECTILE_LIFETIME || 2500;
+
+                            proj.reset(
+                                orbiter.x, orbiter.y, projColor,
+                                Math.cos(angle), Math.sin(angle),
+                                projSpeedMultiplier, // This is the speedMultiplier relative to BASE_RAY_SPEED
+                                null, // playerInstance (null for boss projectiles)
+                                projLifetime,
+                                true, // isBossProjectile
+                                false, // isJuggernaut
+                                projRadius, // customRadius
+                                false // isGravityRay
+                            );
+                            proj.damageValue = projDamage; // Store damage value
+                            rays.push(proj);
+                            // TODO: Play Orbiter shoot sound if you have one
+                        }
+                    },
                     requestFirstBossLoot: (bossX, bossY) => {
                         const uniqueBuffChoices = [
                             {
@@ -905,6 +997,9 @@ function updateGame(deltaTime) {
                                 if (boss instanceof MirrorShieldBoss) {
                                     damageAppliedToBoss = boss.takeDamage(currentRayDamage, r, player, bossTakeDmgCtx);
                                     consumedByShield = !r.isActive || damageAppliedToBoss;
+                                } else if (boss instanceof NexusWeaverBoss) {
+                                    damageAppliedToBoss = boss.takeDamage(currentRayDamage, r, player, bossTakeDmgCtx);
+                                    consumedByShield = true;
                                 } else {
                                     damageAppliedToBoss = boss.takeDamage(currentRayDamage, r, player, bossTakeDmgCtx);
                                     consumedByShield = true;
@@ -928,6 +1023,19 @@ function updateGame(deltaTime) {
                                 }
                                 if(consumedByShield && r.isActive) r.isActive = false;
                                 if(!r.isActive) break;
+                            }
+                            if (boss instanceof NexusWeaverBoss && boss.activeMinions && boss.activeMinions.length > 0) {
+                                for (let mIdx = boss.activeMinions.length - 1; mIdx >=0; mIdx--) {
+                                    const minion = boss.activeMinions[mIdx];
+                                    if (minion.isActive && checkCollision(r, minion)) {
+                                        minion.takeDamage(currentRayDamage, player, boss);
+                                        r.isActive = false;
+                                        if(!minion.isActive) {
+                                        }
+                                        break;
+                                    }
+                                }
+                                if (!r.isActive) break;
                             }
                         }
                     }
@@ -1016,6 +1124,17 @@ function updateGame(deltaTime) {
                     if (dist < effect.maxRadius + boss.radius) {
                         if (typeof boss.takeDamage === 'function') {
                             boss.takeDamage(effect.damage, null, player);
+                        }
+                    }
+                    if (boss instanceof NexusWeaverBoss && boss.activeMinions) {
+                        for (let mIdx = boss.activeMinions.length - 1; mIdx >=0; mIdx--) {
+                            const minion = boss.activeMinions[mIdx];
+                             if (minion.isActive) {
+                                const distMinion = Math.sqrt((effect.x - minion.x) ** 2 + (effect.y - minion.y) ** 2);
+                                if (distMinion < effect.maxRadius + minion.radius) {
+                                    minion.takeDamage(effect.damage, player, boss);
+                                }
+                            }
                         }
                     }
                 });
@@ -1427,7 +1546,7 @@ function generateEvolutionOffers() {
 
 
 function triggerEvolutionInternal() {
-    if(!player || isAnyPauseActiveInternal() || (bossManager && bossManager.isBossSequenceActive())) return;
+    if(!player || isAnyPauseActiveInternal() || (bossManager && bossManager.isBossSequenceActive()))return;
     if (shrinkMeCooldown > 0) shrinkMeCooldown--;
     pauseAllGameIntervals(); gamePausedForEvolution = true;
     currentActiveScreenElement = evolutionScreen;
@@ -1706,7 +1825,7 @@ function createFinalStatsSnapshot() {
                 evolutionFreezesRemaining: CONSTANTS.MAX_EVOLUTION_FREEZES_PER_RUN,
                 frozenEvolutionChoice: null
             },
-            bossTierData: { chaser: 0, reflector: 0, singularity: 0 },
+            bossTierData: { chaser: 0, reflector: 0, singularity: 0, nexusWeaver: 0 },
             gameplayTimeData: gameplayTimeElapsed
         };
     }
@@ -1754,7 +1873,7 @@ function createFinalStatsSnapshot() {
         displayedUpgrades: prepareDisplayedUpgradesForStats(player)
     };
 
-    const bossTierSnapshot = bossManager ? { ...bossManager.bossTiers } : { chaser: 0, reflector: 0, singularity: 0 };
+    const bossTierSnapshot = bossManager ? { ...bossManager.bossTiers } : { chaser: 0, reflector: 0, singularity: 0, nexusWeaver: 0 };
     return {
         playerData: playerDataSnapshot,
         bossTierData: bossTierSnapshot,
@@ -1982,15 +2101,29 @@ const getAbilityContextForPlayer = () => {
     };
 };
 
-function debugForceSpawnBoss(bossIndexToForce = 0) {
+function debugForceSpawnBoss(bossType = 'random') { // Modified to accept a type
     if (!gameRunning || isAnyPauseActiveInternal() || !bossManager || bossManager.activeBosses.length > 0 || bossManager.isBossWarningActiveProp()) {
+        console.warn("Cannot force spawn boss now.");
         return;
     }
+    // Ensure score is high enough for any boss
     if (score < (bossManager.bossSpawnStartScore || CONSTANTS.BOSS_SPAWN_START_SCORE) ) {
         score = (bossManager.bossSpawnStartScore || CONSTANTS.BOSS_SPAWN_START_SCORE);
         updateScoreDisplay(score);
     }
-    bossManager.trySpawnBoss(score);
+
+    if (bossType === 'nexusWeaver') {
+        // Force the conditions for Nexus Weaver spawn
+        bossManager.totalBossEncountersTriggered = bossManager.nexusWeaverSpawnInterval -1; // So next encounter is NW
+         console.log(`F1: Attempting to force spawn Nexus Weaver. Total encounters set to ${bossManager.totalBossEncountersTriggered}. Next boss should be NW.`);
+    } else {
+        // For random, ensure it's NOT a Nexus Weaver turn if it's specifically not requested
+        if (bossManager.totalBossEncountersTriggered % bossManager.nexusWeaverSpawnInterval === (bossManager.nexusWeaverSpawnInterval -1) ) {
+            bossManager.totalBossEncountersTriggered++; // Skip Nexus Weaver turn for random spawn
+             console.log(`F1: Skipped potential Nexus Weaver turn for random spawn. Total encounters now ${bossManager.totalBossEncountersTriggered}.`);
+        }
+    }
+    bossManager.trySpawnBoss(score); // This will now respect the forced/skipped Nexus Weaver turn
 }
 
 const gameContextForEventListeners = {
@@ -2037,7 +2170,7 @@ const gameContextForEventListeners = {
         showSettingsScreenFromPause: () => { setPreviousScreenForSettings(pauseScreen); currentActiveScreenElement = settingsScreen; showScreen(settingsScreen, true, gameScreenCallbacks); if (pausePlayerStatsPanel) pausePlayerStatsPanel.style.display = 'none'; },
         goToMainMenuFromPause: showStartScreenWithUpdatesInternal,
         onWindowResize: () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; inputState.mouseX = canvas.width / 2; inputState.mouseY = canvas.height / 2; mouseX = inputState.mouseX; mouseY = inputState.mouseY; if(player&&gameRunning){player.x=Math.max(player.radius,Math.min(player.x,canvas.width-player.radius));player.y=Math.max(player.radius,Math.min(player.y,canvas.height-player.radius));} if(gameRunning && !gameOver && !isAnyPauseActiveInternal()) drawGame(); if ((gamePausedByEsc || gameOver || (detailedHighScoresScreen && detailedHighScoresScreen.style.display === 'flex')) && pausePlayerStatsPanel && pausePlayerStatsPanel.style.display === 'block') { if (pausePlayerStatsPanel.parentElement === document.body && uiHighScoreContainer && uiHighScoreContainer.offsetParent !== null && detailedHighScoresScreen.style.display !== 'flex') { const r = uiHighScoreContainer.getBoundingClientRect(); pausePlayerStatsPanel.style.top = (r.bottom + 10) + 'px'; }  else if (pausePlayerStatsPanel.parentElement === document.body && detailedHighScoresScreen.style.display !== 'flex') { pausePlayerStatsPanel.style.top = '20px';}}},
-        debugSpawnBoss: debugForceSpawnBoss,
+        debugSpawnBoss: () => debugForceSpawnBoss('nexusWeaver'), // <<< MODIFIED: F1 now specifically calls for Nexus Weaver
         handleEvolutionReRoll: handleEvolutionReRoll,
         toggleBlockMode: toggleBlockMode,
         toggleFreezeMode: toggleFreezeMode,

@@ -6,7 +6,8 @@ let bgMusic, playerHitSound, targetHitSound, gameOverSoundFX, heartSound, shootS
     gravityWellChargeSound, gravityWellExplodeSound, chainReactionSound, playerWellDeploySound,
     playerWellDetonateSound, lootPickupSound, abilityUseSound, abilityReadySound,
     chaserSpawnSound, reflectorSpawnSound, singularitySpawnSound, bossHitSound,
-    teleportSound, empBurstSound, omegaLaserSound, shieldOverchargeSound;
+    teleportSound, empBurstSound, omegaLaserSound, shieldOverchargeSound,
+    nexusWeaverSpawnSound; // <<< ADDED
 
 // --- Audio State ---
 let audioInitialized = false;
@@ -74,6 +75,7 @@ export function initializeAudio(audioDomElements) {
         empBurstSound = new Audio('assets/audio/emp_burst_activate.mp3');
         omegaLaserSound = new Audio('assets/audio/omega_laser.mp3');
         shieldOverchargeSound = new Audio('assets/audio/shield_overcharge.mp3');
+        nexusWeaverSpawnSound = new Audio('assets/audio/nexus_weaver_spawn.mp3'); // <<< ADDED (Assuming you'll add this mp3)
         bgMusic = bgMusicAudioElement;
 
         // --- Set audioInitialized to true AFTER audio objects are created but BEFORE volumes are applied ---
@@ -218,6 +220,7 @@ export function updateSpecificSfxVolume(soundTypeKey, volume) {
             if(abilityUseSound) soundObjectsToUpdate.push({sound: abilityUseSound});
             if(abilityReadySound) soundObjectsToUpdate.push({sound: abilityReadySound});
             if(shieldOverchargeSound) soundObjectsToUpdate.push({sound: shieldOverchargeSound});
+            if(nexusWeaverSpawnSound) soundObjectsToUpdate.push({sound: nexusWeaverSpawnSound}); // <<< ADDED
             storageKey = 'lightBlasterUiVol'; displayElement = uiVolumeValueElem;
             break;
         default:
@@ -275,5 +278,6 @@ export {
     playerWellDetonateSound, lootPickupSound, abilityUseSound, abilityReadySound,
     chaserSpawnSound, reflectorSpawnSound, singularitySpawnSound, bossHitSound,
     teleportSound, empBurstSound, omegaLaserSound, shieldOverchargeSound,
+    nexusWeaverSpawnSound, // <<< ADDED
     bgMusic
 };
