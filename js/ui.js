@@ -213,9 +213,7 @@ export function updateAbilityCooldownUI(playerInstance) {
     });
 }
 
-// console.log("[Debug UI_JS_FUNC_DEF] Defining updateKineticChargeUI function now.");
 export function updateKineticChargeUI(currentCharge, maxCharge, currentMaxPotencyBonus, playerHasKineticConversionEvolution) {
-    // console.log(`[Debug KINETIC_UI_ENTERED] updateKineticChargeUI ENTERED. Visible: ${playerHasKineticConversionEvolution}, Charge: ${currentCharge}/${maxCharge}`);
     if (!kineticChargeUIElement || !kineticChargeBarFillElement || !kineticChargeTextElement) {
         return;
     }
@@ -229,10 +227,8 @@ export function updateKineticChargeUI(currentCharge, maxCharge, currentMaxPotenc
     kineticChargeBarFillElement.style.width = `${chargePercentage}%`;
     let barColor = 'rgba(0, 60, 120, 0.8)';
     if (chargePercentage > 89.9) {
-        // console.log("[Debug SPARKLE] Charge percentage > 89.9. Current:", chargePercentage); 
         barColor = 'rgba(255, 100, 0, 1.0)';
         if (!kineticChargeBarFillElement.classList.contains('sparkling')) {
-            // console.log("[Debug SPARKLE] Adding 'sparkling' class."); 
             kineticChargeBarFillElement.classList.add('sparkling');
             kineticChargeBarFillElement.style.setProperty('--sparkle1-x', `${Math.random()*80 + 10}%`);
             kineticChargeBarFillElement.style.setProperty('--sparkle1-y', `${Math.random()*60 + 20}%`);
@@ -296,7 +292,6 @@ export function showScreen(screenElementToShow, cameFromPauseMenu = false, callb
         }
     }
 
-    // Call height equalization logic if the evolution screen is being shown
     if (screenElementToShow === evolutionScreen) {
         equalizeEvolutionCardHeights();
     }
@@ -326,7 +321,7 @@ function getTierStyling(tier) {
     switch(tier) {
         case 'core': return { color: '#00E0FF', text: 'CORE' }; 
         case 'common': return { color: '#9DB8B7', text: 'COMMON' }; 
-        case 'rare': return { color: '#55FF55', text: 'RARE' }; // Changed to Green
+        case 'rare': return { color: '#55FF55', text: 'RARE' }; 
         case 'epic': return { color: '#C077FF', text: 'EPIC' };   
         case 'legendary': return { color: '#FFB000', text: 'LEGENDARY' }; 
         default: return { color: '#FFFFFF', text: tier ? tier.toUpperCase() : ''};
@@ -337,7 +332,7 @@ function equalizeEvolutionCardHeights() {
     if (!evolutionOptionsContainer) return;
     const optionElements = evolutionOptionsContainer.querySelectorAll('.evolutionOption');
     if (optionElements.length > 0) {
-        requestAnimationFrame(() => { // Ensure calculations happen after layout
+        requestAnimationFrame(() => { 
             let maxHeight = 0;
             optionElements.forEach(opt => {
                 opt.style.minHeight = '0'; 
@@ -484,8 +479,6 @@ export function populateEvolutionOptionsUI(choices, playerInstance, evolutionSel
         choiceWrapper.appendChild(optionDiv); 
         evolutionOptionsContainer.appendChild(choiceWrapper); 
     });
-
-    // Height equalization is now called from showScreen after this screen is made visible
 }
 
 export function populateFreeUpgradeOptionUI(chosenUpgrade, onContinueCallback) {
@@ -496,8 +489,6 @@ export function populateFreeUpgradeOptionUI(chosenUpgrade, onContinueCallback) {
     optionDiv.innerHTML = `<h3>${chosenUpgrade.text}</h3><p>${chosenUpgrade.id === 'noMoreFreeUpgrades' ? 'Continue playing!' : 'Claim this free bonus!'}</p>`;
     freeUpgradeOptionContainer.appendChild(optionDiv);
     closeFreeUpgradeButton.onclick = () => onContinueCallback(chosenUpgrade);
-
-    // Height equalization is now called from showScreen
 }
 
 export function populateLootOptionsUI(choices, playerInstance, onSelectLootCallback, allPossibleColors, getReadableColorNameFunc) {
@@ -508,7 +499,7 @@ export function populateLootOptionsUI(choices, playerInstance, onSelectLootCallb
         optionDiv.classList.add('lootOption');
         let colorsToOffer = [];
 
-        if (choice.type === 'path_buff') { // Handle Path Buffs for first boss
+        if (choice.type === 'path_buff') { 
              optionDiv.innerHTML = `<h3>${choice.name}</h3> <p>${choice.description}</p><span class="optionType" style="color: #FFD700; font-weight:bold;">Path Defining</span>`;
              optionDiv.onclick = () => onSelectLootCallback(choice); 
         } else if (choice.id === 'adaptiveShield') {
@@ -533,7 +524,6 @@ export function populateLootOptionsUI(choices, playerInstance, onSelectLootCallb
         }
         lootOptionsContainer.appendChild(optionDiv);
     });
-    // Height equalization is now called from showScreen
 }
 
 
@@ -659,12 +649,25 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, getReadableColorNam
     let coreHTML = '';
     const formatNum = (val, digits = 1) => (typeof val === 'number' && !isNaN(val) ? val.toFixed(digits) : 'N/A');
     const formatInt = (val) => (typeof val === 'number' && !isNaN(val) ? val.toString() : 'N/A');
+    const formatPercent = (val) => (typeof val === 'number' && !isNaN(val) ? (val * 100).toFixed(0) + '%' : '0%');
+    const formatMultiplier = (val) => (typeof val === 'number' && !isNaN(val) ? 'x' + val.toFixed(2) : 'x1.00');
+
 
     coreHTML += `<p><span class="stat-label">Max HP:</span><span class="stat-value">${formatInt(playerData.maxHp)}</span></p>`;
     coreHTML += `<p><span class="stat-label">Player Size:</span><span class="stat-value">${formatNum(playerData.finalRadius)}</span></p>`; 
     coreHTML += `<p><span class="stat-label">Times Hit:</span><span class="stat-value">${formatInt(playerData.timesHit)}</span></p>`;
     if (gameplayTimeData !== undefined) { const mins = Math.floor(gameplayTimeData / 60000); const secs = Math.floor((gameplayTimeData % 60000) / 1000); coreHTML += `<p><span class="stat-label">Time Played:</span><span class="stat-value">${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}</span></p>`; }
     coreHTML += `<p><span class="stat-label">Damage Dealt:</span><span class="stat-value">${playerData.totalDamageDealt ? playerData.totalDamageDealt.toLocaleString() : 0}</span></p>`;
+    
+    if (playerData.rayCritChance !== undefined && (playerData.rayCritChance > 0 || playerData.rayCritDamageMultiplier > 1.5)) {
+        coreHTML += `<p><span class="stat-label">Ray Crit Chance:</span><span class="stat-value">${formatPercent(playerData.rayCritChance)}</span></p>`;
+        coreHTML += `<p><span class="stat-label">Ray Crit Damage:</span><span class="stat-value">${formatMultiplier(playerData.rayCritDamageMultiplier)}</span></p>`;
+    }
+    if (playerData.abilityCritChance !== undefined && (playerData.abilityCritChance > 0 || playerData.abilityCritDamageMultiplier > 1.5)) {
+        coreHTML += `<p><span class="stat-label">Ability Crit Chance:</span><span class="stat-value">${formatPercent(playerData.abilityCritChance)}</span></p>`;
+        coreHTML += `<p><span class="stat-label">Ability Crit Damage:</span><span class="stat-value">${formatMultiplier(playerData.abilityCritDamageMultiplier)}</span></p>`;
+    }
+    
     statsCoreDiv.innerHTML = coreHTML;
 
     statsUpgradesUl.innerHTML = '';

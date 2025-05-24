@@ -2,7 +2,8 @@
 import {
     BOSS_HEALTH_BAR_WIDTH, BOSS_HEALTH_BAR_HEIGHT,
     BOSS_HEALTH_BAR_COLOR_BG, BOSS_HEALTH_BAR_COLOR_FG,
-    BOSS_HEALTH_BAR_OFFSET_Y, BASE_BOSS_STUN_CHANCE
+    BOSS_HEALTH_BAR_OFFSET_Y
+    // BASE_BOSS_STUN_CHANCE // Removed this import
 } from './constants.js';
 
 
@@ -32,20 +33,28 @@ export class BossNPC {
         this.bleedTimer = Math.max(this.bleedTimer, duration);
     }
 
-    takeDamage(amount, ray, playerInstance) { // playerInstance can be used for stun chance, etc.
+    takeDamage(amount, ray, playerInstance) { 
         if (this.health <= 0) return false;
 
         this.health -= amount;
         this.hitFlashTimer = this.HIT_FLASH_DURATION;
         if (this.health < 0) this.health = 0;
 
-        // Stun logic using playerInstance's properties
-        if (ray && playerInstance && typeof this.speed !== 'undefined' && this.hitStunTimer <= 0 && (typeof this.playerCollisionStunTimer === 'undefined' || this.playerCollisionStunTimer <= 0)) {
-            let stunChance = BASE_BOSS_STUN_CHANCE + (playerInstance.bossStunChanceBonus || 0);
-            if (Math.random() < stunChance) {
-                this.originalSpeed = this.speed;
-                this.speed *= this.hitStunSlowFactor;
-                this.hitStunTimer = this.HIT_STUN_DURATION;
+        // Stun logic using playerInstance's properties - REMOVED old BASE_BOSS_STUN_CHANCE logic
+        // If you want a stun mechanic, it should be driven by specific player abilities/evolutions
+        // or different conditions. The player-collision stun is handled in individual boss classes.
+        // The hitStunTimer here is for a generic brief slow on taking damage, not a full stun.
+        if (ray && typeof this.speed !== 'undefined' && this.hitStunTimer <= 0 && (typeof this.playerCollisionStunTimer === 'undefined' || this.playerCollisionStunTimer <= 0)) {
+            // Check if the player has an evolution that grants stun on hit
+            // For example, if (playerInstance && playerInstance.someStunEvolutionActive && Math.random() < playerInstance.stunChanceFromEvolution)
+            // For now, we remove the generic stun chance based on BASE_BOSS_STUN_CHANCE
+            
+            // A simple hit stun (slow down) could still be applied if desired, but not a chance-based full stun.
+            // For instance, always apply a brief slow:
+            if (this.speed > 0 && this.originalSpeed === 0) { // Only if not already stunned/slowed by this timer
+                 this.originalSpeed = this.speed;
+                 this.speed *= this.hitStunSlowFactor;
+                 this.hitStunTimer = this.HIT_STUN_DURATION;
             }
         }
         return true;
@@ -97,7 +106,7 @@ export class BossNPC {
             this.hitStunTimer -= dt;
             if (this.hitStunTimer <= 0 && this.originalSpeed > 0 && typeof this.speed !== 'undefined') {
                 this.speed = this.originalSpeed;
-                this.originalSpeed = 0;
+                this.originalSpeed = 0; // Reset originalSpeed after stun wears off
             }
         }
     }

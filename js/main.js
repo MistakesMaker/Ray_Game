@@ -18,11 +18,11 @@ import {
 import { 
     canvas as gameCanvasElement,
     scoreDisplayElem, healthDisplayElem, highScoreListDisplay, startScreenHighScoresDiv,
-    startScreen, settingsScreen, gameOverScreen, evolutionScreen, evolutionOptionsContainer, // Ensure settingsScreen is exported/imported
+    startScreen, settingsScreen, gameOverScreen, evolutionScreen, evolutionOptionsContainer, 
     freeUpgradeScreen, freeUpgradeOptionContainer, closeFreeUpgradeButton,
     lootChoiceScreen, lootOptionsContainer, abilityCooldownUI, evolutionTooltip,
     countdownOverlay, pauseScreen, pausePlayerStatsPanel,
-    detailedHighScoresScreen, kineticChargeUIElement,  // Ensure detailedHighScoresScreen is exported/imported
+    detailedHighScoresScreen, kineticChargeUIElement,  
     updateScoreDisplay, updateHealthDisplay as uiUpdateHealthDisplay,
     updateBuffIndicator as uiUpdateBuffIndicator,
     updateSurvivalBonusIndicator as uiUpdateSurvivalBonusIndicator,
@@ -98,7 +98,7 @@ const inputState = {
 let evolutionChoices = [];
 let bossLootPool = [];
 let freeUpgradeChoicesData = [];
-let currentActiveScreenElement = null; // This variable is crucial
+let currentActiveScreenElement = null; 
 let firstBossDefeatedThisRun = false; 
 
 
@@ -189,7 +189,7 @@ function reduceAllAbilityCooldowns(playerInstance, reductionFactor) {
 
 function initEvolutionChoicesInternal() {
     evolutionChoices = [
-        // --- NON-TIERED EVOLUTIONS ---
+        // --- NON-TIERED "CORE" EVOLUTIONS ---
         {
             id:'colorImmunity', classType: 'tank', text:"Chameleon Plating", level:0, 
             maxLevel: ALL_POSSIBLE_RAY_COLORS.length - CONSTANTS.INITIAL_RAY_COLORS.length, 
@@ -239,7 +239,7 @@ function initEvolutionChoicesInternal() {
             getCardEffectString: function() { return `Reduce size, pause growth`; }
         },
         {
-            id:'systemOvercharge', classType: 'utility', text:"System Overcharge", level:0, maxLevel: 1, 
+            id:'systemOvercharge', classType: 'ability', text:"System Overcharge", level:0, maxLevel: 1, 
             detailedDescription: "Reduces the score needed between evolutions by a massive 30% (one-time upgrade).", 
             isTiered: false,
             isMaxed: function(p){ return (p && p.evolutionIntervalModifier <= 0.70) || this.level >= this.maxLevel; }, 
@@ -255,6 +255,7 @@ function initEvolutionChoicesInternal() {
         },
 
         // --- TIERED EVOLUTIONS ---
+        // ** TANK CLASS **
         {
             id:'reinforcedHull', classType: 'tank', text:"Reinforced Hull", level:0, maxLevel: 999, 
             isTiered: true,
@@ -299,59 +300,7 @@ function initEvolutionChoicesInternal() {
             getEffectString: function(playerInstance) { return `Current Max HP: ${playerInstance ? playerInstance.maxHp : CONSTANTS.PLAYER_MAX_HP}`; },
             getCardEffectString: function(tier) { return `+${CONSTANTS.FORTIFIED_CORE_TIER_BONUS[tier]} Max HP`;}
         },
-        {
-            id: 'kineticConversion', classType: 'utility', text: "Kinetic Conversion", level: 0, maxLevel: 999,
-            isTiered: true,
-            isMaxed: function(p) { return false; }, 
-            tiers: { 
-                common:    { description: "Increases Kinetic Conversion level. Standard per-level scaling for charge rate and damage potential.", apply: function(p) { p.kineticConversionLevel++; p.effectiveKineticChargeRatePerLevel = Math.max(p.effectiveKineticChargeRatePerLevel, CONSTANTS.DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.common.rateBonus); p.effectiveKineticAdditionalDamageBonusPerLevel = Math.max(p.effectiveKineticAdditionalDamageBonusPerLevel, CONSTANTS.DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.common.dmgBonus); }},
-                rare:      { description: "Increases Kinetic Conversion level. Slightly enhances its per-level scaling.", apply: function(p) { p.kineticConversionLevel++; p.effectiveKineticChargeRatePerLevel = Math.max(p.effectiveKineticChargeRatePerLevel, CONSTANTS.DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.rare.rateBonus); p.effectiveKineticAdditionalDamageBonusPerLevel = Math.max(p.effectiveKineticAdditionalDamageBonusPerLevel, CONSTANTS.DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.rare.dmgBonus); }},
-                epic:      { description: "Increases Kinetic Conversion level. Moderately enhances its per-level scaling.", apply: function(p) { p.kineticConversionLevel++; p.effectiveKineticChargeRatePerLevel = Math.max(p.effectiveKineticChargeRatePerLevel, CONSTANTS.DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.epic.rateBonus); p.effectiveKineticAdditionalDamageBonusPerLevel = Math.max(p.effectiveKineticAdditionalDamageBonusPerLevel, CONSTANTS.DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.epic.dmgBonus); }},
-                legendary: { description: "Increases Kinetic Conversion level. Greatly enhances its per-level scaling.", apply: function(p) { p.kineticConversionLevel++; p.effectiveKineticChargeRatePerLevel = Math.max(p.effectiveKineticChargeRatePerLevel, CONSTANTS.DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.legendary.rateBonus); p.effectiveKineticAdditionalDamageBonusPerLevel = Math.max(p.effectiveKineticAdditionalDamageBonusPerLevel, CONSTANTS.DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.legendary.dmgBonus); }}
-            },
-            getEffectString: function(playerInstance) { 
-                const KCL = playerInstance.kineticConversionLevel || 0;
-                const maxPotencyBonus = playerInstance.initialKineticDamageBonus + (Math.max(0, KCL - 1) * playerInstance.effectiveKineticAdditionalDamageBonusPerLevel);
-                const chargeRate = playerInstance.baseKineticChargeRate + (KCL * playerInstance.effectiveKineticChargeRatePerLevel);
-                if (KCL > 0) {
-                    return `Lvl ${KCL}: Max Dmg +${(maxPotencyBonus * 100).toFixed(0)}%, Rate ${chargeRate.toFixed(2)}/s`;
-                }
-                const previewRate = playerInstance.baseKineticChargeRate + (1 * (playerInstance.effectiveKineticChargeRatePerLevel || CONSTANTS.DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL)); 
-                const previewDmg = playerInstance.initialKineticDamageBonus;
-                return `Next Lvl Max Dmg: +${(previewDmg * 100).toFixed(0)}%, Rate: ${previewRate.toFixed(2)}/s`;
-            },
-            getCardEffectString: function(tier) { 
-                 const rateBonusPercent = (CONSTANTS.KINETIC_CONVERSION_TIER_SCALING[tier]?.rateBonus || 0) * 100;
-                 const dmgBonusPercent = (CONSTANTS.KINETIC_CONVERSION_TIER_SCALING[tier]?.dmgBonus || 0) * 100;
-                 return `Tier Bonus: +${rateBonusPercent.toFixed(0)}% Rate, +${dmgBonusPercent.toFixed(0)}% Dmg`;
-            }
-        },
-        {
-            id: 'temporalEcho', classType: 'utility', text: "Temporal Echo", level: 0, maxLevel: 999, 
-            isTiered: true,
-            isMaxed: function(p) { return p && p.temporalEchoChance >= 1.0; },
-            tiers: {
-                common:    { description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.common}%.`,   apply: function(p) { p.temporalEchoChance = Math.min(1.0, p.temporalEchoChance + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.common / 100); }},
-                rare:      { description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.rare}%.`,     apply: function(p) { p.temporalEchoChance = Math.min(1.0, p.temporalEchoChance + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.rare / 100); }},
-                epic:      { description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.epic}%.`,     apply: function(p) { p.temporalEchoChance = Math.min(1.0, p.temporalEchoChance + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.epic / 100); }},
-                legendary: { description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.legendary}%.`, apply: function(p) { p.temporalEchoChance = Math.min(1.0, p.temporalEchoChance + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.legendary / 100); }}
-            },
-            getEffectString: function(playerInstance) { return `Total Echo Chance: ${Math.round((playerInstance ? playerInstance.temporalEchoChance : 0) * 100)}%`; },
-            getCardEffectString: function(tier) { return `+${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE[tier]}% Echo Chance`;}
-        },
-        {
-            id: 'streamlinedSystems', classType: 'utility', text: "Streamlined Systems", level: 0, maxLevel: 999,
-            isTiered: true,
-            isMaxed: function(p) { return false; }, 
-            tiers: {
-                common:    { description: `Reduces current ability cooldowns by ${CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.common}%.`, apply: function(p) { reduceAllAbilityCooldowns(p, CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.common / 100); }},
-                rare:      { description: `Reduces current ability cooldowns by ${CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.rare}%.`, apply: function(p) { reduceAllAbilityCooldowns(p, CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.rare / 100); }},
-                epic:      { description: `Reduces current ability cooldowns by ${CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.epic}%.`, apply: function(p) { reduceAllAbilityCooldowns(p, CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.epic / 100); }},
-                legendary: { description: `Reduces current ability cooldowns by ${CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.legendary}%.`, apply: function(p) { reduceAllAbilityCooldowns(p, CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.legendary / 100); }}
-            },
-            getEffectString: function(playerInstance, currentChoiceLevel) { return `Applied ${currentChoiceLevel || 0} time(s)`; }, 
-            getCardEffectString: function(tier) { return `Reduce current CDs by ${CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION[tier]}%`; }
-        },
+        // ** ATTACK CLASS **
         {
             id:'focusedBeam', classType: 'attack', text:"Focused Beam", level:0, maxLevel: 999 , 
             isTiered: true,
@@ -379,7 +328,87 @@ function initEvolutionChoicesInternal() {
             getCardEffectString: function(tier) { return `+${CONSTANTS.UNSTABLE_CORE_TIER_CHANCE[tier]}% AOE Chance`;}
         },
         {
-            id: 'abilityPotency', classType: 'attack', text: "Empowered Abilities", level: 0, maxLevel: 999,
+            id: 'rayCritChance', classType: 'attack', text: "Critical Array", level: 0, maxLevel: 999,
+            isTiered: true,
+            isMaxed: function(p) { return p && (p.rayCritChance !== undefined ? p.rayCritChance >= 1.0 : false); },
+            tiers: {
+                common:    { description: `Increases ray critical hit chance by ${CONSTANTS.RAY_CRIT_CHANCE_TIER_BONUS.common*100}%.`, apply: function(p) { p.rayCritChance = Math.min(1.0, (p.rayCritChance || 0) + CONSTANTS.RAY_CRIT_CHANCE_TIER_BONUS.common); }},
+                rare:      { description: `Increases ray critical hit chance by ${CONSTANTS.RAY_CRIT_CHANCE_TIER_BONUS.rare*100}%.`,   apply: function(p) { p.rayCritChance = Math.min(1.0, (p.rayCritChance || 0) + CONSTANTS.RAY_CRIT_CHANCE_TIER_BONUS.rare);   }},
+                epic:      { description: `Increases ray critical hit chance by ${CONSTANTS.RAY_CRIT_CHANCE_TIER_BONUS.epic*100}%.`,   apply: function(p) { p.rayCritChance = Math.min(1.0, (p.rayCritChance || 0) + CONSTANTS.RAY_CRIT_CHANCE_TIER_BONUS.epic);   }},
+                legendary: { description: `Increases ray critical hit chance by ${CONSTANTS.RAY_CRIT_CHANCE_TIER_BONUS.legendary*100}%.`,apply: function(p) { p.rayCritChance = Math.min(1.0, (p.rayCritChance || 0) + CONSTANTS.RAY_CRIT_CHANCE_TIER_BONUS.legendary);}}
+            },
+            getEffectString: function(p) { return `Total ${( (p && p.rayCritChance !== undefined ? p.rayCritChance:0) * 100).toFixed(0)}% Ray Crit Chance`; },
+            getCardEffectString: function(tier) { return `+${(CONSTANTS.RAY_CRIT_CHANCE_TIER_BONUS[tier]*100).toFixed(0)}% Ray Crit Chance`;}
+        },
+        {
+            id: 'rayCritDamage', classType: 'attack', text: "Amplified Output", level: 0, maxLevel: 999,
+            isTiered: true,
+            isMaxed: function(p) { return false; }, // No cap
+            tiers: {
+                common:    { description: `Increases ray critical damage multiplier by +${CONSTANTS.RAY_CRIT_DAMAGE_TIER_BONUS.common*100}%.`, apply: function(p) { p.rayCritDamageMultiplier = (p.rayCritDamageMultiplier !== undefined ? p.rayCritDamageMultiplier : 1.5) + CONSTANTS.RAY_CRIT_DAMAGE_TIER_BONUS.common; }},
+                rare:      { description: `Increases ray critical damage multiplier by +${CONSTANTS.RAY_CRIT_DAMAGE_TIER_BONUS.rare*100}%.`,   apply: function(p) { p.rayCritDamageMultiplier = (p.rayCritDamageMultiplier !== undefined ? p.rayCritDamageMultiplier : 1.5) + CONSTANTS.RAY_CRIT_DAMAGE_TIER_BONUS.rare;   }},
+                epic:      { description: `Increases ray critical damage multiplier by +${CONSTANTS.RAY_CRIT_DAMAGE_TIER_BONUS.epic*100}%.`,   apply: function(p) { p.rayCritDamageMultiplier = (p.rayCritDamageMultiplier !== undefined ? p.rayCritDamageMultiplier : 1.5) + CONSTANTS.RAY_CRIT_DAMAGE_TIER_BONUS.epic;   }},
+                legendary: { description: `Increases ray critical damage multiplier by +${CONSTANTS.RAY_CRIT_DAMAGE_TIER_BONUS.legendary*100}%.`,apply: function(p) { p.rayCritDamageMultiplier = (p.rayCritDamageMultiplier !== undefined ? p.rayCritDamageMultiplier : 1.5) + CONSTANTS.RAY_CRIT_DAMAGE_TIER_BONUS.legendary;}}
+            },
+            getEffectString: function(p) { return `Total x${(p && p.rayCritDamageMultiplier !== undefined ? p.rayCritDamageMultiplier:1.5).toFixed(2)} Ray Crit Damage`; },
+            getCardEffectString: function(tier) { return `+${(CONSTANTS.RAY_CRIT_DAMAGE_TIER_BONUS[tier]*100).toFixed(0)}% Ray Crit Damage`;}
+        },
+        // ** ABILITY CLASS (formerly UTILITY) **
+        {
+            id: 'kineticConversion', classType: 'ability', text: "Kinetic Conversion", level: 0, maxLevel: 999,
+            isTiered: true,
+            isMaxed: function(p) { return false; }, 
+            tiers: { 
+                common:    { description: "Increases Kinetic Conversion level. Standard per-level scaling for charge rate and damage potential.", apply: function(p) { p.kineticConversionLevel++; p.effectiveKineticChargeRatePerLevel = Math.max(p.effectiveKineticChargeRatePerLevel, CONSTANTS.DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.common.rateBonus); p.effectiveKineticAdditionalDamageBonusPerLevel = Math.max(p.effectiveKineticAdditionalDamageBonusPerLevel, CONSTANTS.DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.common.dmgBonus); }},
+                rare:      { description: "Increases Kinetic Conversion level. Slightly enhances its per-level scaling.", apply: function(p) { p.kineticConversionLevel++; p.effectiveKineticChargeRatePerLevel = Math.max(p.effectiveKineticChargeRatePerLevel, CONSTANTS.DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.rare.rateBonus); p.effectiveKineticAdditionalDamageBonusPerLevel = Math.max(p.effectiveKineticAdditionalDamageBonusPerLevel, CONSTANTS.DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.rare.dmgBonus); }},
+                epic:      { description: "Increases Kinetic Conversion level. Moderately enhances its per-level scaling.", apply: function(p) { p.kineticConversionLevel++; p.effectiveKineticChargeRatePerLevel = Math.max(p.effectiveKineticChargeRatePerLevel, CONSTANTS.DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.epic.rateBonus); p.effectiveKineticAdditionalDamageBonusPerLevel = Math.max(p.effectiveKineticAdditionalDamageBonusPerLevel, CONSTANTS.DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.epic.dmgBonus); }},
+                legendary: { description: "Increases Kinetic Conversion level. Greatly enhances its per-level scaling.", apply: function(p) { p.kineticConversionLevel++; p.effectiveKineticChargeRatePerLevel = Math.max(p.effectiveKineticChargeRatePerLevel, CONSTANTS.DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.legendary.rateBonus); p.effectiveKineticAdditionalDamageBonusPerLevel = Math.max(p.effectiveKineticAdditionalDamageBonusPerLevel, CONSTANTS.DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.legendary.dmgBonus); }}
+            },
+            getEffectString: function(playerInstance) { 
+                const KCL = playerInstance.kineticConversionLevel || 0;
+                const maxPotencyBonus = playerInstance.initialKineticDamageBonus + (Math.max(0, KCL - 1) * playerInstance.effectiveKineticAdditionalDamageBonusPerLevel);
+                const chargeRate = playerInstance.baseKineticChargeRate + (KCL * playerInstance.effectiveKineticChargeRatePerLevel);
+                if (KCL > 0) {
+                    return `Lvl ${KCL}: Max Dmg +${(maxPotencyBonus * 100).toFixed(0)}%, Rate ${chargeRate.toFixed(2)}/s`;
+                }
+                const previewRate = playerInstance.baseKineticChargeRate + (1 * (playerInstance.effectiveKineticChargeRatePerLevel || CONSTANTS.DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL)); 
+                const previewDmg = playerInstance.initialKineticDamageBonus;
+                return `Next Lvl Max Dmg: +${(previewDmg * 100).toFixed(0)}%, Rate: ${previewRate.toFixed(2)}/s`;
+            },
+            getCardEffectString: function(tier) { 
+                 const rateBonusPercent = (CONSTANTS.KINETIC_CONVERSION_TIER_SCALING[tier]?.rateBonus || 0) * 100;
+                 const dmgBonusPercent = (CONSTANTS.KINETIC_CONVERSION_TIER_SCALING[tier]?.dmgBonus || 0) * 100;
+                 return `Tier Bonus: +${rateBonusPercent.toFixed(0)}% Rate, +${dmgBonusPercent.toFixed(0)}% Dmg`;
+            }
+        },
+        {
+            id: 'temporalEcho', classType: 'ability', text: "Temporal Echo", level: 0, maxLevel: 999, 
+            isTiered: true,
+            isMaxed: function(p) { return p && p.temporalEchoChance >= 1.0; },
+            tiers: {
+                common:    { description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.common}%.`,   apply: function(p) { p.temporalEchoChance = Math.min(1.0, p.temporalEchoChance + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.common / 100); }},
+                rare:      { description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.rare}%.`,     apply: function(p) { p.temporalEchoChance = Math.min(1.0, p.temporalEchoChance + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.rare / 100); }},
+                epic:      { description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.epic}%.`,     apply: function(p) { p.temporalEchoChance = Math.min(1.0, p.temporalEchoChance + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.epic / 100); }},
+                legendary: { description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.legendary}%.`, apply: function(p) { p.temporalEchoChance = Math.min(1.0, p.temporalEchoChance + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.legendary / 100); }}
+            },
+            getEffectString: function(playerInstance) { return `Total Echo Chance: ${Math.round((playerInstance ? playerInstance.temporalEchoChance : 0) * 100)}%`; },
+            getCardEffectString: function(tier) { return `+${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE[tier]}% Echo Chance`;}
+        },
+        {
+            id: 'streamlinedSystems', classType: 'ability', text: "Streamlined Systems", level: 0, maxLevel: 999,
+            isTiered: true,
+            isMaxed: function(p) { return false; }, 
+            tiers: {
+                common:    { description: `Reduces current ability cooldowns by ${CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.common}%.`, apply: function(p) { reduceAllAbilityCooldowns(p, CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.common / 100); }},
+                rare:      { description: `Reduces current ability cooldowns by ${CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.rare}%.`, apply: function(p) { reduceAllAbilityCooldowns(p, CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.rare / 100); }},
+                epic:      { description: `Reduces current ability cooldowns by ${CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.epic}%.`, apply: function(p) { reduceAllAbilityCooldowns(p, CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.epic / 100); }},
+                legendary: { description: `Reduces current ability cooldowns by ${CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.legendary}%.`, apply: function(p) { reduceAllAbilityCooldowns(p, CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.legendary / 100); }}
+            },
+            getEffectString: function(playerInstance, currentChoiceLevel) { return `Applied ${currentChoiceLevel || 0} time(s)`; }, 
+            getCardEffectString: function(tier) { return `Reduce current CDs by ${CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION[tier]}%`; }
+        },
+        {
+            id: 'abilityPotency', classType: 'ability', text: "Empowered Abilities", level: 0, maxLevel: 999, 
             isTiered: true,
             isMaxed: function(p) { return false; },
             tiers: {
@@ -390,6 +419,32 @@ function initEvolutionChoicesInternal() {
             },
             getEffectString: function(playerInstance) { return `Total Ability Dmg: ${Math.round((playerInstance ? playerInstance.abilityDamageMultiplier : 1) * 100)}%`; },
             getCardEffectString: function(tier) { return `Ability Dmg x${CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER[tier].toFixed(2)}`;}
+        },
+        {
+            id: 'abilityCritChance', classType: 'ability', text: "Unstable Energies", level: 0, maxLevel: 999,
+            isTiered: true,
+            isMaxed: function(p) { return p && (p.abilityCritChance !== undefined ? p.abilityCritChance >= 1.0 : false); },
+            tiers: {
+                common:    { description: `Increases ability critical hit chance by ${CONSTANTS.ABILITY_CRIT_CHANCE_TIER_BONUS.common*100}%.`, apply: function(p) { p.abilityCritChance = Math.min(1.0, (p.abilityCritChance || 0) + CONSTANTS.ABILITY_CRIT_CHANCE_TIER_BONUS.common); }},
+                rare:      { description: `Increases ability critical hit chance by ${CONSTANTS.ABILITY_CRIT_CHANCE_TIER_BONUS.rare*100}%.`,   apply: function(p) { p.abilityCritChance = Math.min(1.0, (p.abilityCritChance || 0) + CONSTANTS.ABILITY_CRIT_CHANCE_TIER_BONUS.rare);   }},
+                epic:      { description: `Increases ability critical hit chance by ${CONSTANTS.ABILITY_CRIT_CHANCE_TIER_BONUS.epic*100}%.`,   apply: function(p) { p.abilityCritChance = Math.min(1.0, (p.abilityCritChance || 0) + CONSTANTS.ABILITY_CRIT_CHANCE_TIER_BONUS.epic);   }},
+                legendary: { description: `Increases ability critical hit chance by ${CONSTANTS.ABILITY_CRIT_CHANCE_TIER_BONUS.legendary*100}%.`,apply: function(p) { p.abilityCritChance = Math.min(1.0, (p.abilityCritChance || 0) + CONSTANTS.ABILITY_CRIT_CHANCE_TIER_BONUS.legendary);}}
+            },
+            getEffectString: function(p) { return `Total ${( (p && p.abilityCritChance !== undefined ? p.abilityCritChance:0) * 100).toFixed(0)}% Ability Crit Chance`; },
+            getCardEffectString: function(tier) { return `+${(CONSTANTS.ABILITY_CRIT_CHANCE_TIER_BONUS[tier]*100).toFixed(0)}% Ability Crit Chance`;}
+        },
+        {
+            id: 'abilityCritDamage', classType: 'ability', text: "Focused Overload", level: 0, maxLevel: 999,
+            isTiered: true,
+            isMaxed: function(p) { return false; }, // No cap
+            tiers: {
+                common:    { description: `Increases ability critical damage multiplier by +${CONSTANTS.ABILITY_CRIT_DAMAGE_TIER_BONUS.common*100}%.`, apply: function(p) { p.abilityCritDamageMultiplier = (p.abilityCritDamageMultiplier !== undefined ? p.abilityCritDamageMultiplier : 1.5) + CONSTANTS.ABILITY_CRIT_DAMAGE_TIER_BONUS.common; }},
+                rare:      { description: `Increases ability critical damage multiplier by +${CONSTANTS.ABILITY_CRIT_DAMAGE_TIER_BONUS.rare*100}%.`,   apply: function(p) { p.abilityCritDamageMultiplier = (p.abilityCritDamageMultiplier !== undefined ? p.abilityCritDamageMultiplier : 1.5) + CONSTANTS.ABILITY_CRIT_DAMAGE_TIER_BONUS.rare;   }},
+                epic:      { description: `Increases ability critical damage multiplier by +${CONSTANTS.ABILITY_CRIT_DAMAGE_TIER_BONUS.epic*100}%.`,   apply: function(p) { p.abilityCritDamageMultiplier = (p.abilityCritDamageMultiplier !== undefined ? p.abilityCritDamageMultiplier : 1.5) + CONSTANTS.ABILITY_CRIT_DAMAGE_TIER_BONUS.epic;   }},
+                legendary: { description: `Increases ability critical damage multiplier by +${CONSTANTS.ABILITY_CRIT_DAMAGE_TIER_BONUS.legendary*100}%.`,apply: function(p) { p.abilityCritDamageMultiplier = (p.abilityCritDamageMultiplier !== undefined ? p.abilityCritDamageMultiplier : 1.5) + CONSTANTS.ABILITY_CRIT_DAMAGE_TIER_BONUS.legendary;}}
+            },
+            getEffectString: function(p) { return `Total x${(p && p.abilityCritDamageMultiplier !== undefined ? p.abilityCritDamageMultiplier:1.5).toFixed(2)} Ability Crit Dmg`; },
+            getCardEffectString: function(tier) { return `+${(CONSTANTS.ABILITY_CRIT_DAMAGE_TIER_BONUS[tier]*100).toFixed(0)}% Ability Crit Dmg`;}
         }
     ];
 }
@@ -771,8 +826,9 @@ function updateGame(deltaTime) {
 
                 if (r.isActive && !r.isBossProjectile && !r.isGravityWellRay && !r.isCorruptedByGravityWell && !r.isCorruptedByPlayerWell && r.state==='moving' && !r.isForming) {
                     let baseRayDmg = 1 + (player ? player.rayDamageBonus : 0);
-                    let finalDamage = baseRayDmg;
+                    let finalDamage = baseRayDmg; // Start with base + flat bonus
 
+                    // Apply multiplicative player buffs
                     if (player) {
                         if (player.isHarmonized && player.hasPerfectHarmonyHelm) {
                             finalDamage *= (1 + CONSTANTS.PERFECT_HARMONY_RAY_DAMAGE_BONUS);
@@ -785,27 +841,33 @@ function updateGame(deltaTime) {
                                 finalDamage *= (1 + berserkDamageBonus);
                             }
                         }
-                        if (r.isPlayerAbilityRay) { 
-                            let abilityBaseDamage = 1 + player.rayDamageBonus; 
+                        if (r.isPlayerAbilityRay) { // If it's a ray from an ability (like Mini Gravity Well)
+                            // It already has baseRayDmg (1 + player.rayDamageBonus)
+                            // Now apply ability-specific multipliers
                             if (typeof player.abilityDamageMultiplier === 'number') {
-                                 abilityBaseDamage *= player.abilityDamageMultiplier;
+                                 finalDamage *= player.abilityDamageMultiplier;
                             }
-                            if (player.hasUltimateConfigurationHelm) { 
-                                if (r.sourceAbility === 'miniGravityWell') { 
-                                   abilityBaseDamage *= 2; 
-                                }
+                            if (player.hasUltimateConfigurationHelm && r.sourceAbility === 'miniGravityWell') { 
+                                   finalDamage *= 2; 
                             }
-                            if (player.isHarmonized && player.hasPerfectHarmonyHelm) {
-                                abilityBaseDamage *= (1 + CONSTANTS.PERFECT_HARMONY_RAY_DAMAGE_BONUS);
+                            // Harmony already applied above if it's a player ray
+                            // Kinetic boost for launched rays
+                            if (r.customKineticDamageBoost && typeof r.customKineticDamageBoost === 'number' && r.customKineticDamageBoost > 1.0) {
+                                finalDamage *= r.customKineticDamageBoost;
                             }
-                            finalDamage = abilityBaseDamage; 
+                        }
+                         // Apply momentum bonus (applies to all player rays)
+                        finalDamage *= (1 + (r.momentumDamageBonusValue || 0));
+
+                        // Apply Critical Hit for Player Rays (including ability-launched rays)
+                        if (player.rayCritChance > 0 && Math.random() < player.rayCritChance) {
+                            finalDamage *= player.rayCritDamageMultiplier;
+                            // TODO: Maybe add a visual effect for critical hits: r.isCrit = true;
                         }
                     }
-                    if (r.isPlayerAbilityRay && r.customKineticDamageBoost && typeof r.customKineticDamageBoost === 'number' && r.customKineticDamageBoost > 1.0) {
-                        finalDamage *= r.customKineticDamageBoost;
-                    }
-                    finalDamage *= (1 + (r.momentumDamageBonusValue || 0));
+                    
                     let currentRayDamage = Math.round(Math.max(1, finalDamage));
+
 
                     for(let j=targets.length-1;j>=0;j--){
                         const t=targets[j];
@@ -1117,7 +1179,7 @@ function triggerEvolutionInternal() {
         choicesForUI.push({ 
             id:'noMoreEvolutions', 
             baseId: 'noMoreEvolutions', 
-            classType: 'utility', 
+            classType: 'ability', // Default class if no options left
             text:"All evolutions maxed or no valid options!",
             applyEffect:()=>"No more evolutions!", 
             isMaxed: ()=> true, 
@@ -1443,7 +1505,14 @@ function prepareDisplayedUpgradesForStats(p) {
                 else if (e.id === 'unstableCore') desc = `${Math.round((p.chainReactionChance || 0) * 100)}% AOE Chance`;
                 else if (e.id === 'abilityPotency') desc = `${Math.round((p.abilityDamageMultiplier || 1.0)*100)}% Dmg`;
                 else if (e.id === 'maxHpIncrease') desc = `Total +${(p.maxHp - CONSTANTS.PLAYER_MAX_HP)} Max HP`; 
-                else if (e.id === 'abilityCooldownReduction') desc = `Applied ${currentEvoLevel}x`;
+                else if (e.id === 'abilityCooldownReduction') desc = `Applied ${currentEvoLevel}x`; // Should be streamlinedSystems
+                else if (e.id === 'streamlinedSystems') desc = `Applied ${currentEvoLevel}x`; // Corrected
+                else if (e.id === 'rayCritChance') desc = `${((p.rayCritChance || 0)*100).toFixed(0)}% Chance`;
+                else if (e.id === 'rayCritDamage') desc = `x${(p.rayCritDamageMultiplier || 1.5).toFixed(2)} Damage`;
+                else if (e.id === 'abilityCritChance') desc = `${((p.abilityCritChance || 0)*100).toFixed(0)}% Chance`;
+                else if (e.id === 'abilityCritDamage') desc = `x${(p.abilityCritDamageMultiplier || 1.5).toFixed(2)} Damage`;
+
+
             }
             
             if (desc) {
@@ -1505,7 +1574,7 @@ function showDetailedHighScores() {
                 if (pausePlayerStatsPanel) pausePlayerStatsPanel.style.display = 'none';
             }
         },
-        () => { // This is the onBackCallback for detailed high scores
+        () => { 
             if (pausePlayerStatsPanel && pausePlayerStatsPanel.parentElement !== document.body) {
                  document.body.appendChild(pausePlayerStatsPanel);
             }
@@ -1619,9 +1688,9 @@ const gameContextForEventListeners = {
     isGamePausedByEsc: () => gamePausedByEsc, getBossManager: () => bossManager,
     getForPlayerAbilityContext: getAbilityContextForPlayer, 
     getActiveBuffNotificationsArray: () => activeBuffNotifications,
-    getCurrentActiveScreen: () => currentActiveScreenElement, // Pass function to get current screen
-    getSettingsScreenElement: () => settingsScreen,         // Pass settings screen element
-    getDetailedHighScoresScreenElement: () => detailedHighScoresScreen, // Pass detailed scores screen element
+    getCurrentActiveScreen: () => currentActiveScreenElement, 
+    getSettingsScreenElement: () => settingsScreen,         
+    getDetailedHighScoresScreenElement: () => detailedHighScoresScreen, 
     callbacks: {
         startGame: initGame,
         showSettingsScreenFromStart: () => { setPreviousScreenForSettings(startScreen); currentActiveScreenElement = settingsScreen; showScreen(settingsScreen, false, gameScreenCallbacks); },
@@ -1642,7 +1711,7 @@ const gameContextForEventListeners = {
                 pausePlayerStatsPanel.style.display = 'none';
             }
         },
-        goBackFromDetailedHighScores: () => { // New callback for ESC from detailed scores
+        goBackFromDetailedHighScores: () => { 
             if (pausePlayerStatsPanel && pausePlayerStatsPanel.parentElement !== document.body) {
                  document.body.appendChild(pausePlayerStatsPanel);
             }

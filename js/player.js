@@ -1,5 +1,5 @@
 // js/player.js
-import {
+import { 
     PLAYER_BASE_RADIUS, MIN_PLAYER_BASE_RADIUS, PLAYER_BASE_COLOR, PLAYER_MAX_HP,
     RAY_DAMAGE_TO_PLAYER, HP_REGEN_NO_DAMAGE_THRESHOLD, HP_REGEN_INTERVAL, PLAYER_SPEED_BASE,
     PLAYER_AIM_INDICATOR_LENGTH, TELEPORT_IMMUNITY_DURATION,
@@ -17,6 +17,9 @@ import {
     PERFECT_HARMONY_COOLDOWN_REDUCTION, 
     BERSERKERS_ECHO_DAMAGE_PER_10_HP,  
     BERSERKERS_ECHO_SPEED_PER_10_HP,   
+    DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL,
+    DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL,
+    KINETIC_INITIAL_DAMAGE_BONUS
 } from './constants.js'; 
 
 import { checkCollision, hexToRgb, lightenColor, isLineSegmentIntersectingCircle } from './utils.js';
@@ -53,21 +56,27 @@ export class Player {
         this.temporalEchoChance = 0.0;
         this.temporalEchoFixedReduction = 2000;
 
+        // Critical Hit Stats
+        this.rayCritChance = 0.0;               
+        this.rayCritDamageMultiplier = 1.5;     
+        this.abilityCritChance = 0.0;           
+        this.abilityCritDamageMultiplier = 1.5; 
+
         // Kinetic Conversion Properties
         this.kineticCharge = 0;                            
-        this.baseKineticChargeRate = 1.0;             
-        this.kineticChargeRatePerLevel = 0.25;            
+        this.baseKineticChargeRate = 1.0;          
+        this.effectiveKineticChargeRatePerLevel = DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL; 
         this.kineticDecayRate = 2.0;                       
         this.kineticChargeSpeedThresholdFactor = 0.70;     
         this.kineticConversionLevel = 0;                   
-        this.initialKineticDamageBonus = 0.30;             
-        this.additionalKineticDamageBonusPerLevel = 0.20;  
+        this.initialKineticDamageBonus = KINETIC_INITIAL_DAMAGE_BONUS;          
+        this.effectiveKineticAdditionalDamageBonusPerLevel = DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL; 
         this.kineticChargeConsumption = 100;               
 
         this.currentOmegaLaserKineticBoost = 1.0;    
         this.currentGravityWellKineticBoost = 1.0; 
 
-        this.timeSinceLastHit = Number.MAX_SAFE_INTEGER; // Used for Perfect Harmony
+        this.timeSinceLastHit = Number.MAX_SAFE_INTEGER; 
         this.hpRegenTimer = 0; this.baseHpRegenAmount = 1;
         this.hpRegenBonusFromEvolution = 0;
         this.acquiredBossUpgrades = []; 
@@ -77,7 +86,6 @@ export class Player {
         this.hasUltimateConfigurationHelm = false; 
 
         this.isHarmonized = false;
-        // this.hpAtFullForXSecondsTimer = 0; // No longer needed for Perfect Harmony's new logic
 
         this.activeAbilities = {
             '1': null,
@@ -164,7 +172,7 @@ export class Player {
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.arc(0, -this.radius * 0.85, this.radius * 0.6, 0, Math.PI * 2, false);
-            if (!this.isHarmonized) { // Only fill if not actively harmonized, stroke always to show base circlet
+            if (!this.isHarmonized) { 
                 ctx.globalAlpha = 0.3 + Math.abs(Math.sin(now / 300)) * 0.3;
                 ctx.fill();
                 ctx.globalAlpha = 1.0;
@@ -177,9 +185,9 @@ export class Player {
                 ctx.shadowBlur = helmGlowRadius;
                 ctx.shadowColor = helmGlowColor;
                 ctx.lineWidth = 2.5;
-                ctx.strokeStyle = "rgba(255, 255, 180, 1)"; // Brighter stroke for active harmony
-                ctx.beginPath(); // Redraw for glow effect
-                ctx.arc(0, -this.radius * 0.85, this.radius * 0.65, 0, Math.PI * 2, false); // Slightly larger for glow emphasis
+                ctx.strokeStyle = "rgba(255, 255, 180, 1)"; 
+                ctx.beginPath(); 
+                ctx.arc(0, -this.radius * 0.85, this.radius * 0.65, 0, Math.PI * 2, false); 
                 ctx.stroke();
                 ctx.shadowBlur = 0; 
                 ctx.shadowColor = "transparent";
@@ -385,8 +393,6 @@ export class Player {
                 ui 
               } = gameContext;
 
-        // Increment timeSinceLastHit if not taking damage this frame.
-        // The reset to 0 is handled in takeDamage.
         this.timeSinceLastHit += dt; 
 
         if (this.teleporting && this.teleportEffectTimer > 0) {
@@ -396,7 +402,6 @@ export class Player {
             }
         }
 
-        // ---- PERFECT HARMONY LOGIC (uses timeSinceLastHit) ----
         if (this.hasPerfectHarmonyHelm) {
             if (this.timeSinceLastHit >= PERFECT_HARMONY_NO_DAMAGE_DURATION_THRESHOLD) {
                 if (!this.isHarmonized) {
@@ -404,11 +409,8 @@ export class Player {
                     if(activeBuffNotificationsArray) activeBuffNotificationsArray.push({ text: `Perfect Harmony Active!`, timer: 2000});
                 }
             } else {
-                // If timeSinceLastHit is less, and player was harmonized, it means they just took damage.
-                // takeDamage() will set isHarmonized to false.
             }
         }
-        // ---- END PERFECT HARMONY LOGIC ----
 
         let numericAbilityUIUpdateNeeded = false;
         for (const slot in this.activeAbilities) {
@@ -547,7 +549,7 @@ export class Player {
 
         let currentTotalKineticChargeRate = this.baseKineticChargeRate;
         if (this.kineticConversionLevel > 0) { 
-            currentTotalKineticChargeRate += this.kineticConversionLevel * this.kineticChargeRatePerLevel;
+            currentTotalKineticChargeRate += this.kineticConversionLevel * this.effectiveKineticChargeRatePerLevel; 
         }
 
         if (playerIsActuallyMoving) {
@@ -559,7 +561,7 @@ export class Player {
         if (ui && ui.updateKineticChargeUI) {
             let maxPotencyAtFullCharge = 0;
             if (this.kineticConversionLevel > 0) {
-                maxPotencyAtFullCharge = this.initialKineticDamageBonus + (Math.max(0, this.kineticConversionLevel - 1) * this.additionalKineticDamageBonusPerLevel);
+                maxPotencyAtFullCharge = this.initialKineticDamageBonus + (Math.max(0, this.kineticConversionLevel - 1) * this.effectiveKineticAdditionalDamageBonusPerLevel); 
             }
             ui.updateKineticChargeUI(this.kineticCharge, this.kineticChargeConsumption, maxPotencyAtFullCharge, this.kineticConversionLevel > 0);
         }
@@ -698,11 +700,11 @@ export class Player {
         let chargeToConsume = Math.min(this.kineticCharge, this.kineticChargeConsumption);
         let effectScale = chargeToConsume / this.kineticChargeConsumption; 
         let maxPossiblePotencyBonus;
-        if (this.kineticConversionLevel === 1) {
+        if (this.kineticConversionLevel === 1) { 
             maxPossiblePotencyBonus = this.initialKineticDamageBonus;
         } else { 
             maxPossiblePotencyBonus = this.initialKineticDamageBonus +
-                                      ((this.kineticConversionLevel - 1) * this.additionalKineticDamageBonusPerLevel);
+                                      ((this.kineticConversionLevel - 1) * this.effectiveKineticAdditionalDamageBonusPerLevel);
         }
         let currentPotencyBonus = effectScale * maxPossiblePotencyBonus;
         let finalDamageMultiplier = 1.0 + currentPotencyBonus;
@@ -862,7 +864,7 @@ export class Player {
         }
     }
 
-    dealOmegaLaserDamage(targetsArray, activeBossesArray, laserDamageContext) { // laserDamageContext passed from player.update
+    dealOmegaLaserDamage(targetsArray, activeBossesArray, laserDamageContext) { 
         const beamStartX = this.x + Math.cos(this.omegaLaserAngle) * this.radius;
         const beamStartY = this.y + Math.sin(this.omegaLaserAngle) * this.radius;
         const beamEndX = this.x + Math.cos(this.omegaLaserAngle) * (this.radius + this.omegaLaserRange);
@@ -881,6 +883,12 @@ export class Player {
         }
         damagePerTickForCalc *= this.currentOmegaLaserKineticBoost; 
 
+        // Apply Ability Critical Hit for Omega Laser
+        if (this.abilityCritChance > 0 && Math.random() < this.abilityCritChance) {
+            damagePerTickForCalc *= this.abilityCritDamageMultiplier;
+            // TODO: Visual cue for Omega Laser crit if desired
+        }
+
         const finalDamagePerTick = Math.round(Math.max(1, damagePerTickForCalc));
 
         if (targetsArray) {
@@ -888,7 +896,7 @@ export class Player {
                 const target = targetsArray[i];
                 if (target && isLineSegmentIntersectingCircle(beamStartX, beamStartY, beamEndX, beamEndY, target.x, target.y, target.radius + this.omegaLaserWidth / 2)) {
                     targetsArray.splice(i, 1);
-                    this.totalDamageDealt += 10; // Base score/damage for targets hit by Omega Laser
+                    this.totalDamageDealt += 10; 
                     if (laserDamageContext && laserDamageContext.updateScoreCallback) laserDamageContext.updateScoreCallback(10);
                 }
             }

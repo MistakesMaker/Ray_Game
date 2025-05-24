@@ -125,11 +125,22 @@
         /* --- CLASS-BASED BACKGROUNDS (scoped to #evolutionScreen for specificity) --- */
         #evolutionScreen .evolutionOption[data-class="attack"] { background-color: rgba(230, 80, 80, 0.28); } 
         #evolutionScreen .evolutionOption[data-class="tank"]   { background-color: rgba(50, 220, 50, 0.35); } 
-        #evolutionScreen .evolutionOption[data-class="utility"]{ background-color: rgba(130, 50, 200, 0.35); }
+        #evolutionScreen .evolutionOption[data-class="ability"]{ background-color: rgba(130, 50, 200, 0.35); }
 
         #evolutionScreen .evolutionOption[data-class="attack"]:hover { background-color: rgba(250, 100, 100, 0.38); }
         #evolutionScreen .evolutionOption[data-class="tank"]:hover   { background-color: rgba(70, 240, 70, 0.45); }
-        #evolutionScreen .evolutionOption[data-class="utility"]:hover{ background-color: rgba(150, 70, 220, 0.45); }
+        #evolutionScreen .evolutionOption[data-class="ability"]:hover{ background-color: rgba(150, 70, 220, 0.45); }
+        
+        /* Specific override for higher-tier TANK to make its green background more translucent to compensate for contrasting glow */
+        #evolutionScreen .evolutionOption[data-tier="epic"][data-class="tank"],
+        #evolutionScreen .evolutionOption[data-tier="legendary"][data-class="tank"] {
+            background-color: rgba(50, 220, 50, 0.25) !important; 
+        }
+        #evolutionScreen .evolutionOption[data-tier="epic"][data-class="tank"]:hover,
+        #evolutionScreen .evolutionOption[data-tier="legendary"][data-class="tank"]:hover {
+            background-color: rgba(70, 240, 70, 0.35) !important; 
+        }
+
 
         /* --- TIER-BASED GLOWS & BORDERS (CORE background is special) --- */
         /* CORE */
