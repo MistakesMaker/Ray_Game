@@ -102,6 +102,7 @@ let freeUpgradeChoicesData = [];
 let currentActiveScreenElement = null;
 let firstBossDefeatedThisRun = false;
 let isBlockModeActive = false;
+// isFreezeModeActive will be on player instance
 
 
 // --- Helper Functions & Initialization Data Logic ---
@@ -585,6 +586,13 @@ function initGame() {
     player.isBlockModeActive = false;
     isBlockModeActive = false; // Sync global state
 
+    // Freeze related player state reset
+    player.evolutionFreezesRemaining = CONSTANTS.MAX_EVOLUTION_FREEZES_PER_RUN;
+    player.frozenEvolutionChoice = null;
+    player.isFreezeModeActive = false;
+    player.hasUsedFreezeForCurrentOffers = false;
+
+
     evolutionChoicesMasterList.forEach(evo => evo.level = 0);
 
     initializeAllPossibleRayColors();
@@ -729,7 +737,8 @@ function updateGame(deltaTime) {
             const contextForBossMan = {
                 dt: deltaTime, canvasWidth: canvas.width, canvasHeight: canvas.height, isAnyPauseActive: isAnyPauseActiveInternal, allRays: rays,
                 screenShakeParams: { isScreenShaking, screenShakeTimer, currentShakeMagnitude, currentShakeType, hitShakeDx, hitShakeDy },
-                bossDefeatEffectsArray: bossDefeatEffects, lootDropsArray: lootDrops, bossLootPool,
+                bossDefeatEffectsArray: bossDefeatEffects,
+                lootDropsArray: lootDrops, bossLootPool,
                 firstBossDefeatedThisRunRef: { get: () => firstBossDefeatedThisRun, set: (val) => firstBossDefeatedThisRun = val },
                 score, evolutionPendingAfterBossRef: { get: () => evolutionPendingAfterBoss, set: (val) => evolutionPendingAfterBoss = val },
                 playerPostDamageImmunityTimer: postDamageImmunityTimer,
@@ -1092,7 +1101,10 @@ function togglePauseMenu() {
         prepareAndShowPauseStats("Paused - Current Status");
         currentActiveScreenElement = pauseScreen;
         isBlockModeActive = false;
-        if(player) player.isBlockModeActive = false;
+        if(player) {
+            player.isBlockModeActive = false;
+            player.isFreezeModeActive = false; // Also turn off freeze mode
+        }
         showScreen(pauseScreen, true, gameScreenCallbacks);
         if(pausePlayerStatsPanel) {
             if (pausePlayerStatsPanel.parentElement !== document.body) document.body.appendChild(pausePlayerStatsPanel);
@@ -1113,7 +1125,10 @@ function startResumeCountdownInternal() {
     gamePausedByEsc = true; isCountingDownToResume = true; let countVal = 3;
     currentActiveScreenElement = countdownOverlay;
     isBlockModeActive = false;
-    if(player) player.isBlockModeActive = false;
+    if(player) {
+        player.isBlockModeActive = false;
+        player.isFreezeModeActive = false;
+    }
     if(countdownOverlay) { countdownOverlay.textContent = countVal.toString(); countdownOverlay.style.display = 'flex'; }
     if (resumeCountdownTimerId) clearInterval(resumeCountdownTimerId);
     resumeCountdownTimerId = setInterval(() => {
@@ -1128,29 +1143,27 @@ function startResumeCountdownInternal() {
     }, 1000);
 }
 
-// --- Evolution Re-roll and Block Logic ---
+// --- Evolution Re-roll, Block, and Freeze Logic ---
 function handleEvolutionReRoll() {
     if (!player || player.evolutionReRollsRemaining <= 0 || !gamePausedForEvolution) return;
 
     player.evolutionReRollsRemaining--;
     playSound(upgradeSound);
-    isBlockModeActive = false;
-    if (player) player.isBlockModeActive = false;
 
-    // Directly refresh the evolution options and UI
+    player.isFreezeModeActive = false;
+    player.isBlockModeActive = false;
+    isBlockModeActive = false;
+
+    player.frozenEvolutionChoice = null;
+    player.hasUsedFreezeForCurrentOffers = false;
+
     currentEvolutionOffers = generateEvolutionOffers();
 
     populateEvolutionOptionsUI(
-        currentEvolutionOffers,
-        player,
-        selectEvolutionInternal,
-        handleEvolutionReRoll, // Pass self for the button's next click
-        toggleBlockMode,
-        shrinkMeCooldown,
-        getReadableColorNameFromUtils
+        currentEvolutionOffers, player, selectEvolutionInternal,
+        handleEvolutionReRoll, toggleBlockMode, shrinkMeCooldown, getReadableColorNameFromUtils,
+        toggleFreezeMode, handleFreezeSelection
     );
-    // The screen (evolutionScreen) is already visible and the game is already paused.
-    // No need to call showScreen or pauseAllGameIntervals again.
 }
 
 function getSingleReplacementEvolution(alreadyOfferedOrBlockedIds) {
@@ -1166,7 +1179,7 @@ function getSingleReplacementEvolution(alreadyOfferedOrBlockedIds) {
 
     const availableForReplacement = evolutionChoicesMasterList.filter(c => {
         if (player.blockedEvolutionIds.includes(c.id)) return false;
-        if (alreadyOfferedOrBlockedIds.includes(c.id)) return false; // Don't offer what's already there or just blocked
+        if (alreadyOfferedOrBlockedIds.includes(c.id)) return false;
 
         if (c.id === 'temporalEcho') {
             if (!hasKineticConversion && !hasSlottedOrMouseAbility) {
@@ -1183,7 +1196,7 @@ function getSingleReplacementEvolution(alreadyOfferedOrBlockedIds) {
 
     let rolledTier = 'common';
     if (chosenBaseEvo.isTiered) {
-        rolledTier = rollTier(); // rollTier() function is already defined
+        rolledTier = rollTier();
     }
     const tierSpecificData = chosenBaseEvo.isTiered ? chosenBaseEvo.tiers[rolledTier] : chosenBaseEvo;
 
@@ -1211,6 +1224,14 @@ function handleBlockActionOnCard(baseIdToBlock, indexOfCardInOffer) {
     player.evolutionBlocksRemaining--;
     playSound(newColorSound);
 
+    player.isFreezeModeActive = false;
+    player.isBlockModeActive = false;
+    isBlockModeActive = false;
+
+    player.frozenEvolutionChoice = null;
+    player.hasUsedFreezeForCurrentOffers = false;
+
+
     const otherOfferedBaseIds = currentEvolutionOffers
         .filter((offer, index) => index !== indexOfCardInOffer && offer.baseId !== 'noMoreEvolutions' && !offer.baseId.startsWith('empty_slot_'))
         .map(offer => offer.baseId);
@@ -1228,91 +1249,144 @@ function handleBlockActionOnCard(baseIdToBlock, indexOfCardInOffer) {
             originalEvolution: { id: `empty_slot_${indexOfCardInOffer}`, isMaxed: ()=>true, isTiered: false }
         };
     }
-    isBlockModeActive = false;
-    if(player) player.isBlockModeActive = false;
 
     populateEvolutionOptionsUI(
-        currentEvolutionOffers,
-        player,
-        selectEvolutionInternal,
-        handleEvolutionReRoll,
-        toggleBlockMode,
-        shrinkMeCooldown,
-        getReadableColorNameFromUtils
+        currentEvolutionOffers, player, selectEvolutionInternal,
+        handleEvolutionReRoll, toggleBlockMode, shrinkMeCooldown, getReadableColorNameFromUtils,
+        toggleFreezeMode, handleFreezeSelection
     );
-     if (typeof equalizeEvolutionCardHeights === "function") { // This function is in ui.js, ensure it's exported or callable
-        // equalizeEvolutionCardHeights(); // This was commented out, assuming it's handled within populateEvolutionOptionsUI or not needed for this specific fix
-    }
 }
 
 function toggleBlockMode() {
     if (!player || !gamePausedForEvolution) return;
-    if (player.evolutionBlocksRemaining <= 0 && !isBlockModeActive) {
+    if (player.isFreezeModeActive) {
+        player.isFreezeModeActive = false;
+    }
+    if (player.evolutionBlocksRemaining <= 0 && !player.isBlockModeActive) {
         playSound(targetHitSound);
         return;
     }
 
-    isBlockModeActive = !isBlockModeActive;
-    player.isBlockModeActive = isBlockModeActive;
+    player.isBlockModeActive = !player.isBlockModeActive;
+    isBlockModeActive = player.isBlockModeActive;
 
-    playSound(upgradeSound);
+    playSound(player.isBlockModeActive ? upgradeSound : targetHitSound);
 
     populateEvolutionOptionsUI(
-        currentEvolutionOffers,
-        player,
-        selectEvolutionInternal,
-        handleEvolutionReRoll,
-        toggleBlockMode,
-        shrinkMeCooldown,
-        getReadableColorNameFromUtils
+        currentEvolutionOffers, player, selectEvolutionInternal,
+        handleEvolutionReRoll, toggleBlockMode, shrinkMeCooldown, getReadableColorNameFromUtils,
+        toggleFreezeMode, handleFreezeSelection
     );
-    // if (typeof equalizeEvolutionCardHeights === "function") { // This was commented out
-    //    equalizeEvolutionCardHeights();
-    // }
+}
+
+function toggleFreezeMode() {
+    if (!player || !gamePausedForEvolution) return;
+    if (player.isBlockModeActive) { // Cannot enter freeze mode if block mode is active
+        playSound(targetHitSound); return;
+    }
+
+    // If currently in freeze selection mode, toggle it off.
+    if (player.isFreezeModeActive) {
+        player.isFreezeModeActive = false;
+        playSound(targetHitSound); // "Cancel" sound
+    }
+    // Else, trying to activate freeze functionality (either unfreeze or enter selection mode)
+    else {
+        if (player.frozenEvolutionChoice) { // A card is globally frozen - pressing F/button unfreezes it
+            player.frozenEvolutionChoice = null;
+            if (player.evolutionFreezesRemaining < CONSTANTS.MAX_EVOLUTION_FREEZES_PER_RUN) {
+                player.evolutionFreezesRemaining++; // Refund charge
+            }
+            player.hasUsedFreezeForCurrentOffers = true; // Action taken this turn
+            playSound(newColorSound); // "Unfreeze" sound
+            // Do NOT enter player.isFreezeModeActive = true here
+        } else if (player.evolutionFreezesRemaining > 0) { // No global freeze, but have charges: enter selection mode
+            player.isFreezeModeActive = true;
+            playSound(upgradeSound); // "Enable freeze mode" sound
+        } else { // No global freeze and no charges
+            playSound(targetHitSound); // Deny
+        }
+    }
+
+    populateEvolutionOptionsUI(
+        currentEvolutionOffers, player, selectEvolutionInternal,
+        handleEvolutionReRoll, toggleBlockMode, shrinkMeCooldown, getReadableColorNameFromUtils,
+        toggleFreezeMode, handleFreezeSelection
+    );
+}
+
+function handleFreezeSelection(uiSelectedChoiceToFreeze) {
+    // This function is now only for *setting* a new freeze when a card is clicked in freeze mode.
+    // Unfreezing is handled by toggleFreezeMode if a global freeze was already set.
+    if (!player || !gamePausedForEvolution || !player.isFreezeModeActive) return;
+
+    if (player.evolutionFreezesRemaining > 0) {
+        // If they are in freeze mode and click a card, it means they want to freeze THIS card.
+        // If another card was globally frozen before entering freeze mode THIS TURN,
+        // that old global freeze is lost (charge not refunded for old one). New one costs.
+        player.evolutionFreezesRemaining--;
+        player.frozenEvolutionChoice = JSON.parse(JSON.stringify(uiSelectedChoiceToFreeze));
+        player.hasUsedFreezeForCurrentOffers = true;
+        playSound(evolutionSound);
+    } else {
+        playSound(targetHitSound); // Should ideally not happen if toggleFreezeMode is correct
+    }
+
+    player.isFreezeModeActive = false; // Exit freeze selection mode after picking a card to freeze
+    populateEvolutionOptionsUI(
+        currentEvolutionOffers, player, selectEvolutionInternal,
+        handleEvolutionReRoll, toggleBlockMode, shrinkMeCooldown, getReadableColorNameFromUtils,
+        toggleFreezeMode, handleFreezeSelection
+    );
 }
 
 
 function generateEvolutionOffers() {
     if (!player) return [];
+    let offers = [];
+    let offeredBaseIds = [];
 
-    const hasSlottedOrMouseAbility =
-        (player.activeAbilities['1'] !== null) ||
-        (player.activeAbilities['2'] !== null) ||
-        (player.activeAbilities['3'] !== null) ||
-        player.hasOmegaLaser ||
-        player.hasShieldOvercharge;
-    const hasKineticConversion = player.kineticConversionLevel > 0;
+    // Store the currently globally frozen choice's baseId if it exists
+    // This is so the UI can still show the "actually-frozen" visual marker correctly
+    // even though player.frozenEvolutionChoice itself might be cleared by this function after presentation.
+    const globallyFrozenBaseIdForVisuals = player.frozenEvolutionChoice ? player.frozenEvolutionChoice.baseId : null;
 
-    const available = evolutionChoicesMasterList.filter(c => {
-        if (player.blockedEvolutionIds.includes(c.id)) {
-            return false;
+
+    if (player.frozenEvolutionChoice) {
+        const originalFrozenMeta = evolutionChoicesMasterList.find(e => e.id === player.frozenEvolutionChoice.baseId);
+        let isStillValid = true;
+        if (!originalFrozenMeta || (originalFrozenMeta.isMaxed && originalFrozenMeta.isMaxed(player)) || player.blockedEvolutionIds.includes(originalFrozenMeta.id)) {
+            isStillValid = false;
         }
-        if (c.id === 'temporalEcho') {
-            if (!hasKineticConversion && !hasSlottedOrMouseAbility) {
-                return false;
-            }
+
+        if (isStillValid) {
+            const frozenOfferData = JSON.parse(JSON.stringify(player.frozenEvolutionChoice));
+            offers.push(frozenOfferData);
+            offeredBaseIds.push(frozenOfferData.baseId);
         }
-        const isChoiceMaxed = c.isMaxed ? c.isMaxed(player) : false;
-        return !isChoiceMaxed;
-    });
+        // The global freeze is "spent" by being presented (or found invalid).
+        // It will be cleared here. If the player wants THIS card frozen for *next* round,
+        // they must use the freeze UI action *this turn*.
+        player.frozenEvolutionChoice = null;
+    }
 
-    let newOffers = [];
-    if(available.length > 0){
-        let shuffledAvailable = [...available].sort(() => 0.5 - Math.random());
-        // Ensure we don't try to pick more than available
-        const numToPick = Math.min(3, shuffledAvailable.length);
-        let selectedBaseEvolutions = shuffledAvailable.slice(0, numToPick);
+    const slotsToFill = 3 - offers.length;
+    if (slotsToFill > 0) {
+        const exclusionList = [...player.blockedEvolutionIds, ...offeredBaseIds];
+        const availableChoices = evolutionChoicesMasterList.filter(c => {
+            if (exclusionList.includes(c.id)) return false;
+            return !(c.isMaxed && c.isMaxed(player));
+        });
+        let shuffledAvailable = [...availableChoices].sort(() => 0.5 - Math.random());
 
-        selectedBaseEvolutions.forEach(baseEvo => {
-            let rolledTier = 'common';
-            if (baseEvo.isTiered) {
-                rolledTier = rollTier();
-            }
+        for (let i = 0; i < slotsToFill && shuffledAvailable.length > 0; i++) {
+            const baseEvo = shuffledAvailable.shift();
+            if (!baseEvo) continue;
+            let rolledTier = baseEvo.isTiered ? rollTier() : 'common';
             const tierSpecificData = baseEvo.isTiered ? baseEvo.tiers[rolledTier] : baseEvo;
 
-            newOffers.push({
-                baseId: baseEvo.id,
-                classType: baseEvo.classType,
+            const offer = {
+                baseId: baseEvo.id, classType: baseEvo.classType,
                 rolledTier: baseEvo.isTiered ? rolledTier : null,
                 text: baseEvo.text,
                 detailedDescription: baseEvo.isTiered ? tierSpecificData.description : baseEvo.detailedDescription,
@@ -1321,31 +1395,34 @@ function generateEvolutionOffers() {
                                     ? baseEvo.getCardEffectString(rolledTier, player)
                                     : (baseEvo.getEffectString ? baseEvo.getEffectString(player, baseEvo.level) : 'Effect details vary'),
                 originalEvolution: baseEvo
-            });
-        });
+            };
+            // If this offer was the one that was globally frozen for UI visuals
+            if(offer.baseId === globallyFrozenBaseIdForVisuals) {
+                offer.wasGloballyFrozen = true; // Add a temporary flag for UI
+            }
+            offers.push(offer);
+            offeredBaseIds.push(baseEvo.id);
+        }
     }
 
-    if (newOffers.length === 0) {
-        newOffers.push({
-            id:'noMoreEvolutions',
-            baseId: 'noMoreEvolutions',
-            classType: 'ability',
+    if (offers.length === 0) {
+        offers.push({
+            baseId: 'noMoreEvolutions', classType: 'ability',
             text:"All evolutions maxed or no valid options!",
             applyEffect:()=>"No more evolutions!",
-            isMaxed: ()=> true,
             originalEvolution: {id:'noMoreEvolutions', isMaxed:()=>true, isTiered: false, detailedDescription: "No further upgrades available at this time."}
         });
     }
-     while (newOffers.length > 0 && newOffers.length < 3) {
-        newOffers.push({
-            baseId: `empty_slot_${newOffers.length}`,
-            classType: 'ability', text:"No More Options",
+    while (offers.length < 3 && offers.length > 0) {
+        offers.push({
+            baseId: `empty_slot_${offers.length}`, classType: 'ability', text:"No More Options",
             detailedDescription: "All available evolutions have been offered or blocked.",
             applyEffect: ()=>{}, cardEffectString: "Unavailable",
-            originalEvolution: { id: `empty_slot_${newOffers.length}`, isMaxed: ()=>true, isTiered: false }
+            originalEvolution: { id: `empty_slot_${offers.length}`, isMaxed: ()=>true, isTiered: false }
         });
     }
-    return newOffers;
+    if (offers.length > 1) { offers.sort(() => 0.5 - Math.random()); }
+    return offers;
 }
 
 
@@ -1356,25 +1433,25 @@ function triggerEvolutionInternal() {
     currentActiveScreenElement = evolutionScreen;
     applyMusicPlayStateWrapper(); playSound(evolutionSound);
 
+    player.hasUsedFreezeForCurrentOffers = false;
     player.isBlockModeActive = false;
     isBlockModeActive = false;
+    player.isFreezeModeActive = false;
+    // player.frozenEvolutionChoice is now cleared within generateEvolutionOffers after presentation
+
     currentEvolutionOffers = generateEvolutionOffers();
 
     populateEvolutionOptionsUI(
-        currentEvolutionOffers,
-        player,
-        selectEvolutionInternal,
-        handleEvolutionReRoll,
-        toggleBlockMode,
-        shrinkMeCooldown,
-        getReadableColorNameFromUtils
+        currentEvolutionOffers, player, selectEvolutionInternal,
+        handleEvolutionReRoll, toggleBlockMode, shrinkMeCooldown, getReadableColorNameFromUtils,
+        toggleFreezeMode, handleFreezeSelection
     );
     showScreen(evolutionScreen, true, gameScreenCallbacks);
 }
 
 
 function selectEvolutionInternal(uiSelectedChoice, indexOfCardInOffer) {
-    if(!player) {console.error("Player not defined"); return;}
+    if (!player) { console.error("Player not defined"); return; }
 
     if (player.isBlockModeActive) {
         if (uiSelectedChoice.baseId !== 'noMoreEvolutions' && !uiSelectedChoice.baseId.startsWith('empty_slot_')) {
@@ -1385,48 +1462,52 @@ function selectEvolutionInternal(uiSelectedChoice, indexOfCardInOffer) {
         return;
     }
 
-    if(uiSelectedChoice.baseId ==='noMoreEvolutions' || uiSelectedChoice.baseId.startsWith('empty_slot_')){
-        gamePausedForEvolution=false; postPopupImmunityTimer=CONSTANTS.POST_POPUP_IMMUNITY_DURATION;
-        currentActiveScreenElement = null;
-        isBlockModeActive = false; if(player) player.isBlockModeActive = false;
-        showScreen(null, false, gameScreenCallbacks);
-        applyMusicPlayStateWrapper(); lastTime=performance.now(); if(!gameOver&&!animationFrameId && gameRunning)animationFrameId=requestAnimationFrame(gameLoop);
-        uiUpdateActiveBuffIndicator(player, postPopupImmunityTimer, postDamageImmunityTimer); resumeAllGameIntervals();
-        return;
-    }
-
-    if (uiSelectedChoice.applyEffect) {
-        const effectMessage = uiSelectedChoice.applyEffect(player);
-        if (effectMessage && typeof effectMessage === 'string' && activeBuffNotifications) {
+    if (uiSelectedChoice.baseId !== 'noMoreEvolutions' && !uiSelectedChoice.baseId.startsWith('empty_slot_')) {
+        if (uiSelectedChoice.applyEffect) {
+            uiSelectedChoice.applyEffect(player);
+        } else {
+            console.error("Error: applyEffect not found for choice:", uiSelectedChoice);
         }
-    } else {
-        console.error("Error: applyEffect not found for choice:", uiSelectedChoice);
+        const originalEvo = evolutionChoicesMasterList.find(e => e.id === uiSelectedChoice.baseId);
+        if (originalEvo) {
+            originalEvo.level = (originalEvo.level || 0) + 1;
+        }
     }
 
-    const originalEvo = evolutionChoicesMasterList.find(e => e.id === uiSelectedChoice.baseId);
-    if (originalEvo) {
-        originalEvo.level = (originalEvo.level || 0) + 1;
+    // If player.hasUsedFreezeForCurrentOffers is true, it means a freeze action (new freeze)
+    // was performed THIS TURN via handleFreezeSelection. player.frozenEvolutionChoice will
+    // correctly hold the card they want to carry to the next round. The charge was consumed there.
+    // If player.hasUsedFreezeForCurrentOffers is false, it means no freeze UI interaction happened this turn.
+    // In this case, player.frozenEvolutionChoice should be null (because generateEvolutionOffers cleared it
+    // if one was presented). So, no card carries over.
+    if (!player.hasUsedFreezeForCurrentOffers) {
+        player.frozenEvolutionChoice = null;
     }
+
 
     lastEvolutionScore = player.evolutionIntervalModifier > 0 ? Math.floor(score / (CONSTANTS.EVOLUTION_SCORE_INTERVAL * player.evolutionIntervalModifier)) * (CONSTANTS.EVOLUTION_SCORE_INTERVAL * player.evolutionIntervalModifier) : score;
     survivalScoreThisCycle = 0;
-
     if (uiSelectedChoice.baseId !== 'smallerPlayer') {
         currentPlayerRadiusGrowthFactor = currentEffectiveDefaultGrowthFactor;
     }
-
     if (uiSelectedChoice.baseId === 'kineticConversion' && kineticChargeUIElement && player) {
         let maxPotencyBonusAtFullCharge = player.initialKineticDamageBonus + (Math.max(0, player.kineticConversionLevel - 1) * player.effectiveKineticAdditionalDamageBonusPerLevel);
         updateKineticChargeUI(player.kineticCharge, player.kineticChargeConsumption, maxPotencyBonusAtFullCharge, player.kineticConversionLevel > 0);
     }
 
-    gamePausedForEvolution = false; evolutionPendingAfterBoss = false; postPopupImmunityTimer = CONSTANTS.POST_POPUP_IMMUNITY_DURATION;
+    player.isFreezeModeActive = false;
+    player.hasUsedFreezeForCurrentOffers = false;
+    player.isBlockModeActive = false;
+    isBlockModeActive = false;
+
+    gamePausedForEvolution = false;
+    evolutionPendingAfterBoss = false;
+    postPopupImmunityTimer = CONSTANTS.POST_POPUP_IMMUNITY_DURATION;
     currentActiveScreenElement = null;
-    isBlockModeActive = false; if(player) player.isBlockModeActive = false; // Ensure block mode is off after selection
     showScreen(null, false, gameScreenCallbacks);
     applyMusicPlayStateWrapper();
     lastTime = performance.now();
-    if(!gameOver&&!animationFrameId && gameRunning) {
+    if (!gameOver && !animationFrameId && gameRunning) {
         animationFrameId = requestAnimationFrame(gameLoop);
     }
     uiUpdateActiveBuffIndicator(player, postPopupImmunityTimer, postDamageImmunityTimer);
@@ -1440,7 +1521,11 @@ function triggerFreeUpgradeInternal() {
     if(!player || isAnyPauseActiveInternal() || (bossManager && bossManager.isBossSequenceActive()))return;
     pauseAllGameIntervals(); gamePausedForFreeUpgrade = true;
     currentActiveScreenElement = freeUpgradeScreen;
-    isBlockModeActive = false; if(player) player.isBlockModeActive = false;
+    if(player) {
+        player.isBlockModeActive = false;
+        player.isFreezeModeActive = false;
+    }
+    isBlockModeActive = false;
     applyMusicPlayStateWrapper(); playSound(upgradeSound);
     let upg; const avail = freeUpgradeChoicesData.filter(c=>!c.isMaxed(player));
     if(avail.length>0) upg=avail[Math.floor(Math.random()*avail.length)]; else upg={id:'noMoreFreeUpgrades',text:"All free bonuses maxed!",apply:()=>"No more free bonuses!"};
@@ -1452,7 +1537,11 @@ function handleFreeUpgradeCloseInternal(chosenUpgrade) {
     if(chosenUpgrade && chosenUpgrade.id!=='noMoreFreeUpgrades') chosenUpgrade.apply();
     gamePausedForFreeUpgrade = false; postPopupImmunityTimer=CONSTANTS.POST_POPUP_IMMUNITY_DURATION;
     currentActiveScreenElement = null;
-    isBlockModeActive = false; if(player) player.isBlockModeActive = false;
+    if(player) {
+        player.isBlockModeActive = false;
+        player.isFreezeModeActive = false;
+    }
+    isBlockModeActive = false;
     showScreen(null, false, gameScreenCallbacks);
     applyMusicPlayStateWrapper(); lastTime=performance.now(); if(!gameOver&&!animationFrameId && gameRunning)animationFrameId=requestAnimationFrame(gameLoop);
     uiUpdateActiveBuffIndicator(player, postPopupImmunityTimer, postDamageImmunityTimer); resumeAllGameIntervals();
@@ -1466,7 +1555,11 @@ function triggerLootChoiceInternal(choices) {
     }
     pauseAllGameIntervals(); gamePausedForLootChoice = true;
     currentActiveScreenElement = lootChoiceScreen;
-    isBlockModeActive = false; if(player) player.isBlockModeActive = false;
+    if(player) {
+        player.isBlockModeActive = false;
+        player.isFreezeModeActive = false;
+    }
+    isBlockModeActive = false;
     applyMusicPlayStateWrapper();
     lootChoiceScreen.querySelector('h2').textContent = "Salvaged Technology!";
     lootChoiceScreen.querySelector('p').textContent = "Choose one permanent upgrade:";
@@ -1503,7 +1596,11 @@ function selectLootUpgradeInternal(chosenUpgrade) {
      gamePausedForLootChoice = false;
      postPopupImmunityTimer = CONSTANTS.POST_POPUP_IMMUNITY_DURATION * 0.75;
      currentActiveScreenElement = null;
-     isBlockModeActive = false; if(player) player.isBlockModeActive = false;
+     if(player) {
+        player.isBlockModeActive = false;
+        player.isFreezeModeActive = false;
+     }
+    isBlockModeActive = false;
      showScreen(null, false, gameScreenCallbacks);
      applyMusicPlayStateWrapper();
      lastTime = performance.now();
@@ -1525,7 +1622,11 @@ function triggerFirstBossLootChoiceInternal() {
     if (!player) return;
     pauseAllGameIntervals(); gamePausedForLootChoice = true;
     currentActiveScreenElement = lootChoiceScreen;
-    isBlockModeActive = false; if(player) player.isBlockModeActive = false;
+    if(player) {
+        player.isBlockModeActive = false;
+        player.isFreezeModeActive = false;
+    }
+    isBlockModeActive = false;
     applyMusicPlayStateWrapper();
 
     const firstBossChoices = [
@@ -1566,7 +1667,11 @@ function selectFirstPathBuffInternal(chosenPathBuff) {
     gamePausedForLootChoice = false;
     postPopupImmunityTimer = CONSTANTS.POST_POPUP_IMMUNITY_DURATION * 0.75;
     currentActiveScreenElement = null;
-    isBlockModeActive = false; if(player) player.isBlockModeActive = false;
+    if(player) {
+        player.isBlockModeActive = false;
+        player.isFreezeModeActive = false;
+    }
+    isBlockModeActive = false;
     showScreen(null, false, gameScreenCallbacks);
     applyMusicPlayStateWrapper();
     lastTime = performance.now();
@@ -1597,7 +1702,9 @@ function createFinalStatsSnapshot() {
                 evolutionReRollsRemaining: CONSTANTS.MAX_EVOLUTION_REROLLS,
                 evolutionBlocksRemaining: CONSTANTS.MAX_EVOLUTION_BLOCKS,
                 blockedEvolutionIds: [],
-                isBlockModeActive: false
+                isBlockModeActive: false,
+                evolutionFreezesRemaining: CONSTANTS.MAX_EVOLUTION_FREEZES_PER_RUN,
+                frozenEvolutionChoice: null
             },
             bossTierData: { chaser: 0, reflector: 0, singularity: 0 },
             gameplayTimeData: gameplayTimeElapsed
@@ -1639,6 +1746,8 @@ function createFinalStatsSnapshot() {
         evolutionBlocksRemaining: player.evolutionBlocksRemaining,
         blockedEvolutionIds: [...player.blockedEvolutionIds],
         isBlockModeActive: player.isBlockModeActive,
+        evolutionFreezesRemaining: player.evolutionFreezesRemaining,
+        frozenEvolutionChoice: player.frozenEvolutionChoice ? JSON.parse(JSON.stringify(player.frozenEvolutionChoice)) : null,
 
         formattedActiveAbilities: getFormattedActiveAbilitiesForStats(player),
         formattedMouseAbilities: getFormattedMouseAbilitiesForStats(player),
@@ -1825,8 +1934,13 @@ function showStartScreenWithUpdatesInternal() {
     if (player && player.isFiringOmegaLaser) stopSound(omegaLaserSound);
     if (bossManager) bossManager.reset();
 
-    isBlockModeActive = false;
-    if(player) player.isBlockModeActive = false;
+    if(player) { // Reset interaction modes on player for new game
+        player.isBlockModeActive = false;
+        player.isFreezeModeActive = false;
+        player.frozenEvolutionChoice = null;
+        player.hasUsedFreezeForCurrentOffers = false;
+    }
+    isBlockModeActive = false; // Global for block mode, ensure it's off
 
 
     if (pausePlayerStatsPanel) {
@@ -1890,6 +2004,7 @@ const gameContextForEventListeners = {
     getDetailedHighScoresScreenElement: () => detailedHighScoresScreen,
     isEvolutionScreenActive: () => currentActiveScreenElement === evolutionScreen,
     isBlockModeActive: () => isBlockModeActive,
+    isFreezeModeActive: () => (player ? player.isFreezeModeActive : false),
     callbacks: {
         startGame: initGame,
         showSettingsScreenFromStart: () => { setPreviousScreenForSettings(startScreen); currentActiveScreenElement = settingsScreen; showScreen(settingsScreen, false, gameScreenCallbacks); },
@@ -1924,7 +2039,9 @@ const gameContextForEventListeners = {
         onWindowResize: () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; inputState.mouseX = canvas.width / 2; inputState.mouseY = canvas.height / 2; mouseX = inputState.mouseX; mouseY = inputState.mouseY; if(player&&gameRunning){player.x=Math.max(player.radius,Math.min(player.x,canvas.width-player.radius));player.y=Math.max(player.radius,Math.min(player.y,canvas.height-player.radius));} if(gameRunning && !gameOver && !isAnyPauseActiveInternal()) drawGame(); if ((gamePausedByEsc || gameOver || (detailedHighScoresScreen && detailedHighScoresScreen.style.display === 'flex')) && pausePlayerStatsPanel && pausePlayerStatsPanel.style.display === 'block') { if (pausePlayerStatsPanel.parentElement === document.body && uiHighScoreContainer && uiHighScoreContainer.offsetParent !== null && detailedHighScoresScreen.style.display !== 'flex') { const r = uiHighScoreContainer.getBoundingClientRect(); pausePlayerStatsPanel.style.top = (r.bottom + 10) + 'px'; }  else if (pausePlayerStatsPanel.parentElement === document.body && detailedHighScoresScreen.style.display !== 'flex') { pausePlayerStatsPanel.style.top = '20px';}}},
         debugSpawnBoss: debugForceSpawnBoss,
         handleEvolutionReRoll: handleEvolutionReRoll,
-        toggleBlockMode: toggleBlockMode
+        toggleBlockMode: toggleBlockMode,
+        toggleFreezeMode: toggleFreezeMode,
+        handleFreezeSelection: handleFreezeSelection
     }
 };
 

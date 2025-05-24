@@ -2,12 +2,12 @@
 
 export function setupEventListeners(canvasElement, gameContext) {
     window.addEventListener('keydown', (e) => {
-        if (!e.key) { 
-            return; 
+        if (!e.key) {
+            return;
         }
         const keyLower = e.key.toLowerCase();
 
-        if (gameContext.inputState.keys.hasOwnProperty(e.key)) { 
+        if (gameContext.inputState.keys.hasOwnProperty(e.key)) {
             gameContext.inputState.keys[e.key] = true;
         }
         if (['w', 'a', 's', 'd'].includes(keyLower) && gameContext.inputState.keys.hasOwnProperty(keyLower) ) {
@@ -22,15 +22,15 @@ export function setupEventListeners(canvasElement, gameContext) {
 
 
             if (activeScreen === settingsScreenElement && gameContext.callbacks.goBackFromSettings) {
-                e.preventDefault(); 
+                e.preventDefault();
                 gameContext.callbacks.goBackFromSettings();
             } else if (activeScreen === detailedHighScoresScreenElement && gameContext.callbacks.goBackFromDetailedHighScores) {
                 e.preventDefault();
-                gameContext.callbacks.goBackFromDetailedHighScores(); 
+                gameContext.callbacks.goBackFromDetailedHighScores();
             } else if (gameContext.isGameRunning && gameContext.isGameRunning() && !gameContext.isGameOver()) {
-                if ((gameContext.isAnyPauseActiveExceptEsc && !gameContext.isAnyPauseActiveExceptEsc()) || 
+                if ((gameContext.isAnyPauseActiveExceptEsc && !gameContext.isAnyPauseActiveExceptEsc()) ||
                     (gameContext.isGamePausedByEsc && gameContext.isGamePausedByEsc()) ||
-                    (!gameContext.isAnyPauseActiveExceptEsc || !gameContext.isAnyPauseActiveExceptEsc()) && (!gameContext.isGamePausedByEsc || !gameContext.isGamePausedByEsc()) 
+                    (!gameContext.isAnyPauseActiveExceptEsc || !gameContext.isAnyPauseActiveExceptEsc()) && (!gameContext.isGamePausedByEsc || !gameContext.isGamePausedByEsc())
                    ) {
                     if (gameContext.callbacks.togglePauseMenu) {
                         e.preventDefault();
@@ -39,14 +39,14 @@ export function setupEventListeners(canvasElement, gameContext) {
                 }
             }
         }
-        
-        // --- ABILITY & INTERACTION KEY LOGIC ---
-        const playerInstance = gameContext.getPlayerInstance ? gameContext.getPlayerInstance() : null; 
 
-        if (playerInstance && gameContext.isGameRunning && gameContext.isGameRunning() && 
-            (!gameContext.isAnyPauseActiveExceptEsc || !gameContext.isAnyPauseActiveExceptEsc()) && 
-            (!gameContext.isGamePausedByEsc || !gameContext.isGamePausedByEsc()) 
-           ) { 
+        // --- ABILITY & INTERACTION KEY LOGIC ---
+        const playerInstance = gameContext.getPlayerInstance ? gameContext.getPlayerInstance() : null;
+
+        if (playerInstance && gameContext.isGameRunning && gameContext.isGameRunning() &&
+            (!gameContext.isAnyPauseActiveExceptEsc || !gameContext.isAnyPauseActiveExceptEsc()) &&
+            (!gameContext.isGamePausedByEsc || !gameContext.isGamePausedByEsc())
+           ) {
             // Numbered Abilities (1, 2, 3)
             const abilityContext = gameContext.getForPlayerAbilityContext ? gameContext.getForPlayerAbilityContext() : {};
             if (e.key === '1') playerInstance.activateAbility('1', abilityContext);
@@ -56,8 +56,8 @@ export function setupEventListeners(canvasElement, gameContext) {
         }
 
         // Re-roll listener (R key) - only if evolution screen is active
-        if (keyLower === 'r' && 
-            gameContext.isEvolutionScreenActive && gameContext.isEvolutionScreenActive() && 
+        if (keyLower === 'r' &&
+            gameContext.isEvolutionScreenActive && gameContext.isEvolutionScreenActive() &&
             gameContext.callbacks.handleEvolutionReRoll) {
             e.preventDefault();
             gameContext.callbacks.handleEvolutionReRoll();
@@ -71,8 +71,16 @@ export function setupEventListeners(canvasElement, gameContext) {
             gameContext.callbacks.toggleBlockMode();
         }
 
+        // Toggle Freeze Mode listener (F key) - only if evolution screen is active
+        if (keyLower === 'f' &&
+            gameContext.isEvolutionScreenActive && gameContext.isEvolutionScreenActive() &&
+            gameContext.callbacks.toggleFreezeMode) { // New callback for freeze
+            e.preventDefault();
+            gameContext.callbacks.toggleFreezeMode();
+        }
 
-        if (e.key === 'F1') { 
+
+        if (e.key === 'F1') {
             if (gameContext.callbacks.debugSpawnBoss) {
                 e.preventDefault();
                 gameContext.callbacks.debugSpawnBoss(0);
@@ -81,8 +89,8 @@ export function setupEventListeners(canvasElement, gameContext) {
     });
 
     window.addEventListener('keyup', (e) => {
-        if (!e.key) { 
-            return; 
+        if (!e.key) {
+            return;
         }
         const keyLower = e.key.toLowerCase();
 
@@ -90,7 +98,7 @@ export function setupEventListeners(canvasElement, gameContext) {
             gameContext.inputState.keys[e.key] = false;
         }
         if (['w', 'a', 's', 'd'].includes(keyLower) && gameContext.inputState.keys.hasOwnProperty(keyLower) ) {
-            gameContext.inputState.keys[keyLower] = false;
+             gameContext.inputState.keys[keyLower] = false;
        }
     });
 
@@ -101,23 +109,23 @@ export function setupEventListeners(canvasElement, gameContext) {
     });
 
     canvasElement.addEventListener('mousedown', (e) => {
-        const playerInstance = gameContext.getPlayerInstance ? gameContext.getPlayerInstance() : null; 
+        const playerInstance = gameContext.getPlayerInstance ? gameContext.getPlayerInstance() : null;
         const activeBuffsArray = gameContext.getActiveBuffNotificationsArray ? gameContext.getActiveBuffNotificationsArray() : [];
         const abilityContext = gameContext.getForPlayerAbilityContext ? gameContext.getForPlayerAbilityContext() : {};
 
 
-        if (playerInstance && gameContext.isGameRunning && gameContext.isGameRunning() && 
+        if (playerInstance && gameContext.isGameRunning && gameContext.isGameRunning() &&
             (!gameContext.isAnyPauseActiveExceptEsc || !gameContext.isAnyPauseActiveExceptEsc()) &&
             (!gameContext.isGamePausedByEsc || !gameContext.isGamePausedByEsc())
-            ) { 
-            if (e.button === 0) { 
+            ) {
+            if (e.button === 0) {
                 if (playerInstance.hasOmegaLaser) {
-                    playerInstance.activateOmegaLaser(activeBuffsArray, abilityContext); 
+                    playerInstance.activateOmegaLaser(activeBuffsArray, abilityContext);
                     e.preventDefault();
                 }
-            } else if (e.button === 2) { 
+            } else if (e.button === 2) {
                 if (playerInstance.hasShieldOvercharge) {
-                    playerInstance.activateShieldOvercharge(activeBuffsArray, abilityContext); 
+                    playerInstance.activateShieldOvercharge(activeBuffsArray, abilityContext);
                     e.preventDefault();
                 }
             }
@@ -130,7 +138,7 @@ export function setupEventListeners(canvasElement, gameContext) {
         if (gameContext.callbacks.onWindowResize) gameContext.callbacks.onWindowResize();
     });
 
-    // Button Event Listeners 
+    // Button Event Listeners
     const startGameButton = document.getElementById('startGameButton');
     if (startGameButton && gameContext.callbacks.startGame) {
         startGameButton.addEventListener('click', gameContext.callbacks.startGame);

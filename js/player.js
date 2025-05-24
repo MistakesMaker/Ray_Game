@@ -1,5 +1,5 @@
 // js/player.js
-import { 
+import {
     PLAYER_BASE_RADIUS, MIN_PLAYER_BASE_RADIUS, PLAYER_BASE_COLOR, PLAYER_MAX_HP,
     RAY_DAMAGE_TO_PLAYER, HP_REGEN_NO_DAMAGE_THRESHOLD, HP_REGEN_INTERVAL, PLAYER_SPEED_BASE,
     PLAYER_AIM_INDICATOR_LENGTH, TELEPORT_IMMUNITY_DURATION,
@@ -11,18 +11,17 @@ import {
     POST_DAMAGE_IMMUNITY_DURATION,
     PLAYER_BOUNCE_FORCE_FROM_GRAVITY_BALL,
     RAY_SPAWN_GRACE_PERIOD,
-    PERFECT_HARMONY_NO_DAMAGE_DURATION_THRESHOLD, 
-    PERFECT_HARMONY_RAY_DAMAGE_BONUS,    
-    PERFECT_HARMONY_SPEED_BONUS,       
-    PERFECT_HARMONY_COOLDOWN_REDUCTION, 
-    BERSERKERS_ECHO_DAMAGE_PER_10_HP,  
-    BERSERKERS_ECHO_SPEED_PER_10_HP,   
+    PERFECT_HARMONY_NO_DAMAGE_DURATION_THRESHOLD,
+    PERFECT_HARMONY_RAY_DAMAGE_BONUS,
+    PERFECT_HARMONY_SPEED_BONUS,
+    PERFECT_HARMONY_COOLDOWN_REDUCTION,
+    BERSERKERS_ECHO_DAMAGE_PER_10_HP,
+    BERSERKERS_ECHO_SPEED_PER_10_HP,
     DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL,
     DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL,
     KINETIC_INITIAL_DAMAGE_BONUS,
-    // MAX_EVOLUTION_REROLLS, // Not strictly needed here if only used for init in main.js
-    // MAX_EVOLUTION_BLOCKS   // Not strictly needed here if only used for init in main.js
-} from './constants.js'; 
+    MAX_EVOLUTION_FREEZES_PER_RUN // Make sure this is imported if needed here, or used from main.js
+} from './constants.js';
 
 import { checkCollision, hexToRgb, lightenColor, isLineSegmentIntersectingCircle } from './utils.js';
 import {
@@ -50,42 +49,42 @@ export class Player {
         this.evolutionIntervalModifier = 1.0; this.rayDamageBonus = 0;
         this.hasTargetPierce = false; this.chainReactionChance = 0.0;
         this.scatterShotLevel = 0; this.ownRaySpeedMultiplier = 1.0;
-        
-        this.damageTakenMultiplier = 1.0; 
+
+        this.damageTakenMultiplier = 1.0;
 
         this.hpPickupBonus = 0;
-        this.abilityDamageMultiplier = 1.0; 
+        this.abilityDamageMultiplier = 1.0;
         this.temporalEchoChance = 0.0;
         this.temporalEchoFixedReduction = 2000;
 
         // Critical Hit Stats
-        this.rayCritChance = 0.0;               
-        this.rayCritDamageMultiplier = 1.5;     
-        this.abilityCritChance = 0.0;           
-        this.abilityCritDamageMultiplier = 1.5; 
+        this.rayCritChance = 0.0;
+        this.rayCritDamageMultiplier = 1.5;
+        this.abilityCritChance = 0.0;
+        this.abilityCritDamageMultiplier = 1.5;
 
         // Kinetic Conversion Properties
-        this.kineticCharge = 0;                            
-        this.baseKineticChargeRate = 1.0;          
-        this.effectiveKineticChargeRatePerLevel = DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL; 
-        this.kineticDecayRate = 2.0;                       
-        this.kineticChargeSpeedThresholdFactor = 0.70;     
-        this.kineticConversionLevel = 0;                   
-        this.initialKineticDamageBonus = KINETIC_INITIAL_DAMAGE_BONUS;          
-        this.effectiveKineticAdditionalDamageBonusPerLevel = DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL; 
-        this.kineticChargeConsumption = 100;               
+        this.kineticCharge = 0;
+        this.baseKineticChargeRate = 1.0;
+        this.effectiveKineticChargeRatePerLevel = DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL;
+        this.kineticDecayRate = 2.0;
+        this.kineticChargeSpeedThresholdFactor = 0.70;
+        this.kineticConversionLevel = 0;
+        this.initialKineticDamageBonus = KINETIC_INITIAL_DAMAGE_BONUS;
+        this.effectiveKineticAdditionalDamageBonusPerLevel = DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL;
+        this.kineticChargeConsumption = 100;
 
-        this.currentOmegaLaserKineticBoost = 1.0;    
-        this.currentGravityWellKineticBoost = 1.0; 
+        this.currentOmegaLaserKineticBoost = 1.0;
+        this.currentGravityWellKineticBoost = 1.0;
 
-        this.timeSinceLastHit = Number.MAX_SAFE_INTEGER; 
+        this.timeSinceLastHit = Number.MAX_SAFE_INTEGER;
         this.hpRegenTimer = 0; this.baseHpRegenAmount = 1;
         this.hpRegenBonusFromEvolution = 0;
-        this.acquiredBossUpgrades = []; 
-        
+        this.acquiredBossUpgrades = [];
+
         this.hasPerfectHarmonyHelm = false;
         this.hasBerserkersEchoHelm = false;
-        this.hasUltimateConfigurationHelm = false; 
+        this.hasUltimateConfigurationHelm = false;
 
         this.isHarmonized = false;
 
@@ -94,10 +93,10 @@ export class Player {
             '2': null,
             '3': null
         };
-        this.visualModifiers = {}; 
-        this.bleedOnHit = false; 
-        this.momentumDamageBonus = 0; 
-        this.bossDamageReduction = 0.0; 
+        this.visualModifiers = {};
+        this.bleedOnHit = false;
+        this.momentumDamageBonus = 0;
+        this.bossDamageReduction = 0.0;
         this.teleporting = false; this.teleportEffectTimer = 0;
         this.activeMiniWell = null;
         this.phaseStabilizerAnimTimer = Math.random() * 5000;
@@ -127,12 +126,18 @@ export class Player {
         this.omegaLaserRange = OMEGA_LASER_RANGE;
         this.omegaLaserWidth = OMEGA_LASER_WIDTH;
         this.originalPlayerSpeed = initialPlayerSpeed;
-        this.currentSpeed = initialPlayerSpeed; 
+        this.currentSpeed = initialPlayerSpeed;
 
         // Evolution Interaction Properties
-        this.evolutionReRollsRemaining = 0; // Will be initialized in main.js using CONSTANTS.MAX_EVOLUTION_REROLLS
-        this.blockedEvolutionIds = [];      // Will be reset in main.js
-        this.evolutionBlocksRemaining = 0;  // Will be initialized in main.js using CONSTANTS.MAX_EVOLUTION_BLOCKS
+        this.evolutionReRollsRemaining = 0; // Initialized in main.js
+        this.blockedEvolutionIds = [];      // Initialized/Reset in main.js
+        this.evolutionBlocksRemaining = 0;  // Initialized in main.js
+
+        // New Freeze Mechanic Properties
+        this.evolutionFreezesRemaining = 0;     // Initialized in main.js with MAX_EVOLUTION_FREEZES_PER_RUN
+        this.frozenEvolutionChoice = null;      // Stores the frozen evolution object or null
+        this.isFreezeModeActive = false;        // True if player has clicked "Enable Freeze"
+        this.hasUsedFreezeForCurrentOffers = false; // True if a freeze is set for the current set of offers
     }
 
     drawHpBar(ctx) {
@@ -169,17 +174,17 @@ export class Player {
         ctx.translate(this.x, this.y);
 
         // ---- HELMET DRAWING with CONDITIONAL GLOWS ----
-        ctx.save(); 
+        ctx.save();
         let helmGlowRadius = 0;
         let helmGlowColor = "transparent";
 
         if (this.hasPerfectHarmonyHelm) {
-            ctx.fillStyle = "rgba(255, 255, 200, 0.6)"; 
+            ctx.fillStyle = "rgba(255, 255, 200, 0.6)";
             ctx.strokeStyle = "gold";
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.arc(0, -this.radius * 0.85, this.radius * 0.6, 0, Math.PI * 2, false);
-            if (!this.isHarmonized) { 
+            if (!this.isHarmonized) {
                 ctx.globalAlpha = 0.3 + Math.abs(Math.sin(now / 300)) * 0.3;
                 ctx.fill();
                 ctx.globalAlpha = 1.0;
@@ -187,57 +192,57 @@ export class Player {
             ctx.stroke();
 
             if (this.isHarmonized) {
-                helmGlowRadius = 15 + Math.sin(now / 200) * 5; 
-                helmGlowColor = "rgba(255, 255, 100, 0.7)"; 
+                helmGlowRadius = 15 + Math.sin(now / 200) * 5;
+                helmGlowColor = "rgba(255, 255, 100, 0.7)";
                 ctx.shadowBlur = helmGlowRadius;
                 ctx.shadowColor = helmGlowColor;
                 ctx.lineWidth = 2.5;
-                ctx.strokeStyle = "rgba(255, 255, 180, 1)"; 
-                ctx.beginPath(); 
-                ctx.arc(0, -this.radius * 0.85, this.radius * 0.65, 0, Math.PI * 2, false); 
+                ctx.strokeStyle = "rgba(255, 255, 180, 1)";
+                ctx.beginPath();
+                ctx.arc(0, -this.radius * 0.85, this.radius * 0.65, 0, Math.PI * 2, false);
                 ctx.stroke();
-                ctx.shadowBlur = 0; 
+                ctx.shadowBlur = 0;
                 ctx.shadowColor = "transparent";
             }
 
         } else if (this.hasBerserkersEchoHelm) {
-            ctx.fillStyle = "rgb(120, 20, 20)"; 
+            ctx.fillStyle = "rgb(120, 20, 20)";
             ctx.strokeStyle = "rgb(50, 0, 0)";
             ctx.lineWidth = 1.5;
-            
-            const missingHpFactor = Math.max(0, (this.maxHp - this.hp) / this.maxHp); 
-            if (missingHpFactor > 0.05) { 
-                helmGlowRadius = 5 + missingHpFactor * 20; 
-                const glowIntensity = 0.3 + missingHpFactor * 0.6; 
-                helmGlowColor = `rgba(255, 0, 0, ${glowIntensity})`; 
+
+            const missingHpFactor = Math.max(0, (this.maxHp - this.hp) / this.maxHp);
+            if (missingHpFactor > 0.05) {
+                helmGlowRadius = 5 + missingHpFactor * 20;
+                const glowIntensity = 0.3 + missingHpFactor * 0.6;
+                helmGlowColor = `rgba(255, 0, 0, ${glowIntensity})`;
                 ctx.shadowBlur = helmGlowRadius;
                 ctx.shadowColor = helmGlowColor;
             }
 
             const hornBaseOffsetY = -this.radius * 0.5;
             const hornSideOffsetX = this.radius * 0.45;
-            const hornTipOffsetY = -this.radius * 1.1; 
-            const hornTipSideOffsetX = this.radius * 0.7; 
+            const hornTipOffsetY = -this.radius * 1.1;
+            const hornTipSideOffsetX = this.radius * 0.7;
 
             ctx.beginPath();
-            ctx.moveTo(-hornSideOffsetX, hornBaseOffsetY); 
-            ctx.quadraticCurveTo(-hornTipSideOffsetX * 0.8, hornTipOffsetY * 0.9, -hornTipSideOffsetX, hornTipOffsetY); 
-            ctx.quadraticCurveTo(-hornTipSideOffsetX * 0.6, hornTipOffsetY * 1.1, -hornSideOffsetX + this.radius * 0.15, hornBaseOffsetY + this.radius * 0.1); 
+            ctx.moveTo(-hornSideOffsetX, hornBaseOffsetY);
+            ctx.quadraticCurveTo(-hornTipSideOffsetX * 0.8, hornTipOffsetY * 0.9, -hornTipSideOffsetX, hornTipOffsetY);
+            ctx.quadraticCurveTo(-hornTipSideOffsetX * 0.6, hornTipOffsetY * 1.1, -hornSideOffsetX + this.radius * 0.15, hornBaseOffsetY + this.radius * 0.1);
             ctx.closePath();
             ctx.fill(); ctx.stroke();
 
             ctx.beginPath();
-            ctx.moveTo(hornSideOffsetX, hornBaseOffsetY); 
-            ctx.quadraticCurveTo(hornTipSideOffsetX * 0.8, hornTipOffsetY * 0.9, hornTipSideOffsetX, hornTipOffsetY); 
-            ctx.quadraticCurveTo(hornTipSideOffsetX * 0.6, hornTipOffsetY * 1.1, hornSideOffsetX - this.radius * 0.15, hornBaseOffsetY + this.radius * 0.1); 
+            ctx.moveTo(hornSideOffsetX, hornBaseOffsetY);
+            ctx.quadraticCurveTo(hornTipSideOffsetX * 0.8, hornTipOffsetY * 0.9, hornTipSideOffsetX, hornTipOffsetY);
+            ctx.quadraticCurveTo(hornTipSideOffsetX * 0.6, hornTipOffsetY * 1.1, hornSideOffsetX - this.radius * 0.15, hornBaseOffsetY + this.radius * 0.1);
             ctx.closePath();
             ctx.fill(); ctx.stroke();
 
-            ctx.shadowBlur = 0; 
+            ctx.shadowBlur = 0;
             ctx.shadowColor = "transparent";
 
         } else if (this.hasUltimateConfigurationHelm) {
-            ctx.fillStyle = "rgba(80, 0, 120, 0.85)"; 
+            ctx.fillStyle = "rgba(80, 0, 120, 0.85)";
             ctx.strokeStyle = "rgba(180, 120, 255, 0.9)";
             ctx.lineWidth = 2;
 
@@ -246,15 +251,15 @@ export class Player {
             ctx.shadowBlur = helmGlowRadius;
             ctx.shadowColor = helmGlowColor;
 
-            ctx.beginPath(); 
-            ctx.moveTo(0, -this.radius * 1.8); 
-            ctx.lineTo(-this.radius * 0.8, -this.radius * 0.5); 
-            ctx.quadraticCurveTo(0, -this.radius * 0.1, this.radius * 0.8, -this.radius * 0.5); 
+            ctx.beginPath();
+            ctx.moveTo(0, -this.radius * 1.8);
+            ctx.lineTo(-this.radius * 0.8, -this.radius * 0.5);
+            ctx.quadraticCurveTo(0, -this.radius * 0.1, this.radius * 0.8, -this.radius * 0.5);
             ctx.closePath();
             ctx.fill();
             ctx.stroke();
-            
-            ctx.shadowBlur = 0; 
+
+            ctx.shadowBlur = 0;
             ctx.shadowColor = "transparent";
 
             ctx.fillStyle = "yellow";
@@ -262,13 +267,13 @@ export class Player {
             ctx.arc(0, -this.radius * 1.5, this.radius * 0.15, 0, Math.PI * 2);
             ctx.fill();
         }
-        ctx.restore(); 
+        ctx.restore();
         // ---- END HELMET DRAWING ----
 
         if (this.teleporting && this.teleportEffectTimer > 0) {
             const effectProgress = 1 - (this.teleportEffectTimer / TELEPORT_IMMUNITY_DURATION);
             const alpha = 0.5 * (1 - effectProgress) + Math.abs(Math.sin(now / 80)) * 0.3;
-            ctx.globalAlpha = alpha; 
+            ctx.globalAlpha = alpha;
         }
 
         const isImmuneActiveForShield = postPopupTimerFromCtx > 0 || postDamageTimerFromCtx > 0 || this.isShieldOvercharging;
@@ -311,7 +316,7 @@ export class Player {
             ctx.arc(0, 0, shieldRadius, 0, Math.PI * 2);
             ctx.stroke();
         }
-        ctx.globalAlpha = 1.0; 
+        ctx.globalAlpha = 1.0;
 
         ctx.beginPath();
         ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
@@ -388,19 +393,19 @@ export class Player {
 
         ctx.restore(); // Restore from player translate
     }
-    
+
     update(gameContext) {
         const { dt, keys, mouseX, mouseY, canvasWidth, canvasHeight, targets, activeBosses,
-                currentGrowthFactor, 
-                currentEffectiveDefaultGrowthFactor, 
+                currentGrowthFactor,
+                currentEffectiveDefaultGrowthFactor,
                 updateHealthDisplayCallback, updateAbilityCooldownCallback,
                 isAnyPauseActiveCallback, decoysArray, bossDefeatEffectsArray, allRays,
                 screenShakeParams, activeBuffNotificationsArray, score,
-                evolutionChoices, 
-                ui 
+                evolutionChoices,
+                ui
               } = gameContext;
 
-        this.timeSinceLastHit += dt; 
+        this.timeSinceLastHit += dt;
 
         if (this.teleporting && this.teleportEffectTimer > 0) {
             this.teleportEffectTimer -= dt;
@@ -422,16 +427,16 @@ export class Player {
         let numericAbilityUIUpdateNeeded = false;
         for (const slot in this.activeAbilities) {
              if (this.activeAbilities[slot]) {
-                let effectiveCooldownMultiplier = 1.0; 
+                let effectiveCooldownMultiplier = 1.0;
                 if (this.isHarmonized && this.hasPerfectHarmonyHelm) {
-                    effectiveCooldownMultiplier *= (1.0 - PERFECT_HARMONY_COOLDOWN_REDUCTION); 
+                    effectiveCooldownMultiplier *= (1.0 - PERFECT_HARMONY_COOLDOWN_REDUCTION);
                 }
-                if (this.hasUltimateConfigurationHelm) { 
-                    effectiveCooldownMultiplier *= 1.5; 
+                if (this.hasUltimateConfigurationHelm) {
+                    effectiveCooldownMultiplier *= 1.5;
                 }
 
                 if (this.activeAbilities[slot].cooldownTimer > 0) {
-                    this.activeAbilities[slot].cooldownTimer -= dt / effectiveCooldownMultiplier; 
+                    this.activeAbilities[slot].cooldownTimer -= dt / effectiveCooldownMultiplier;
                     numericAbilityUIUpdateNeeded = true;
                     if (this.activeAbilities[slot].cooldownTimer <= 0) {
                         this.activeAbilities[slot].cooldownTimer = 0;
@@ -453,20 +458,20 @@ export class Player {
                 effectiveCooldownMultiplier *= (1.0 - PERFECT_HARMONY_COOLDOWN_REDUCTION);
             }
 
-            if (this[abilityStateProp]) { 
+            if (this[abilityStateProp]) {
                 this[abilityTimerProp] -= dt;
                 mouseAbilityUIUpdateNeeded = true;
                 if (this[abilityTimerProp] <= 0) {
-                    return true; 
+                    return true;
                 }
             } else if (this[abilityCooldownTimerProp] > 0) {
                 this[abilityCooldownTimerProp] -= dt / effectiveCooldownMultiplier;
                 mouseAbilityUIUpdateNeeded = true;
                 if (this[abilityCooldownTimerProp] < 0) this[abilityCooldownTimerProp] = 0;
             }
-            return false; 
+            return false;
         };
-        
+
         if (this.hasShieldOvercharge) {
             if(updateMouseAbility('isShieldOvercharging', 'shieldOverchargeTimer', 'shieldOverchargeCooldownTimer', this.shieldOverchargeCooldown)){
                 this.isShieldOvercharging = false;
@@ -483,16 +488,16 @@ export class Player {
 
                 if (this.omegaLaserCurrentTickTimer <= 0) {
                     const laserDamageContext = { updateScoreCallback: gameContext.updateScoreCallback };
-                    this.dealOmegaLaserDamage(targets, activeBosses, laserDamageContext); 
+                    this.dealOmegaLaserDamage(targets, activeBosses, laserDamageContext);
                     this.omegaLaserCurrentTickTimer = OMEGA_LASER_TICK_INTERVAL;
                 }
                 if (this.omegaLaserTimer <= 0) {
                     this.isFiringOmegaLaser = false;
                     stopSound(omegaLaserSound);
                     this.omegaLaserCooldownTimer = this.omegaLaserCooldown;
-                    this.currentOmegaLaserKineticBoost = 1.0; 
+                    this.currentOmegaLaserKineticBoost = 1.0;
                 }
-            } else { 
+            } else {
                 if (this.omegaLaserCooldownTimer > 0) {
                      let effectiveCooldownMultiplier = 1.0;
                     if (this.isHarmonized && this.hasPerfectHarmonyHelm) {
@@ -539,14 +544,14 @@ export class Player {
             }
             actualCurrentSpeed *= speedMultiplier;
         }
-        this.currentSpeed = actualCurrentSpeed; 
+        this.currentSpeed = actualCurrentSpeed;
 
         let playerIsActuallyMoving = false;
         if (dxMovement !== 0 || dyMovement !== 0) {
             playerIsActuallyMoving = true;
             if (dxMovement !== 0 && dyMovement !== 0) {
                 const m = Math.sqrt(2);
-                dxMovement = (dxMovement / m) * this.currentSpeed; 
+                dxMovement = (dxMovement / m) * this.currentSpeed;
                 dyMovement = (dyMovement / m) * this.currentSpeed;
             } else {
                 dxMovement *= this.currentSpeed;
@@ -555,8 +560,8 @@ export class Player {
         }
 
         let currentTotalKineticChargeRate = this.baseKineticChargeRate;
-        if (this.kineticConversionLevel > 0) { 
-            currentTotalKineticChargeRate += this.kineticConversionLevel * this.effectiveKineticChargeRatePerLevel; 
+        if (this.kineticConversionLevel > 0) {
+            currentTotalKineticChargeRate += this.kineticConversionLevel * this.effectiveKineticChargeRatePerLevel;
         }
 
         if (playerIsActuallyMoving) {
@@ -568,7 +573,7 @@ export class Player {
         if (ui && ui.updateKineticChargeUI) {
             let maxPotencyAtFullCharge = 0;
             if (this.kineticConversionLevel > 0) {
-                maxPotencyAtFullCharge = this.initialKineticDamageBonus + (Math.max(0, this.kineticConversionLevel - 1) * this.effectiveKineticAdditionalDamageBonusPerLevel); 
+                maxPotencyAtFullCharge = this.initialKineticDamageBonus + (Math.max(0, this.kineticConversionLevel - 1) * this.effectiveKineticAdditionalDamageBonusPerLevel);
             }
             ui.updateKineticChargeUI(this.kineticCharge, this.kineticChargeConsumption, maxPotencyAtFullCharge, this.kineticConversionLevel > 0);
         }
@@ -605,7 +610,7 @@ export class Player {
         if (!this.isFiringOmegaLaser) {
             this.aimAngle = Math.atan2(mouseY - this.y, mouseX - this.x);
         }
-        
+
         if (this.hp > 0 && this.hp < this.maxHp) {
             this.hpRegenTimer += dt;
             if (this.hpRegenTimer >= HP_REGEN_INTERVAL) {
@@ -647,7 +652,7 @@ export class Player {
             this.isHarmonized = false;
             if(gameContext.activeBuffNotificationsArray) gameContext.activeBuffNotificationsArray.push({ text: `Harmony Lost!`, timer: 1500});
         }
-        this.timeSinceLastHit = 0; 
+        this.timeSinceLastHit = 0;
 
         this.timesHit++;
 
@@ -657,12 +662,12 @@ export class Player {
         } else if (!hittingRay) {
         }
 
-        damageToTake *= this.damageTakenMultiplier; 
+        damageToTake *= this.damageTakenMultiplier;
 
         if (hittingRay && hittingRay.isBossProjectile && this.visualModifiers.ablativeSublayer) {
             damageToTake *= (1 - (this.bossDamageReduction || 0));
         }
-        
+
         damageToTake = Math.max(1, Math.round(damageToTake));
 
         this.hp -= damageToTake;
@@ -702,14 +707,14 @@ export class Player {
 
     consumeKineticChargeForDamageBoost() {
         if (this.kineticCharge <= 0 || this.kineticConversionLevel <= 0) {
-            return 1.0; 
+            return 1.0;
         }
         let chargeToConsume = Math.min(this.kineticCharge, this.kineticChargeConsumption);
-        let effectScale = chargeToConsume / this.kineticChargeConsumption; 
+        let effectScale = chargeToConsume / this.kineticChargeConsumption;
         let maxPossiblePotencyBonus;
-        if (this.kineticConversionLevel === 1) { 
+        if (this.kineticConversionLevel === 1) {
             maxPossiblePotencyBonus = this.initialKineticDamageBonus;
-        } else { 
+        } else {
             maxPossiblePotencyBonus = this.initialKineticDamageBonus +
                                       ((this.kineticConversionLevel - 1) * this.effectiveKineticAdditionalDamageBonusPerLevel);
         }
@@ -766,16 +771,16 @@ export class Player {
             if (this.activeMiniWell && this.activeMiniWell.isActive) {
                 this.currentGravityWellKineticBoost = this.consumeKineticChargeForDamageBoost();
                 this.activeMiniWell.detonate({ targetX: abilityContext.mouseX, targetY: abilityContext.mouseY, player: this });
-                ability.cooldownTimer = actualCooldownDuration; 
+                ability.cooldownTimer = actualCooldownDuration;
                 ability.justBecameReady = false;
                 abilityUsedSuccessfully = true;
             } else if (ability.cooldownTimer <= 0) {
                 this.deployMiniGravityWell(ability.duration, abilityContext.decoysArray, abilityContext.mouseX, abilityContext.mouseY);
-                if (this.activeMiniWell) { 
-                    abilityUsedSuccessfully = true; 
+                if (this.activeMiniWell) {
+                    abilityUsedSuccessfully = true;
                 }
             }
-        } else if (ability.cooldownTimer <= 0) { 
+        } else if (ability.cooldownTimer <= 0) {
             switch (ability.id) {
                 case 'teleport':
                     this.doTeleport(abilityContext.bossDefeatEffectsArray, abilityContext.mouseX, abilityContext.mouseY, abilityContext.canvasWidth, abilityContext.canvasHeight);
@@ -801,7 +806,7 @@ export class Player {
         if (this.activeMiniWell && this.activeMiniWell.isActive) {
             return;
         }
-        this.currentGravityWellKineticBoost = 1.0; 
+        this.currentGravityWellKineticBoost = 1.0;
         this.activeMiniWell = new PlayerGravityWell(mouseX, mouseY, duration);
         if (decoysArray) decoysArray.push(this.activeMiniWell);
         playSound(playerWellDeploySound);
@@ -828,7 +833,7 @@ export class Player {
         if (allRays) {
             for (let i = allRays.length - 1; i >= 0; i--) {
                 const ray = allRays[i];
-                if (ray && !ray.isGravityWellRay) { 
+                if (ray && !ray.isGravityWellRay) {
                     ray.isActive = false;
                 }
             }
@@ -837,7 +842,7 @@ export class Player {
             screenShakeParams.isScreenShaking = true;
             screenShakeParams.screenShakeTimer = 400;
             screenShakeParams.currentShakeMagnitude = 8;
-            screenShakeParams.currentShakeType = 'playerHit'; 
+            screenShakeParams.currentShakeType = 'playerHit';
             screenShakeParams.hitShakeDx = 0; screenShakeParams.hitShakeDy = 0;
         }
         playSound(empBurstSound);
@@ -854,7 +859,7 @@ export class Player {
 
             this.currentOmegaLaserKineticBoost = this.consumeKineticChargeForDamageBoost();
 
-            this.procTemporalEcho('omegaLaser', abilityContext); 
+            this.procTemporalEcho('omegaLaser', abilityContext);
             if (abilityContext && abilityContext.updateAbilityCooldownCallback) abilityContext.updateAbilityCooldownCallback(this);
         }
     }
@@ -866,12 +871,12 @@ export class Player {
             playSound(shieldOverchargeSound);
             if(activeBuffNotificationsArray) activeBuffNotificationsArray.push({ text: `Shield Overcharge Active! Healing!`, timer: SHIELD_OVERCHARGE_DURATION });
 
-            this.procTemporalEcho('shieldOvercharge', abilityContext); 
+            this.procTemporalEcho('shieldOvercharge', abilityContext);
             if (abilityContext && abilityContext.updateAbilityCooldownCallback) abilityContext.updateAbilityCooldownCallback(this);
         }
     }
 
-    dealOmegaLaserDamage(targetsArray, activeBossesArray, laserDamageContext) { 
+    dealOmegaLaserDamage(targetsArray, activeBossesArray, laserDamageContext) {
         const beamStartX = this.x + Math.cos(this.omegaLaserAngle) * this.radius;
         const beamStartY = this.y + Math.sin(this.omegaLaserAngle) * this.radius;
         const beamEndX = this.x + Math.cos(this.omegaLaserAngle) * (this.radius + this.omegaLaserRange);
@@ -882,13 +887,13 @@ export class Player {
         if (typeof this.abilityDamageMultiplier === 'number') {
             damagePerTickForCalc *= this.abilityDamageMultiplier;
         }
-        if (this.hasUltimateConfigurationHelm) { 
-            damagePerTickForCalc *= 2; 
+        if (this.hasUltimateConfigurationHelm) {
+            damagePerTickForCalc *= 2;
         }
-        if (this.isHarmonized && this.hasPerfectHarmonyHelm) { 
+        if (this.isHarmonized && this.hasPerfectHarmonyHelm) {
             damagePerTickForCalc *= (1 + PERFECT_HARMONY_RAY_DAMAGE_BONUS);
         }
-        damagePerTickForCalc *= this.currentOmegaLaserKineticBoost; 
+        damagePerTickForCalc *= this.currentOmegaLaserKineticBoost;
 
         // Apply Ability Critical Hit for Omega Laser
         if (this.abilityCritChance > 0 && Math.random() < this.abilityCritChance) {
@@ -903,7 +908,7 @@ export class Player {
                 const target = targetsArray[i];
                 if (target && isLineSegmentIntersectingCircle(beamStartX, beamStartY, beamEndX, beamEndY, target.x, target.y, target.radius + this.omegaLaserWidth / 2)) {
                     targetsArray.splice(i, 1);
-                    this.totalDamageDealt += 10; 
+                    this.totalDamageDealt += 10;
                     if (laserDamageContext && laserDamageContext.updateScoreCallback) laserDamageContext.updateScoreCallback(10);
                 }
             }
@@ -913,7 +918,7 @@ export class Player {
             activeBossesArray.forEach(boss => {
                 if (boss && isLineSegmentIntersectingCircle(beamStartX, beamStartY, beamEndX, beamEndY, boss.x, boss.y, boss.radius + this.omegaLaserWidth / 2)) {
                     if (typeof boss.takeDamage === 'function') {
-                        boss.takeDamage(finalDamagePerTick, null, this, {}); 
+                        boss.takeDamage(finalDamagePerTick, null, this, {});
                     }
                     this.totalDamageDealt += finalDamagePerTick;
                 }

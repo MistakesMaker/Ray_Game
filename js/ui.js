@@ -19,10 +19,13 @@ export const gameOverScreen = document.getElementById('gameOverScreen');
 export const evolutionScreen = document.getElementById('evolutionScreen');
 export const evolutionOptionsContainer = document.getElementById('evolutionOptionsContainer');
 
-const rerollEvolutionButton = document.getElementById('rerollEvolutionButton'); 
+const rerollEvolutionButton = document.getElementById('rerollEvolutionButton');
 const rerollInfoSpan = document.getElementById('rerollInfo');
 const blockInfoSpan = document.getElementById('blockInfo');
-const toggleBlockModeButton = document.getElementById('toggleBlockModeButton'); 
+const toggleBlockModeButton = document.getElementById('toggleBlockModeButton');
+const toggleFreezeModeButton = document.getElementById('toggleFreezeModeButton'); 
+const freezeInfoSpan = document.getElementById('freezeInfo'); 
+
 
 export const freeUpgradeScreen = document.getElementById('freeUpgradeScreen');
 export const freeUpgradeOptionContainer = document.getElementById('freeUpgradeOptionContainer');
@@ -82,7 +85,7 @@ export function updateActiveBuffIndicator(playerInstance, currentPostPopupImmuni
     if (playerInstance.teleporting && playerInstance.teleportEffectTimer > 0) { textParts.push(`Teleporting (${(playerInstance.teleportEffectTimer / 1000).toFixed(1)}s)`); }
     if (playerInstance.isShieldOvercharging) { textParts.push(`Overcharge (${(playerInstance.shieldOverchargeTimer / 1000).toFixed(1)}s)`); }
     if (maxImmunityTime > 0 && !(playerInstance.teleporting && playerInstance.teleportEffectTimer > 0) && !playerInstance.isShieldOvercharging) { textParts.push(`Shield (${Math.ceil(maxImmunityTime / 1000)}s)`);}
-    
+
     if (playerInstance.isHarmonized && playerInstance.hasPerfectHarmonyHelm) {
         textParts.push("Harmony!");
     }
@@ -117,18 +120,18 @@ export function updateAbilityCooldownUI(playerInstance) {
         let isUnlocked = false;
         let isReady = false;
         let isChargingOrActive = false;
-        let maxTimer = 0; 
-        let displayCooldownTimerValue = 0; 
+        let maxTimer = 0;
+        let displayCooldownTimerValue = 0;
 
         if (desc.type === 'mouse') {
             isUnlocked = desc.check();
             if (isUnlocked) {
                 isChargingOrActive = desc.isCharging();
                 if (isChargingOrActive) {
-                    displayCooldownTimerValue = desc.timer(); 
+                    displayCooldownTimerValue = desc.timer();
                     maxTimer = desc.maxTime();
                 } else if (desc.cooldownTimer() > 0) {
-                    displayCooldownTimerValue = desc.cooldownTimer(); 
+                    displayCooldownTimerValue = desc.cooldownTimer();
                     maxTimer = desc.cooldownMax();
                 } else {
                     isReady = true;
@@ -138,15 +141,15 @@ export function updateAbilityCooldownUI(playerInstance) {
             const ability = playerInstance.activeAbilities[desc.slot];
             if (ability) {
                 isUnlocked = true;
-                maxTimer = ability.cooldownDuration; 
-                if (playerInstance.hasUltimateConfigurationHelm) { 
+                maxTimer = ability.cooldownDuration;
+                if (playerInstance.hasUltimateConfigurationHelm) {
                     maxTimer *= 1.5;
                 }
 
                 if (ability.id === 'miniGravityWell' && playerInstance.activeMiniWell && playerInstance.activeMiniWell.isActive) {
                     isChargingOrActive = true;
                     displayCooldownTimerValue = playerInstance.activeMiniWell.lifeTimer;
-                    maxTimer = playerInstance.activeMiniWell.maxLife; 
+                    maxTimer = playerInstance.activeMiniWell.maxLife;
                 } else if (ability.cooldownTimer > 0) {
                     displayCooldownTimerValue = ability.cooldownTimer;
                 } else {
@@ -196,11 +199,11 @@ export function updateAbilityCooldownUI(playerInstance) {
             cooldownOverlayDiv.style.backgroundColor = 'rgba(50,50,50,0.8)';
         } else if (isChargingOrActive) {
             slotDiv.classList.add('charging');
-            if (maxTimer > 0 && displayCooldownTimerValue >= 0) { 
+            if (maxTimer > 0 && displayCooldownTimerValue >= 0) {
                 cooldownOverlayDiv.style.height = `${Math.max(0, (1 - (displayCooldownTimerValue / maxTimer)) * 100)}%`;
                 cooldownTimerSpan.textContent = (displayCooldownTimerValue / 1000).toFixed(1) + 's';
-            } else if (maxTimer > 0 && displayCooldownTimerValue < 0) { 
-                 cooldownOverlayDiv.style.height = '100%'; 
+            } else if (maxTimer > 0 && displayCooldownTimerValue < 0) {
+                 cooldownOverlayDiv.style.height = '100%';
                  cooldownTimerSpan.textContent = '0.0s';
             }
         } else if (!isReady && displayCooldownTimerValue > 0) {
@@ -226,7 +229,7 @@ export function updateKineticChargeUI(currentCharge, maxCharge, currentMaxPotenc
         kineticChargeUIElement.style.display = 'flex';
     } else {
         kineticChargeUIElement.style.display = 'none';
-        return; 
+        return;
     }
     const chargePercentage = Math.max(0, Math.min(100, (currentCharge / maxCharge) * 100));
     kineticChargeBarFillElement.style.width = `${chargePercentage}%`;
@@ -240,7 +243,7 @@ export function updateKineticChargeUI(currentCharge, maxCharge, currentMaxPotenc
             kineticChargeBarFillElement.style.setProperty('--sparkle2-x', `${Math.random()*80 + 10}%`);
             kineticChargeBarFillElement.style.setProperty('--sparkle2-y', `${Math.random()*60 + 20}%`);
         }
-    } else { 
+    } else {
         if (kineticChargeBarFillElement.classList.contains('sparkling')) {
             kineticChargeBarFillElement.classList.remove('sparkling');
         }
@@ -297,9 +300,8 @@ export function showScreen(screenElementToShow, cameFromPauseMenu = false, callb
         }
     }
 
-    // Call height equalization logic if the specific screen is being shown
     if (screenElementToShow === evolutionScreen) {
-        // The call to equalizeEvolutionCardHeights is now at the end of populateEvolutionOptionsUI
+        equalizeEvolutionCardHeights();
     }
     if (screenElementToShow === freeUpgradeScreen) {
         equalizeFreeUpgradeCardHeights();
@@ -325,11 +327,11 @@ export function setPreviousScreenForSettings(screenRef) { previousScreenForSetti
 // --- UI Population Functions ---
 function getTierStyling(tier) {
     switch(tier) {
-        case 'core': return { color: '#00E0FF', text: 'CORE' }; 
-        case 'common': return { color: '#9DB8B7', text: 'COMMON' }; 
-        case 'rare': return { color: '#55FF55', text: 'RARE' }; 
-        case 'epic': return { color: '#C077FF', text: 'EPIC' };   
-        case 'legendary': return { color: '#FFB000', text: 'LEGENDARY' }; 
+        case 'core': return { color: '#00E0FF', text: 'CORE' };
+        case 'common': return { color: '#9DB8B7', text: 'COMMON' };
+        case 'rare': return { color: '#55FF55', text: 'RARE' };
+        case 'epic': return { color: '#C077FF', text: 'EPIC' };
+        case 'legendary': return { color: '#FFB000', text: 'LEGENDARY' };
         default: return { color: '#FFFFFF', text: tier ? tier.toUpperCase() : ''};
     }
 }
@@ -338,10 +340,10 @@ function equalizeEvolutionCardHeights() {
     if (!evolutionOptionsContainer) return;
     const optionElements = evolutionOptionsContainer.querySelectorAll('.evolutionOption');
     if (optionElements.length > 0) {
-        requestAnimationFrame(() => { 
+        requestAnimationFrame(() => {
             let maxHeight = 0;
             optionElements.forEach(opt => {
-                opt.style.minHeight = '0'; 
+                opt.style.minHeight = '0';
                 opt.style.height = 'auto';
                 if (opt.offsetHeight > maxHeight) {
                     maxHeight = opt.offsetHeight;
@@ -401,29 +403,34 @@ function equalizeLootCardHeights() {
 
 
 export function populateEvolutionOptionsUI(
-    choices, 
-    playerInstance, 
-    evolutionSelectCallback, 
-    rerollCallback, 
-    toggleBlockModeCallback, // For the main "Enable Block" button
-    currentShrinkMeCooldown, 
-    getReadableColorNameFunc
+    choices,
+    playerInstance,
+    evolutionSelectCallback,
+    rerollCallback,
+    toggleBlockModeCallback,
+    currentShrinkMeCooldown, // Changed from shrinkMeCooldown
+    getReadableColorNameFunc,
+    toggleFreezeModeCallback,
+    selectFreezeCallback
 ) {
     if (!evolutionOptionsContainer || !playerInstance) return;
     evolutionOptionsContainer.innerHTML = '';
 
+    const maxReRolls = CONSTANTS.MAX_EVOLUTION_REROLLS;
+    const maxBlocks = CONSTANTS.MAX_EVOLUTION_BLOCKS;
+    const maxFreezes = CONSTANTS.MAX_EVOLUTION_FREEZES_PER_RUN;
+
     // Update Re-roll Button and Info
     if (rerollEvolutionButton && rerollInfoSpan) {
-        rerollEvolutionButton.disabled = playerInstance.evolutionReRollsRemaining <= 0;
-        rerollEvolutionButton.onclick = rerollCallback; 
-        rerollInfoSpan.textContent = `Re-rolls left: ${playerInstance.evolutionReRollsRemaining || 0}`;
+        rerollEvolutionButton.disabled = playerInstance.evolutionReRollsRemaining <= 0 || playerInstance.isFreezeModeActive || playerInstance.isBlockModeActive;
+        rerollEvolutionButton.onclick = rerollCallback;
+        rerollInfoSpan.textContent = `Re-rolls left: ${playerInstance.evolutionReRollsRemaining || 0}/${maxReRolls}`;
     }
 
     // Update Block Mode Button and Info
     if (toggleBlockModeButton && blockInfoSpan) {
-        const maxBlocks = playerInstance.maxEvolutionBlocks !== undefined ? playerInstance.maxEvolutionBlocks : CONSTANTS.MAX_EVOLUTION_BLOCKS;
-        toggleBlockModeButton.disabled = playerInstance.evolutionBlocksRemaining <= 0 && !playerInstance.isBlockModeActive;
-        
+        toggleBlockModeButton.disabled = (playerInstance.evolutionBlocksRemaining <= 0 && !playerInstance.isBlockModeActive) || playerInstance.isFreezeModeActive;
+
         if (playerInstance.isBlockModeActive) {
             toggleBlockModeButton.textContent = "Block Active (Cancel X)";
             toggleBlockModeButton.classList.add('block-mode-active');
@@ -432,25 +439,48 @@ export function populateEvolutionOptionsUI(
             toggleBlockModeButton.classList.remove('block-mode-active');
         }
         toggleBlockModeButton.onclick = toggleBlockModeCallback;
-        blockInfoSpan.textContent = `Blocks left: ${playerInstance.evolutionBlocksRemaining !== undefined ? playerInstance.evolutionBlocksRemaining : maxBlocks}/${maxBlocks}`;
+        blockInfoSpan.textContent = `Blocks left: ${playerInstance.evolutionBlocksRemaining !== undefined ? playerInstance.evolutionBlocksRemaining : 0}/${maxBlocks}`;
+    }
+
+    // Update Freeze Mode Button and Info
+    if (toggleFreezeModeButton && freezeInfoSpan) {
+        toggleFreezeModeButton.disabled =
+            (playerInstance.evolutionFreezesRemaining <= 0 && !playerInstance.isFreezeModeActive && !playerInstance.frozenEvolutionChoice) || 
+            playerInstance.isBlockModeActive; 
+
+        if (playerInstance.isFreezeModeActive) { 
+            toggleFreezeModeButton.textContent = "Freeze Active (Cancel F)";
+            toggleFreezeModeButton.classList.add('freeze-mode-active');
+            toggleFreezeModeButton.classList.remove('has-frozen-choice');
+        } else if (playerInstance.frozenEvolutionChoice) { 
+            toggleFreezeModeButton.textContent = "Unfreeze Current (F)"; 
+            toggleFreezeModeButton.classList.add('has-frozen-choice');
+            toggleFreezeModeButton.classList.remove('freeze-mode-active');
+        } else { 
+            toggleFreezeModeButton.textContent = `Enable Freeze (F)`;
+            toggleFreezeModeButton.classList.remove('freeze-mode-active');
+            toggleFreezeModeButton.classList.remove('has-frozen-choice');
+        }
+        toggleFreezeModeButton.onclick = toggleFreezeModeCallback;
+        freezeInfoSpan.textContent = `Freezes left: ${playerInstance.evolutionFreezesRemaining || 0}/${maxFreezes}`;
     }
 
 
-    choices.forEach((uiChoiceData, index) => { 
+    choices.forEach((uiChoiceData, index) => {
         const choiceWrapper = document.createElement('div');
         choiceWrapper.classList.add('evolution-choice-wrapper');
 
         const optionDiv = document.createElement('div');
         optionDiv.classList.add('evolutionOption');
         optionDiv.dataset.class = uiChoiceData.classType;
-        optionDiv.dataset.baseId = uiChoiceData.baseId; 
+        optionDiv.dataset.baseId = uiChoiceData.baseId;
 
         const tierLabel = document.createElement('span');
-        tierLabel.classList.add('evolution-tier-label'); 
+        tierLabel.classList.add('evolution-tier-label');
 
         if (!uiChoiceData.originalEvolution.isTiered) {
             optionDiv.dataset.tier = "core";
-            const tierStyle = getTierStyling("core"); 
+            const tierStyle = getTierStyling("core");
             tierLabel.textContent = tierStyle.text;
             tierLabel.style.color = tierStyle.color;
             tierLabel.classList.add('has-tier');
@@ -459,87 +489,105 @@ export function populateEvolutionOptionsUI(
             tierLabel.textContent = tierStyle.text;
             tierLabel.style.color = tierStyle.color;
             tierLabel.classList.add('has-tier');
-            optionDiv.dataset.tier = uiChoiceData.rolledTier; 
+            optionDiv.dataset.tier = uiChoiceData.rolledTier;
         }
-        
-        choiceWrapper.appendChild(tierLabel); 
-        
-        let displayText = `<h3>${uiChoiceData.text}</h3>`; 
+
+        choiceWrapper.appendChild(tierLabel);
+
+        let displayText = `<h3>${uiChoiceData.text}</h3>`;
         if (uiChoiceData.cardEffectString) {
              displayText += `<span class="evolution-details">${uiChoiceData.cardEffectString}</span>`;
         }
         optionDiv.innerHTML = displayText;
 
-        // No individual block buttons are added here anymore.
-        // Hover effect for block mode is handled by card's mouseover/mouseout.
+        const baseEvoForMaxCheck = uiChoiceData.originalEvolution;
+        const isMaxed = baseEvoForMaxCheck.isMaxed ? baseEvoForMaxCheck.isMaxed(playerInstance) : false;
+        const isAlreadyBlockedByPlayer = playerInstance.blockedEvolutionIds && playerInstance.blockedEvolutionIds.includes(uiChoiceData.baseId);
+        
+        const isVisuallyMarkedAsFrozen = playerInstance.frozenEvolutionChoice && playerInstance.frozenEvolutionChoice.baseId === uiChoiceData.baseId;
+
+        if (isVisuallyMarkedAsFrozen) {
+            optionDiv.classList.add('actually-frozen');
+        }
 
         if (uiChoiceData.detailedDescription && evolutionTooltip) {
-            optionDiv.onmouseover = (event) => { 
-                if (playerInstance.isBlockModeActive && 
-                    uiChoiceData.baseId !== 'noMoreEvolutions' && 
+            optionDiv.onmouseover = (event) => {
+                if (playerInstance.isBlockModeActive &&
+                    uiChoiceData.baseId !== 'noMoreEvolutions' &&
                     !uiChoiceData.baseId.startsWith('empty_slot_') &&
-                    !(playerInstance.blockedEvolutionIds && playerInstance.blockedEvolutionIds.includes(uiChoiceData.baseId)) &&
+                    !isAlreadyBlockedByPlayer &&
                     playerInstance.evolutionBlocksRemaining > 0) {
                     optionDiv.classList.add('primed-for-block');
                 }
+                if (playerInstance.isFreezeModeActive &&
+                    uiChoiceData.baseId !== 'noMoreEvolutions' &&
+                    !uiChoiceData.baseId.startsWith('empty_slot_') &&
+                    !isMaxed && !isAlreadyBlockedByPlayer &&
+                    (playerInstance.evolutionFreezesRemaining > 0 || (playerInstance.frozenEvolutionChoice && playerInstance.frozenEvolutionChoice.baseId === uiChoiceData.baseId)) // Can prime for freeze if charges left OR if it's the one to unfreeze
+                    ) {
+                    optionDiv.classList.add('primed-for-freeze');
+                }
+
 
                 let tooltipText = "";
-                let effectiveTierForTooltip = "core"; 
+                let effectiveTierForTooltip = "core";
                 if (uiChoiceData.originalEvolution.isTiered && uiChoiceData.rolledTier && uiChoiceData.rolledTier !== "none") {
                     effectiveTierForTooltip = uiChoiceData.rolledTier;
                 }
-                
+
                 const tierStyle = getTierStyling(effectiveTierForTooltip);
                 tooltipText = `<span style="text-transform: capitalize; font-weight: bold; color: ${tierStyle.color};">${tierStyle.text} TIER</span><br>`;
                 tooltipText += uiChoiceData.detailedDescription;
 
-                evolutionTooltip.innerHTML = tooltipText; 
-                evolutionTooltip.style.left = `${event.pageX + 15}px`; 
-                evolutionTooltip.style.top = `${event.pageY + 15}px`; 
-                evolutionTooltip.style.display = 'block'; 
+                evolutionTooltip.innerHTML = tooltipText;
+                evolutionTooltip.style.left = `${event.pageX + 15}px`;
+                evolutionTooltip.style.top = `${event.pageY + 15}px`;
+                evolutionTooltip.style.display = 'block';
             };
-            optionDiv.onmousemove = (event) => { 
-                evolutionTooltip.style.left = `${event.pageX + 15}px`; 
+            optionDiv.onmousemove = (event) => {
+                evolutionTooltip.style.left = `${event.pageX + 15}px`;
                 evolutionTooltip.style.top = `${event.pageY + 15}px`;
             };
-            optionDiv.onmouseout = () => { 
-                optionDiv.classList.remove('primed-for-block'); 
-                evolutionTooltip.style.display = 'none'; 
+            optionDiv.onmouseout = () => {
+                optionDiv.classList.remove('primed-for-block');
+                optionDiv.classList.remove('primed-for-freeze');
+                evolutionTooltip.style.display = 'none';
             };
         }
 
-        const baseEvoForMaxCheck = uiChoiceData.originalEvolution;
-        const isMaxed = baseEvoForMaxCheck.isMaxed ? baseEvoForMaxCheck.isMaxed(playerInstance) : false;
-        const isAlreadyBlockedByPlayer = playerInstance.blockedEvolutionIds && playerInstance.blockedEvolutionIds.includes(uiChoiceData.baseId);
 
         if (baseEvoForMaxCheck.id === 'noMoreEvolutions' || baseEvoForMaxCheck.id.startsWith('empty_slot_') || isMaxed || isAlreadyBlockedByPlayer ) {
             optionDiv.classList.add('disabled');
             if (optionDiv.dataset.tier !== "core" || !isMaxed) { 
                  optionDiv.dataset.tier = 'disabled';
-            } 
+            }
             if(isAlreadyBlockedByPlayer && !optionDiv.classList.contains('disabled')){
                 const h3 = optionDiv.querySelector('h3');
                 if (h3) h3.innerHTML += `<p style="font-size:10px; color:#ff8080;">(Blocked)</p>`;
-                 optionDiv.classList.add('disabled'); // Ensure it's styled as disabled
-                 optionDiv.dataset.tier = 'disabled'; // Use disabled tier styling
+                 optionDiv.classList.add('disabled');
+                 optionDiv.dataset.tier = 'disabled';
             }
-
-
-            if (baseEvoForMaxCheck.id === 'smallerPlayer' && currentShrinkMeCooldown > 0) {
+            if (baseEvoForMaxCheck.id === 'smallerPlayer' && currentShrinkMeCooldown > 0) { 
                 const h3 = optionDiv.querySelector('h3');
                 if (h3) {
                     h3.innerHTML += `<p style="font-size:10px; color:#aaa;">(Cooldown: ${currentShrinkMeCooldown})</p>`;
                 }
             }
         } else {
-            // Pass index of the card in the current offers
-            optionDiv.onclick = () => evolutionSelectCallback(uiChoiceData, index); 
+            optionDiv.onclick = () => {
+                if (playerInstance.isFreezeModeActive) {
+                    if (selectFreezeCallback) selectFreezeCallback(uiChoiceData); 
+                } else if (playerInstance.isBlockModeActive) {
+                    if (evolutionSelectCallback) evolutionSelectCallback(uiChoiceData, index);
+                } else {
+                    if (evolutionSelectCallback) evolutionSelectCallback(uiChoiceData, index);
+                }
+            };
         }
-        
-        choiceWrapper.appendChild(optionDiv); 
-        evolutionOptionsContainer.appendChild(choiceWrapper); 
+
+        choiceWrapper.appendChild(optionDiv);
+        evolutionOptionsContainer.appendChild(choiceWrapper);
     });
-    // Equalize heights AFTER all cards are populated
     equalizeEvolutionCardHeights();
 }
 
@@ -561,9 +609,9 @@ export function populateLootOptionsUI(choices, playerInstance, onSelectLootCallb
         optionDiv.classList.add('lootOption');
         let colorsToOffer = [];
 
-        if (choice.type === 'path_buff') { 
+        if (choice.type === 'path_buff') {
              optionDiv.innerHTML = `<h3>${choice.name}</h3> <p>${choice.description}</p><span class="optionType" style="color: #FFD700; font-weight:bold;">Path Defining</span>`;
-             optionDiv.onclick = () => onSelectLootCallback(choice); 
+             optionDiv.onclick = () => onSelectLootCallback(choice);
         } else if (choice.id === 'adaptiveShield') {
            let availableColors = allPossibleColors.filter(c => !playerInstance.immuneColorsList.includes(c));
            let offeredColorsText = [];
@@ -716,11 +764,11 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, getReadableColorNam
 
 
     coreHTML += `<p><span class="stat-label">Max HP:</span><span class="stat-value">${formatInt(playerData.maxHp)}</span></p>`;
-    coreHTML += `<p><span class="stat-label">Player Size:</span><span class="stat-value">${formatNum(playerData.finalRadius)}</span></p>`; 
+    coreHTML += `<p><span class="stat-label">Player Size:</span><span class="stat-value">${formatNum(playerData.finalRadius)}</span></p>`;
     coreHTML += `<p><span class="stat-label">Times Hit:</span><span class="stat-value">${formatInt(playerData.timesHit)}</span></p>`;
     if (gameplayTimeData !== undefined) { const mins = Math.floor(gameplayTimeData / 60000); const secs = Math.floor((gameplayTimeData % 60000) / 1000); coreHTML += `<p><span class="stat-label">Time Played:</span><span class="stat-value">${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}</span></p>`; }
     coreHTML += `<p><span class="stat-label">Damage Dealt:</span><span class="stat-value">${playerData.totalDamageDealt ? playerData.totalDamageDealt.toLocaleString() : 0}</span></p>`;
-    
+
     if (playerData.rayCritChance !== undefined && (playerData.rayCritChance > 0 || playerData.rayCritDamageMultiplier > 1.5)) {
         coreHTML += `<p><span class="stat-label">Ray Crit Chance:</span><span class="stat-value">${formatPercent(playerData.rayCritChance)}</span></p>`;
         coreHTML += `<p><span class="stat-label">Ray Crit Damage:</span><span class="stat-value">${formatMultiplier(playerData.rayCritDamageMultiplier)}</span></p>`;
@@ -729,24 +777,28 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, getReadableColorNam
         coreHTML += `<p><span class="stat-label">Ability Crit Chance:</span><span class="stat-value">${formatPercent(playerData.abilityCritChance)}</span></p>`;
         coreHTML += `<p><span class="stat-label">Ability Crit Damage:</span><span class="stat-value">${formatMultiplier(playerData.abilityCritDamageMultiplier)}</span></p>`;
     }
-    
+
     if (playerData.evolutionReRollsRemaining !== undefined) {
-        coreHTML += `<p><span class="stat-label">Evo Re-rolls Left:</span><span class="stat-value">${playerData.evolutionReRollsRemaining}</span></p>`;
+        coreHTML += `<p><span class="stat-label">Evo Re-rolls Left:</span><span class="stat-value">${playerData.evolutionReRollsRemaining}/${CONSTANTS.MAX_EVOLUTION_REROLLS}</span></p>`;
     }
     if (playerData.evolutionBlocksRemaining !== undefined && CONSTANTS.MAX_EVOLUTION_BLOCKS !== undefined) {
         coreHTML += `<p><span class="stat-label">Evo Blocks Left:</span><span class="stat-value">${playerData.evolutionBlocksRemaining}/${CONSTANTS.MAX_EVOLUTION_BLOCKS}</span></p>`;
     }
+    if (playerData.evolutionFreezesRemaining !== undefined && CONSTANTS.MAX_EVOLUTION_FREEZES_PER_RUN !== undefined) {
+        coreHTML += `<p><span class="stat-label">Evo Freezes Left:</span><span class="stat-value">${playerData.evolutionFreezesRemaining}/${CONSTANTS.MAX_EVOLUTION_FREEZES_PER_RUN}</span></p>`;
+    }
+
 
     statsCoreDiv.innerHTML = coreHTML;
 
     statsUpgradesUl.innerHTML = '';
-    if (playerData.displayedUpgrades && playerData.displayedUpgrades.length > 0) { 
-        playerData.displayedUpgrades.forEach(upg => { 
-            const li = document.createElement('li'); 
-            li.innerHTML = `<span class="stat-label">${upg.name}</span><span class="stat-value">${upg.description || 'Active'}</span>`; 
-            statsUpgradesUl.appendChild(li); 
+    if (playerData.displayedUpgrades && playerData.displayedUpgrades.length > 0) {
+        playerData.displayedUpgrades.forEach(upg => {
+            const li = document.createElement('li');
+            li.innerHTML = `<span class="stat-label">${upg.name}</span><span class="stat-value">${upg.description || 'Active'}</span>`;
+            statsUpgradesUl.appendChild(li);
         });
-    } else { 
+    } else {
         statsUpgradesUl.innerHTML = '<li><span style="color: #aaa; font-size:11px;">No upgrades acquired.</span></li>';
     }
 
@@ -758,28 +810,28 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, getReadableColorNam
     if (playerData.blockedEvolutionIds && playerData.blockedEvolutionIds.length > 0) {
         const blockedHeader = document.createElement('h4');
         blockedHeader.classList.add('stats-header');
-        blockedHeader.id = 'blockedEvolutionsHeader'; 
+        blockedHeader.id = 'blockedEvolutionsHeader';
         blockedHeader.textContent = 'Blocked Evolutions';
-        
+
         const blockedList = document.createElement('ul');
-        blockedList.id = 'blockedEvolutionsList'; 
+        blockedList.id = 'blockedEvolutionsList';
         blockedList.classList.add('stats-section');
         blockedList.style.listStyleType = 'none';
         blockedList.style.padding = '0';
-        blockedList.style.margin = '0 0 10px 0'; 
+        blockedList.style.margin = '0 0 10px 0';
         playerData.blockedEvolutionIds.forEach(id => {
             const li = document.createElement('li');
-            const evoDetail = CONSTANTS.evolutionChoicesMasterList?.find(e => e.id === id); 
+            const evoDetail = CONSTANTS.evolutionChoicesMasterList?.find(e => e.id === id);
             const evoName = evoDetail ? evoDetail.text : id.replace(/([A-Z])/g, ' $1').trim();
             li.innerHTML = `<span class="stat-label" style="color: #ff8080;">${evoName}</span><span class="stat-value">(Blocked)</span>`;
             blockedList.appendChild(li);
         });
 
-        const abilitiesHeader = statsAbilitiesDiv.previousElementSibling; 
+        const abilitiesHeader = statsAbilitiesDiv.previousElementSibling;
         if (abilitiesHeader && abilitiesHeader.classList.contains('stats-header')) {
             abilitiesHeader.parentNode.insertBefore(blockedHeader, abilitiesHeader);
             abilitiesHeader.parentNode.insertBefore(blockedList, abilitiesHeader);
-        } else { 
+        } else {
             statsUpgradesUl.parentNode.appendChild(blockedHeader);
             statsUpgradesUl.parentNode.appendChild(blockedList);
         }

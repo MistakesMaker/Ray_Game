@@ -7,7 +7,7 @@ export const PLAYER_BASE_COLOR = '#FFFFFF';
 export const PLAYER_MAX_HP = 100;
 export const RAY_DAMAGE_TO_PLAYER = 10;
 export const HP_REGEN_PER_PICKUP = 25;
-export const HP_REGEN_NO_DAMAGE_THRESHOLD = 10000; 
+export const HP_REGEN_NO_DAMAGE_THRESHOLD = 10000;
 export const HP_REGEN_INTERVAL = 5000;
 export let PLAYER_SPEED_BASE = 3.5;
 export const PLAYER_AIM_INDICATOR_LENGTH = 25;
@@ -111,10 +111,10 @@ export const BOSS_HEALTH_BAR_COLOR_BG = '#555';
 export const BOSS_HEALTH_BAR_COLOR_FG = '#FF0000';
 export const BOSS_HEALTH_BAR_OFFSET_Y = 30;
 export const BOSS_WARNING_DURATION = 2500;
-export const BOSS_SPAWN_START_SCORE = 300; 
-export const BOSS_SPAWN_SCORE_INTERVAL = 300; 
+export const BOSS_SPAWN_START_SCORE = 300;
+export const BOSS_SPAWN_SCORE_INTERVAL = 300;
 export const MAX_TOTAL_ACTIVE_RAYS_BEFORE_BOSS_THROTTLE = 75;
-export const MAX_BOSSES_IN_WAVE_CAP = 1000; 
+export const MAX_BOSSES_IN_WAVE_CAP = 1000;
 
 // Evolution Upgrade Constants
 export const BASE_PICKUP_ATTRACTION_RADIUS = 0;
@@ -130,62 +130,63 @@ export const CHAIN_REACTION_EXPLOSION_COLOR = 'rgba(255, 165, 0, opacity)';
 export const MAX_HP_PICKUP_BONUS = 15;
 export const HP_PICKUP_BONUS_PER_LEVEL = 10;
 // ---- NEW EVOLUTION INTERACTION CONSTANTS ----
-export const MAX_EVOLUTION_REROLLS = 5; 
-export const MAX_EVOLUTION_BLOCKS = 3;  
+export const MAX_EVOLUTION_REROLLS = 5;
+export const MAX_EVOLUTION_BLOCKS = 3;
+export const MAX_EVOLUTION_FREEZES_PER_RUN = 3; // <-- New Constant
 
 
 // ---- Tiered Evolution Values ----
 export const REINFORCED_HULL_TIER_EFFECTIVENESS = {
-    common: 0.07, 
-    rare: 0.10,   
-    epic: 0.14,   
-    legendary: 0.20 
+    common: 0.07,
+    rare: 0.10,
+    epic: 0.14,
+    legendary: 0.20
 };
-export const VITALITY_SURGE_TIER_BONUS = { 
+export const VITALITY_SURGE_TIER_BONUS = {
     common: 0.5,
     rare: 1.0,
     epic: 1.5,
     legendary: 2.0
 };
-export const FORTIFIED_CORE_TIER_BONUS = { 
+export const FORTIFIED_CORE_TIER_BONUS = {
     common: 5,
     rare: 10,
     epic: 18,
     legendary: 30
 };
-export const DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL = 0.25; 
-export const DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL = 0.20; 
-export const KINETIC_CONVERSION_TIER_SCALING = { 
+export const DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL = 0.25;
+export const DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL = 0.20;
+export const KINETIC_CONVERSION_TIER_SCALING = {
     common:    { rateBonus: 0,    dmgBonus: 0 },
-    rare:      { rateBonus: 0.05, dmgBonus: 0.02 }, 
-    epic:      { rateBonus: 0.12, dmgBonus: 0.05 }, 
-    legendary: { rateBonus: 0.25, dmgBonus: 0.10 }  
+    rare:      { rateBonus: 0.05, dmgBonus: 0.02 },
+    epic:      { rateBonus: 0.12, dmgBonus: 0.05 },
+    legendary: { rateBonus: 0.25, dmgBonus: 0.10 }
 };
-export const TEMPORAL_ECHO_TIER_CHANCE = { 
+export const TEMPORAL_ECHO_TIER_CHANCE = {
     common: 3,
     rare: 7,
     epic: 15,
     legendary: 25
 };
-export const STREAMLINED_SYSTEMS_TIER_REDUCTION = { 
+export const STREAMLINED_SYSTEMS_TIER_REDUCTION = {
     common: 3,
     rare: 5,
     epic: 7,
     legendary: 10
 };
-export const FOCUSED_BEAM_TIER_DAMAGE = { 
+export const FOCUSED_BEAM_TIER_DAMAGE = {
     common: 0.5,
     rare: 1.0,
     epic: 1.75,
     legendary: 3.0
 };
-export const UNSTABLE_CORE_TIER_CHANCE = { 
+export const UNSTABLE_CORE_TIER_CHANCE = {
     common: 3,
     rare: 5,
     epic: 8,
     legendary: 12
 };
-export const ABILITY_POTENCY_TIER_MULTIPLIER = { 
+export const ABILITY_POTENCY_TIER_MULTIPLIER = {
     common: 1.07,
     rare: 1.10,
     epic: 1.15,
@@ -199,17 +200,17 @@ export const ABILITY_CRIT_DAMAGE_TIER_BONUS = { common: 0.10, rare: 0.15, epic: 
 
 
 // ---- Unique Path Buff Constants ----
-export const PERFECT_HARMONY_NO_DAMAGE_DURATION_THRESHOLD = 5000; 
-export const PERFECT_HARMONY_RAY_DAMAGE_BONUS = 0.20;   
-export const PERFECT_HARMONY_SPEED_BONUS = 0.15;      
-export const PERFECT_HARMONY_COOLDOWN_REDUCTION = 0.20; 
+export const PERFECT_HARMONY_NO_DAMAGE_DURATION_THRESHOLD = 5000;
+export const PERFECT_HARMONY_RAY_DAMAGE_BONUS = 0.20;
+export const PERFECT_HARMONY_SPEED_BONUS = 0.15;
+export const PERFECT_HARMONY_COOLDOWN_REDUCTION = 0.20;
 
-export const BERSERKERS_ECHO_DAMAGE_PER_10_HP = 0.09; 
-export const BERSERKERS_ECHO_SPEED_PER_10_HP = 0.03;  
+export const BERSERKERS_ECHO_DAMAGE_PER_10_HP = 0.09;
+export const BERSERKERS_ECHO_SPEED_PER_10_HP = 0.03;
 
 // Kinetic Conversion - Base values (player object holds these)
 export const KINETIC_INITIAL_DAMAGE_BONUS = 0.30;
-export const KINETIC_BASE_CHARGE_RATE = 1.0; 
+export const KINETIC_BASE_CHARGE_RATE = 1.0;
 // ---- END Unique Path Buff Constants ----
 
 // Mouse Abilities Constants
@@ -221,7 +222,7 @@ export const OMEGA_LASER_RANGE = 2000;
 export const OMEGA_LASER_WIDTH = 15;
 export const SHIELD_OVERCHARGE_DURATION = 5000;
 export const SHIELD_OVERCHARGE_COOLDOWN = 25000;
-export const SHIELD_OVERCHARGE_HEAL_PER_RAY = 2; 
+export const SHIELD_OVERCHARGE_HEAL_PER_RAY = 2;
 
 // Misc
 export const INITIAL_RAY_POOL_SIZE = 300;

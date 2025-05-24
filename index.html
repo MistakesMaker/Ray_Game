@@ -55,63 +55,97 @@
             max-width: 700px; 
             box-sizing: border-box;
         }
-        #evolutionScreen h2, #freeUpgradeScreen h2 { color: #99ccff; font-size: 30px; margin-bottom: 10px; } 
-        
-        #evolutionInteractionControls { 
+        #evolutionScreen h2, #freeUpgradeScreen h2 { color: #99ccff; font-size: 30px; margin-bottom: 10px; }
+
+        #evolutionInteractionControls {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
+            justify-content: space-around; 
+            align-items: flex-start; /* Changed to flex-start for better top alignment if needed */
             width: 100%;
-            padding: 5px 10px; 
-            margin-bottom: 15px; 
+            padding: 5px 10px;
+            margin-bottom: 15px;
             box-sizing: border-box;
             font-size: 14px;
             color: #c0c0dd;
-            border-bottom: 1px solid #303050; 
+            border-bottom: 1px solid #303050;
             padding-bottom: 10px;
         }
-        #rerollControlArea, #blockControlArea {
+        #rerollControlArea, #blockControlArea, #freezeControlArea {
             display: flex;
-            align-items: center;
-            gap: 10px; 
+            flex-direction: column; 
+            align-items: center; 
+            gap: 5px;
+            flex: 1; /* <<< ADDED: Make each control area take equal width */
+            text-align: center; /* Ensure text below button is also centered */
         }
-        #blockControlArea button { /* Style for the new block toggle button */
-            background-color: #c0392b; /* Reddish for block */
-            box-shadow: 0 3px #8a2a20;
-        }
-        #blockControlArea button:hover { background-color: #a93226; }
-        #blockControlArea button:active { background-color: #922b21; }
-        #blockControlArea button.block-mode-active { /* Style when block mode is ON */
-            background-color: #27ae60; /* Greenish to indicate active */
-            box-shadow: 0 3px #1e8449;
-        }
-        #blockControlArea button.block-mode-active:hover { background-color: #229954; }
-
-
-        #evolutionInteractionControls button {
+        #rerollControlArea button,
+        #blockControlArea button,
+        #freezeControlArea button {
             padding: 6px 12px;
             font-size: 14px;
-            background-color: #005588;
-            box-shadow: 0 3px #003355;
+            box-shadow: 0 3px #1f618d; 
+            min-width: 130px; /* Keep a min-width for aesthetics */
+            /* max-width: 150px; /* Optional: prevent buttons from becoming too wide */
+            text-align: center;
+            background-color: #2980b9; 
+            color: white; 
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.1s;
+            margin-bottom: 3px; /* Small space before the info text */
         }
-        #evolutionInteractionControls button:hover { background-color: #004477; }
-        #evolutionInteractionControls button:active { background-color: #002244; transform: translateY(1px); box-shadow: 0 2px #003355;}
-        #evolutionInteractionControls button:disabled {
-            background-color: #444 !important; /* Ensure disabled style overrides */
+        #rerollControlArea button:hover,
+        #blockControlArea button:hover,
+        #freezeControlArea button:hover { background-color: #2471a3; }
+
+        #rerollControlArea button:active,
+        #blockControlArea button:active,
+        #freezeControlArea button:active { background-color: #1c5883; transform: translateY(1px); box-shadow: 0 2px #1f618d; }
+
+        #rerollControlArea button:disabled,
+        #blockControlArea button:disabled,
+        #freezeControlArea button:disabled {
+            background-color: #444 !important;
             color: #888 !important;
             cursor: not-allowed !important;
             box-shadow: 0 3px #222 !important;
         }
-        #rerollInfo { text-align: left; }
-        #blockInfo { text-align: right; }
+
+        /* Specific active states */
+        #blockControlArea button.block-mode-active,
+        #freezeControlArea button.freeze-mode-active {
+            background-color: #85c1e9; 
+            color: #154360;
+            box-shadow: 0 3px #5dade2;
+        }
+        #blockControlArea button.block-mode-active:hover,
+        #freezeControlArea button.freeze-mode-active:hover {
+            background-color: #aed6f1;
+        }
+
+        #freezeControlArea button.has-frozen-choice {
+            background-color: #1abc9c; 
+            box-shadow: 0 3px #16a085;
+        }
+        #freezeControlArea button.has-frozen-choice:hover {
+            background-color: #17a589;
+        }
+
+
+        #rerollInfo, #blockInfo, #freezeInfo {
+             text-align: center;
+             min-height: 1.2em;
+             width: 100%; /* Make info span take full width of its control area */
+        }
 
 
         #evolutionOptionsContainer, #freeUpgradeOptionContainer {
             display: flex;
-            flex-wrap: wrap; 
-            justify-content: space-around;
+            flex-wrap: wrap;
+            justify-content: space-around; 
             align-items: flex-start; 
-            gap: 20px; 
+            gap: 20px;
             width:100%;
         }
 
@@ -120,15 +154,15 @@
             flex-direction: column;
             align-items: center; 
             flex: 1 1 180px; 
-            min-width: 170px; 
-            position: relative; 
+            min-width: 170px;
+            position: relative;
         }
         .evolution-tier-label {
-            font-size: 13px; 
+            font-size: 13px;
             font-weight: bold;
-            margin-bottom: 6px; 
+            margin-bottom: 6px;
             padding: 2px 10px;
-            border-radius: 10px; 
+            border-radius: 10px;
             background-color: rgba(0,0,0,0.35);
             text-shadow: 0 0 3px black;
             letter-spacing: 0.5px;
@@ -137,14 +171,14 @@
             visibility: hidden; 
             min-height: 1.5em; 
         }
-        .evolution-tier-label.has-tier { 
+        .evolution-tier-label.has-tier {
             visibility: visible;
         }
-        
+
         #evolutionScreen .evolutionOption,
         #freeUpgradeScreen .freeUpgradeOption {
-            background-color: #101018; 
-            border: 2px solid #444466; 
+            background-color: #101018;
+            border: 2px solid #444466;
             padding: 15px;
             border-radius: 10px;
             cursor: pointer;
@@ -154,33 +188,54 @@
             justify-content: center; align-items: center;
             min-height: 100px; 
             text-align: center;
-            box-sizing: border-box; 
-            position: relative; /* For chain overlay */
+            box-sizing: border-box;
+            position: relative; 
         }
+
         /* Chain overlay for block mode */
         .evolutionOption.primed-for-block::after {
-            content: '🔗'; /* Or use an image, or SVG */
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 50px; /* Adjust size */
-            color: rgba(200, 200, 200, 0.5); /* Semi-transparent white chains */
-            background-color: rgba(0,0,0,0.3); /* Slight dark overlay */
-            pointer-events: none; /* So it doesn't interfere with clicks on card */
-            z-index: 4; /* Above card content, below block button if any */
+            content: '🔗';
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 50px; color: rgba(200, 200, 200, 0.5);
+            background-color: rgba(0,0,0,0.3); pointer-events: none; z-index: 4;
         }
-        
-        
-        #evolutionScreen .evolutionOption h3, 
-        #freeUpgradeScreen .freeUpgradeOption h3 { 
-            margin-top: 0; 
-            color: #ddeeff; 
-            font-size: 18px; 
+        /* Icy overlay for freeze mode */
+        .evolutionOption.primed-for-freeze::after {
+            content: '❄️';
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 50px;
+            color: rgba(180, 220, 255, 0.7);
+            background-color: rgba(0, 50, 100, 0.2);
+            pointer-events: none;
+            z-index: 5;
+        }
+        /* Style for an actually frozen card */
+        .evolutionOption.actually-frozen {
+            border-color: #85c1e9 !important;
+            box-shadow: 0 0 25px 8px rgba(100, 180, 255, 0.8), 0 0 10px rgba(150, 200, 255, 0.6) inset !important;
+            opacity: 0.85;
+        }
+        .evolutionOption.actually-frozen::before {
+            content: '❄️';
+            position: absolute;
+            top: 5px; right: 5px;
+            font-size: 20px;
+            color: rgba(200, 230, 255, 0.9);
+            z-index: 6;
+            opacity: 0.8;
+        }
+
+
+        #evolutionScreen .evolutionOption h3,
+        #freeUpgradeScreen .freeUpgradeOption h3 {
+            margin-top: 0;
+            color: #ddeeff;
+            font-size: 18px;
         }
         #evolutionScreen .evolutionOption .evolution-details,
-        #freeUpgradeScreen .freeUpgradeOption p { 
+        #freeUpgradeScreen .freeUpgradeOption p {
             font-size: 12px;
             color: #aabbcc;
             margin-top: 5px;
@@ -188,42 +243,42 @@
         }
 
         /* --- CLASS-BASED BACKGROUNDS (scoped to #evolutionScreen for specificity) --- */
-        #evolutionScreen .evolutionOption[data-class="attack"] { background-color: rgba(230, 80, 80, 0.28); } 
-        #evolutionScreen .evolutionOption[data-class="tank"]   { background-color: rgba(50, 220, 50, 0.35); } 
-        #evolutionScreen .evolutionOption[data-class="ability"]{ background-color: rgba(130, 50, 200, 0.35); } 
+        #evolutionScreen .evolutionOption[data-class="attack"] { background-color: rgba(230, 80, 80, 0.28); }
+        #evolutionScreen .evolutionOption[data-class="tank"]   { background-color: rgba(50, 220, 50, 0.35); }
+        #evolutionScreen .evolutionOption[data-class="ability"]{ background-color: rgba(130, 50, 200, 0.35); }
 
         #evolutionScreen .evolutionOption[data-class="attack"]:hover { background-color: rgba(250, 100, 100, 0.38); }
         #evolutionScreen .evolutionOption[data-class="tank"]:hover   { background-color: rgba(70, 240, 70, 0.45); }
-        #evolutionScreen .evolutionOption[data-class="ability"]:hover{ background-color: rgba(150, 70, 220, 0.45); } 
-        
+        #evolutionScreen .evolutionOption[data-class="ability"]:hover{ background-color: rgba(150, 70, 220, 0.45); }
+
         #evolutionScreen .evolutionOption[data-tier="epic"][data-class="tank"],
         #evolutionScreen .evolutionOption[data-tier="legendary"][data-class="tank"] {
-            background-color: rgba(50, 220, 50, 0.25) !important; 
+            background-color: rgba(50, 220, 50, 0.25) !important;
         }
         #evolutionScreen .evolutionOption[data-tier="epic"][data-class="tank"]:hover,
         #evolutionScreen .evolutionOption[data-tier="legendary"][data-class="tank"]:hover {
-            background-color: rgba(70, 240, 70, 0.35) !important; 
+            background-color: rgba(70, 240, 70, 0.35) !important;
         }
 
 
         /* --- TIER-BASED GLOWS & BORDERS (CORE background is special) --- */
         /* CORE */
         #evolutionScreen .evolutionOption[data-tier="core"] {
-            border-color: #40A0D0; 
+            border-color: #40A0D0;
             box-shadow: 0 0 20px 7px rgba(60,180,255,0.6), 0 0 7px rgba(100,200,255,0.4) inset;
             animation: corePulse 1.8s infinite ease-in-out;
-            background-color: rgba(30, 70, 130, 0.50) !important; 
+            background-color: rgba(30, 70, 130, 0.50) !important;
         }
         #evolutionScreen .evolutionOption[data-tier="core"]:hover {
             border-color: #60C0F0;
             transform: translateY(-3px) scale(1.02);
             box-shadow: 0 0 30px 9px rgba(80,200,255,0.8), 0 0 12px rgba(120,220,255,0.6) inset;
-            background-color: rgba(40, 90, 160, 0.65) !important; 
+            background-color: rgba(40, 90, 160, 0.65) !important;
         }
 
         /* COMMON */
         #evolutionScreen .evolutionOption[data-tier="common"] {
-            border-color: #78788f; 
+            border-color: #78788f;
             box-shadow: 0 0 10px 2px rgba(120,150,150,0.3), 0 0 3px rgba(150,180,180,0.2) inset;
             animation: commonPulse 2.5s infinite ease-in-out;
         }
@@ -232,52 +287,52 @@
             transform: translateY(-2px) scale(1.01);
             box-shadow: 0 0 12px 3px rgba(120,150,150,0.35), 0 0 4px rgba(150,180,180,0.25) inset;
         }
-        
+
         /* RARE */
-        #evolutionScreen .evolutionOption[data-tier="rare"] { 
-            border-color: #30aa30; 
-            box-shadow: 0 0 20px 7px rgba(60,255,60,0.6), 0 0  7px rgba(80,255,80,0.4) inset; 
+        #evolutionScreen .evolutionOption[data-tier="rare"] {
+            border-color: #30aa30;
+            box-shadow: 0 0 20px 7px rgba(60,255,60,0.6), 0 0  7px rgba(80,255,80,0.4) inset;
             animation: rarePulse 2s infinite ease-in-out;
         }
         #evolutionScreen .evolutionOption[data-tier="rare"]:hover {
-            border-color: #55FF55; 
-            transform: translateY(-3px) scale(1.02); 
+            border-color: #55FF55;
+            transform: translateY(-3px) scale(1.02);
             box-shadow: 0 0 30px 9px rgba(50,255,50,0.8), 0 0 12px rgba(100,255,100,0.6) inset;
         }
 
         /* EPIC */
         #evolutionScreen .evolutionOption[data-tier="epic"] {
-            border-width: 2px; 
-            border-color: #a050d0; 
+            border-width: 2px;
+            border-color: #a050d0;
             box-shadow: 0 0 35px 10px rgba(200,60,255,0.95), 0 0 12px rgba(220,100,255,0.8) inset;
             animation: epicPulse 1.5s infinite ease-in-out;
         }
         #evolutionScreen .evolutionOption[data-tier="epic"]:hover {
             border-color: #D055FF;
-            transform: translateY(-5px) scale(1.05); 
+            transform: translateY(-5px) scale(1.05);
             box-shadow: 0 0 50px 14px rgba(200,60,255,1), 0 0 18px rgba(220,100,255,0.9) inset, 0 0 5px #fff;
         }
 
         /* LEGENDARY */
         #evolutionScreen .evolutionOption[data-tier="legendary"] {
-            border-width: 3px; 
-            border-color: #FFC000; 
-            box-shadow: 0 0 50px 15px rgba(255,180,0,1), 0 0 25px rgba(255,200,50,0.95) inset, 0 0 10px #FFD700; 
+            border-width: 3px;
+            border-color: #FFC000;
+            box-shadow: 0 0 50px 15px rgba(255,180,0,1), 0 0 25px rgba(255,200,50,0.95) inset, 0 0 10px #FFD700;
             animation: legendaryPulse 1s infinite ease-in-out;
         }
-        #evolutionScreen .evolutionOption[data-tier="legendary"]:hover { 
+        #evolutionScreen .evolutionOption[data-tier="legendary"]:hover {
             border-color: #FFD700;
-            transform: translateY(-5px) scale(1.05); 
-            box-shadow: 0 0 70px 20px rgba(255,180,0,1), 0 0 30px rgba(255,215,0,1) inset, 0 0 15px #FFFACD; 
+            transform: translateY(-5px) scale(1.05);
+            box-shadow: 0 0 70px 20px rgba(255,180,0,1), 0 0 30px rgba(255,215,0,1) inset, 0 0 15px #FFFACD;
         }
         /* --- End Tiered Styling --- */
 
         #evolutionScreen .evolutionOption.disabled { /* More specific for disabled */
             background-color: #303030 !important; /* Ensure this overrides class and base */
-            border-color: #505050 !important; 
+            border-color: #505050 !important;
             cursor: not-allowed; opacity: 0.6;
-            box-shadow: 0 2px #111 !important; 
-            animation: none !important; 
+            box-shadow: 0 2px #111 !important;
+            animation: none !important;
         }
         #evolutionScreen .evolutionOption.disabled:hover {
             transform: none;
@@ -297,11 +352,11 @@
             0%, 100% { box-shadow: 0 0 20px 7px rgba(60,255,60,0.6), 0 0  7px rgba(80,255,80,0.4) inset;  }
             50% { box-shadow: 0 0 25px 8px rgba(60,255,60,0.7), 0 0 9px rgba(80,255,80,0.5) inset; }
         }
-        @keyframes epicPulse { 
+        @keyframes epicPulse {
             0%, 100% { box-shadow: 0 0 35px 10px rgba(200,60,255,0.95), 0 0 12px rgba(220,100,255,0.8) inset; }
             50% { box-shadow: 0 0 40px 12px rgba(210,80,255,1), 0 0 15px rgba(230,120,255,0.9) inset; }
         }
-        @keyframes legendaryPulse { 
+        @keyframes legendaryPulse {
             0%, 100% { box-shadow: 0 0 50px 15px rgba(255,180,0,1), 0 0 25px rgba(255,200,50,0.95) inset, 0 0 10px #FFD700; }
             50% { box-shadow: 0 0 65px 18px rgba(255,200,0,1), 0 0 30px rgba(255,225,70,1) inset, 0 0 20px #FFFACD; }
         }
@@ -336,28 +391,28 @@
 
         #kineticChargeUI {
             position: absolute;
-            bottom: 95px; 
+            bottom: 95px;
             left: 50%;
             transform: translateX(-50%);
-            width: 220px; 
+            width: 220px;
             height: 15px;
-            background-color: rgba(30, 30, 50, 0.7); 
-            border: 2px solid #404070; 
+            background-color: rgba(30, 30, 50, 0.7);
+            border: 2px solid #404070;
             border-radius: 3px;
-            z-index: 14; 
+            z-index: 14;
             box-shadow: 0 0 6px rgba(80, 80, 120, 0.4);
             overflow: hidden;
-            display: none; 
+            display: none;
         }
         #kineticChargeBarFill {
             width: 0%;
             height: 100%;
-            background-color: rgba(0, 85, 170, 0.8); 
-            border-radius: 1px; 
+            background-color: rgba(0, 85, 170, 0.8);
+            border-radius: 1px;
             transition: width 0.1s linear, background-color 0.3s ease-out;
             position: relative;
         }
-        #kineticChargeBarFill.sparkling::after { 
+        #kineticChargeBarFill.sparkling::after {
             content: '';
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -366,7 +421,7 @@
                 radial-gradient(circle at var(--sparkle2-x, 70%) var(--sparkle2-y, 60%), white 0px, transparent 2px);
             background-repeat: no-repeat;
             animation: kineticSparkleAnim 1s infinite ease-in-out;
-            opacity: 0; 
+            opacity: 0;
         }
         @keyframes kineticSparkleAnim {
             0%, 100% { opacity: 0; }
@@ -380,7 +435,7 @@
             font-size: 10px;
             font-weight: bold;
             color: white;
-            text-shadow: 0 0 2px black, 0 0 2px black; 
+            text-shadow: 0 0 2px black, 0 0 2px black;
             pointer-events: none;
             z-index: 1;
             white-space: nowrap;
@@ -606,8 +661,12 @@
                 <button id="rerollEvolutionButton">Re-roll (R)</button>
                 <span id="rerollInfo">Re-rolls left: 0</span>
             </div>
+            <div id="freezeControlArea">
+                <button id="toggleFreezeModeButton">Enable Freeze (F)</button>
+                <span id="freezeInfo">Freezes left: 0/0</span>
+            </div>
             <div id="blockControlArea">
-                <button id="toggleBlockModeButton">Enable Block (X)</button> <!-- New Button -->
+                <button id="toggleBlockModeButton">Enable Block (X)</button>
                 <span id="blockInfo">Blocks left: 0/0</span>
             </div>
         </div>
