@@ -18,11 +18,11 @@ import {
 import { 
     canvas as gameCanvasElement,
     scoreDisplayElem, healthDisplayElem, highScoreListDisplay, startScreenHighScoresDiv,
-    startScreen, settingsScreen, gameOverScreen, evolutionScreen, evolutionOptionsContainer,
+    startScreen, settingsScreen, gameOverScreen, evolutionScreen, evolutionOptionsContainer, // Ensure settingsScreen is exported/imported
     freeUpgradeScreen, freeUpgradeOptionContainer, closeFreeUpgradeButton,
     lootChoiceScreen, lootOptionsContainer, abilityCooldownUI, evolutionTooltip,
     countdownOverlay, pauseScreen, pausePlayerStatsPanel,
-    detailedHighScoresScreen, kineticChargeUIElement, 
+    detailedHighScoresScreen, kineticChargeUIElement,  // Ensure detailedHighScoresScreen is exported/imported
     updateScoreDisplay, updateHealthDisplay as uiUpdateHealthDisplay,
     updateBuffIndicator as uiUpdateBuffIndicator,
     updateSurvivalBonusIndicator as uiUpdateSurvivalBonusIndicator,
@@ -98,12 +98,11 @@ const inputState = {
 let evolutionChoices = [];
 let bossLootPool = [];
 let freeUpgradeChoicesData = [];
-let currentActiveScreenElement = null;
+let currentActiveScreenElement = null; // This variable is crucial
 let firstBossDefeatedThisRun = false; 
 
 
 // --- Helper Functions & Initialization Data Logic ---
-// ... (getHighScores, addHighScore, updateAllHighScoreDisplays, initializeAllPossibleRayColors, pause/resume functions remain unchanged) ...
 function getHighScores() { const scoresJson = localStorage.getItem(HIGH_SCORES_KEY); return scoresJson ? JSON.parse(scoresJson) : []; }
 function addHighScore(name, scoreValue, finalStatsSnapshot) {
     const scores = getHighScores();
@@ -209,7 +208,7 @@ function initEvolutionChoicesInternal() {
                 return"No new colors left!";
             }, 
             getEffectString: function(playerInstance) { return `Immune to ${playerInstance?playerInstance.immuneColorsList.length:0} colors`; },
-            getCardEffectString: function() { return `Immune to ${player.immuneColorsList.length + 1} colors`;} // Shows next state
+            getCardEffectString: function() { return `Immune to ${player.immuneColorsList.length + 1} colors`;} 
         },
         {
             id: 'smallerPlayer', classType: 'tank', text: "Evasive Maneuver", level: 0,
@@ -255,7 +254,7 @@ function initEvolutionChoicesInternal() {
             getCardEffectString: function() { return `Evo Interval: 70%`;}
         },
 
-        // --- TIERED EVOLUTIONS (nameSuffix removed from tier data, base text is used) ---
+        // --- TIERED EVOLUTIONS ---
         {
             id:'reinforcedHull', classType: 'tank', text:"Reinforced Hull", level:0, maxLevel: 999, 
             isTiered: true,
@@ -1506,7 +1505,7 @@ function showDetailedHighScores() {
                 if (pausePlayerStatsPanel) pausePlayerStatsPanel.style.display = 'none';
             }
         },
-        () => {
+        () => { // This is the onBackCallback for detailed high scores
             if (pausePlayerStatsPanel && pausePlayerStatsPanel.parentElement !== document.body) {
                  document.body.appendChild(pausePlayerStatsPanel);
             }
@@ -1620,13 +1619,36 @@ const gameContextForEventListeners = {
     isGamePausedByEsc: () => gamePausedByEsc, getBossManager: () => bossManager,
     getForPlayerAbilityContext: getAbilityContextForPlayer, 
     getActiveBuffNotificationsArray: () => activeBuffNotifications,
+    getCurrentActiveScreen: () => currentActiveScreenElement, // Pass function to get current screen
+    getSettingsScreenElement: () => settingsScreen,         // Pass settings screen element
+    getDetailedHighScoresScreenElement: () => detailedHighScoresScreen, // Pass detailed scores screen element
     callbacks: {
         startGame: initGame,
         showSettingsScreenFromStart: () => { setPreviousScreenForSettings(startScreen); currentActiveScreenElement = settingsScreen; showScreen(settingsScreen, false, gameScreenCallbacks); },
         viewDetailedHighScores: () => { currentActiveScreenElement = detailedHighScoresScreen; showDetailedHighScores(); },
         toggleSound: () => { toggleSoundEnabled(); applyMusicPlayStateWrapper(); },
         updateMusicVolume, updateSfxVolume: updateSpecificSfxVolume,
-        goBackFromSettings: () => { const target = getPreviousScreenForSettings() || startScreen; currentActiveScreenElement = target; showScreen(target, target === pauseScreen, gameScreenCallbacks); if (target === pauseScreen && pausePlayerStatsPanel) { prepareAndShowPauseStats("Paused - Current Status"); if (pausePlayerStatsPanel.parentElement !== document.body) document.body.appendChild(pausePlayerStatsPanel); if (uiHighScoreContainer && uiHighScoreContainer.offsetParent !== null) { const r = uiHighScoreContainer.getBoundingClientRect(); pausePlayerStatsPanel.style.top = (r.bottom + 10) + 'px';} else pausePlayerStatsPanel.style.top = '20px'; pausePlayerStatsPanel.style.display = 'block';} else if(pausePlayerStatsPanel && target !== detailedHighScoresScreen) pausePlayerStatsPanel.style.display = 'none';},
+        goBackFromSettings: () => { 
+            const target = getPreviousScreenForSettings() || startScreen; 
+            currentActiveScreenElement = target; 
+            showScreen(target, target === pauseScreen, gameScreenCallbacks); 
+            if (target === pauseScreen && pausePlayerStatsPanel) { 
+                prepareAndShowPauseStats("Paused - Current Status"); 
+                if (pausePlayerStatsPanel.parentElement !== document.body) document.body.appendChild(pausePlayerStatsPanel); 
+                if (uiHighScoreContainer && uiHighScoreContainer.offsetParent !== null) { const r = uiHighScoreContainer.getBoundingClientRect(); pausePlayerStatsPanel.style.top = (r.bottom + 10) + 'px';} 
+                else pausePlayerStatsPanel.style.top = '20px'; 
+                pausePlayerStatsPanel.style.display = 'block';
+            } else if(pausePlayerStatsPanel && target !== detailedHighScoresScreen) {
+                pausePlayerStatsPanel.style.display = 'none';
+            }
+        },
+        goBackFromDetailedHighScores: () => { // New callback for ESC from detailed scores
+            if (pausePlayerStatsPanel && pausePlayerStatsPanel.parentElement !== document.body) {
+                 document.body.appendChild(pausePlayerStatsPanel);
+            }
+            if (pausePlayerStatsPanel) pausePlayerStatsPanel.style.display = 'none';
+            showStartScreenWithUpdatesInternal();
+        },
         resumeGameFromPause: togglePauseMenu, 
         togglePauseMenu: togglePauseMenu,     
         showSettingsScreenFromPause: () => { setPreviousScreenForSettings(pauseScreen); currentActiveScreenElement = settingsScreen; showScreen(settingsScreen, true, gameScreenCallbacks); if (pausePlayerStatsPanel) pausePlayerStatsPanel.style.display = 'none'; },

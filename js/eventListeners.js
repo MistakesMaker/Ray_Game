@@ -2,31 +2,49 @@
 
 export function setupEventListeners(canvasElement, gameContext) {
     window.addEventListener('keydown', (e) => {
-        // ---- START OF FIX ----
-        if (!e.key) { // Check if e.key is undefined or null
-            // console.warn("Keydown event with undefined e.key:", e); // Optional: log the event for debugging
-            return; // Exit early if no key property
+        if (!e.key) { 
+            return; 
         }
         const keyLower = e.key.toLowerCase();
-        // ---- END OF FIX ----
 
-
-        if (gameContext.inputState.keys.hasOwnProperty(e.key)) { // Still use original e.key for properties like 'ArrowUp'
+        if (gameContext.inputState.keys.hasOwnProperty(e.key)) { 
             gameContext.inputState.keys[e.key] = true;
         }
-        // Ensure 'd' and other wasd keys are handled correctly even if e.key is uppercase
         if (['w', 'a', 's', 'd'].includes(keyLower) && gameContext.inputState.keys.hasOwnProperty(keyLower) ) {
              gameContext.inputState.keys[keyLower] = true;
         }
 
+        // --- MODIFIED ESCAPE KEY LOGIC ---
+        if (e.key === 'Escape') {
+            const activeScreen = gameContext.getCurrentActiveScreen ? gameContext.getCurrentActiveScreen() : null;
+            const settingsScreenElement = gameContext.getSettingsScreenElement ? gameContext.getSettingsScreenElement() : null;
+            const detailedHighScoresScreenElement = gameContext.getDetailedHighScoresScreenElement ? gameContext.getDetailedHighScoresScreenElement() : null;
 
-        if (e.key === 'Escape' && gameContext.isGameRunning && gameContext.isGameRunning() && !gameContext.isGameOver()) { 
-            if ((gameContext.isAnyPauseActiveExceptEsc && !gameContext.isAnyPauseActiveExceptEsc()) || (gameContext.isGamePausedByEsc && gameContext.isGamePausedByEsc())) {
-                if (gameContext.callbacks.togglePauseMenu) gameContext.callbacks.togglePauseMenu();
+
+            if (activeScreen === settingsScreenElement && gameContext.callbacks.goBackFromSettings) {
+                e.preventDefault(); // Prevent any other ESC action
+                gameContext.callbacks.goBackFromSettings();
+            } else if (activeScreen === detailedHighScoresScreenElement && gameContext.callbacks.goBackFromDetailedHighScores) {
+                e.preventDefault();
+                gameContext.callbacks.goBackFromDetailedHighScores(); 
+            } else if (gameContext.isGameRunning && gameContext.isGameRunning() && !gameContext.isGameOver()) {
+                if ((gameContext.isAnyPauseActiveExceptEsc && !gameContext.isAnyPauseActiveExceptEsc()) || 
+                    (gameContext.isGamePausedByEsc && gameContext.isGamePausedByEsc()) ||
+                    (!gameContext.isAnyPauseActiveExceptEsc || !gameContext.isAnyPauseActiveExceptEsc()) && (!gameContext.isGamePausedByEsc || !gameContext.isGamePausedByEsc()) 
+                   ) {
+                    if (gameContext.callbacks.togglePauseMenu) {
+                        e.preventDefault();
+                        gameContext.callbacks.togglePauseMenu();
+                    }
+                }
             }
         }
+        // --- END MODIFIED ESCAPE KEY LOGIC ---
 
-        const playerInstance = gameContext.getPlayerInstance ? gameContext.getPlayerInstance() : null;
+        // ---- CORRECTED ABILITY KEY HANDLING ----
+        // Get playerInstance here, inside the keydown listener's scope
+        const playerInstance = gameContext.getPlayerInstance ? gameContext.getPlayerInstance() : null; 
+
         if (playerInstance && gameContext.isGameRunning && gameContext.isGameRunning() && (!gameContext.isAnyPauseActiveExceptEsc || !gameContext.isAnyPauseActiveExceptEsc())) { 
             const abilityContext = gameContext.getForPlayerAbilityContext ? gameContext.getForPlayerAbilityContext() : {};
             if (e.key === '1') playerInstance.activateAbility('1', abilityContext);
@@ -34,8 +52,10 @@ export function setupEventListeners(canvasElement, gameContext) {
             else if (e.key === '3') playerInstance.activateAbility('3', abilityContext);
             if (['1', '2', '3'].includes(e.key)) e.preventDefault();
         }
+        // ---- END CORRECTED ABILITY KEY HANDLING ----
 
-        if (e.key === 'F1') { // Keep original e.key for specific function keys
+
+        if (e.key === 'F1') { 
             if (gameContext.callbacks.debugSpawnBoss) {
                 e.preventDefault();
                 gameContext.callbacks.debugSpawnBoss(0);
@@ -44,13 +64,10 @@ export function setupEventListeners(canvasElement, gameContext) {
     });
 
     window.addEventListener('keyup', (e) => {
-        // ---- START OF FIX ----
-        if (!e.key) { // Check if e.key is undefined or null
-            // console.warn("Keyup event with undefined e.key:", e);
-            return; // Exit early
+        if (!e.key) { 
+            return; 
         }
         const keyLower = e.key.toLowerCase();
-        // ---- END OF FIX ----
 
         if (gameContext.inputState.keys.hasOwnProperty(e.key)) {
             gameContext.inputState.keys[e.key] = false;
@@ -67,18 +84,20 @@ export function setupEventListeners(canvasElement, gameContext) {
     });
 
     canvasElement.addEventListener('mousedown', (e) => {
-        const playerInstance = gameContext.getPlayerInstance ? gameContext.getPlayerInstance() : null;
+        const playerInstance = gameContext.getPlayerInstance ? gameContext.getPlayerInstance() : null; // This one was correct
         const activeBuffsArray = gameContext.getActiveBuffNotificationsArray ? gameContext.getActiveBuffNotificationsArray() : [];
+        const abilityContext = gameContext.getForPlayerAbilityContext ? gameContext.getForPlayerAbilityContext() : {}; // Added for mouse abilities
+
 
         if (playerInstance && gameContext.isGameRunning && gameContext.isGameRunning() && (!gameContext.isAnyPauseActiveExceptEsc || !gameContext.isAnyPauseActiveExceptEsc())) { 
-            if (e.button === 0) { // Left Mouse Button
+            if (e.button === 0) { 
                 if (playerInstance.hasOmegaLaser) {
-                    playerInstance.activateOmegaLaser(activeBuffsArray);
+                    playerInstance.activateOmegaLaser(activeBuffsArray, abilityContext); // Pass abilityContext
                     e.preventDefault();
                 }
-            } else if (e.button === 2) { // Right Mouse Button
+            } else if (e.button === 2) { 
                 if (playerInstance.hasShieldOvercharge) {
-                    playerInstance.activateShieldOvercharge(activeBuffsArray);
+                    playerInstance.activateShieldOvercharge(activeBuffsArray, abilityContext); // Pass abilityContext
                     e.preventDefault();
                 }
             }
