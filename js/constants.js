@@ -116,7 +116,7 @@ export const BOSS_SPAWN_SCORE_INTERVAL = 300;
 export const MAX_TOTAL_ACTIVE_RAYS_BEFORE_BOSS_THROTTLE = 75;
 export const MAX_BOSSES_IN_WAVE_CAP = 1000; 
 
-// Evolution Upgrade Constants (Base values for non-tiered or default)
+// Evolution Upgrade Constants
 export const BASE_PICKUP_ATTRACTION_RADIUS = 0;
 export const ATTRACTION_RADIUS_PER_LEVEL = 30;
 export const MAX_PICKUP_ATTRACTION_LEVELS = 3;
@@ -129,6 +129,10 @@ export const CHAIN_REACTION_EXPLOSION_DURATION = 300;
 export const CHAIN_REACTION_EXPLOSION_COLOR = 'rgba(255, 165, 0, opacity)';
 export const MAX_HP_PICKUP_BONUS = 15;
 export const HP_PICKUP_BONUS_PER_LEVEL = 10;
+// ---- NEW EVOLUTION INTERACTION CONSTANTS ----
+export const MAX_EVOLUTION_REROLLS = 5; 
+export const MAX_EVOLUTION_BLOCKS = 3;  
+
 
 // ---- Tiered Evolution Values ----
 export const REINFORCED_HULL_TIER_EFFECTIVENESS = {
@@ -187,7 +191,6 @@ export const ABILITY_POTENCY_TIER_MULTIPLIER = {
     epic: 1.15,
     legendary: 1.22
 };
-// ---- NEW CRITICAL HIT CONSTANTS ----
 export const RAY_CRIT_CHANCE_TIER_BONUS = { common: 0.02, rare: 0.04, epic: 0.08, legendary: 0.15 };
 export const RAY_CRIT_DAMAGE_TIER_BONUS = { common: 0.10, rare: 0.15, epic: 0.25, legendary: 0.40 };
 export const ABILITY_CRIT_CHANCE_TIER_BONUS = { common: 0.02, rare: 0.04, epic: 0.08, legendary: 0.15 };

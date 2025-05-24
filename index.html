@@ -55,12 +55,62 @@
             max-width: 700px; 
             box-sizing: border-box;
         }
-        #evolutionScreen h2, #freeUpgradeScreen h2 { color: #99ccff; font-size: 30px; margin-bottom: 20px; }
+        #evolutionScreen h2, #freeUpgradeScreen h2 { color: #99ccff; font-size: 30px; margin-bottom: 10px; } 
+        
+        #evolutionInteractionControls { 
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            padding: 5px 10px; 
+            margin-bottom: 15px; 
+            box-sizing: border-box;
+            font-size: 14px;
+            color: #c0c0dd;
+            border-bottom: 1px solid #303050; 
+            padding-bottom: 10px;
+        }
+        #rerollControlArea, #blockControlArea {
+            display: flex;
+            align-items: center;
+            gap: 10px; 
+        }
+        #blockControlArea button { /* Style for the new block toggle button */
+            background-color: #c0392b; /* Reddish for block */
+            box-shadow: 0 3px #8a2a20;
+        }
+        #blockControlArea button:hover { background-color: #a93226; }
+        #blockControlArea button:active { background-color: #922b21; }
+        #blockControlArea button.block-mode-active { /* Style when block mode is ON */
+            background-color: #27ae60; /* Greenish to indicate active */
+            box-shadow: 0 3px #1e8449;
+        }
+        #blockControlArea button.block-mode-active:hover { background-color: #229954; }
+
+
+        #evolutionInteractionControls button {
+            padding: 6px 12px;
+            font-size: 14px;
+            background-color: #005588;
+            box-shadow: 0 3px #003355;
+        }
+        #evolutionInteractionControls button:hover { background-color: #004477; }
+        #evolutionInteractionControls button:active { background-color: #002244; transform: translateY(1px); box-shadow: 0 2px #003355;}
+        #evolutionInteractionControls button:disabled {
+            background-color: #444 !important; /* Ensure disabled style overrides */
+            color: #888 !important;
+            cursor: not-allowed !important;
+            box-shadow: 0 3px #222 !important;
+        }
+        #rerollInfo { text-align: left; }
+        #blockInfo { text-align: right; }
+
+
         #evolutionOptionsContainer, #freeUpgradeOptionContainer {
             display: flex;
             flex-wrap: wrap; 
             justify-content: space-around;
-            align-items: flex-start; /* Align wrappers to the top */
+            align-items: flex-start; 
             gap: 20px; 
             width:100%;
         }
@@ -71,6 +121,7 @@
             align-items: center; 
             flex: 1 1 180px; 
             min-width: 170px; 
+            position: relative; 
         }
         .evolution-tier-label {
             font-size: 13px; 
@@ -83,17 +134,16 @@
             letter-spacing: 0.5px;
             line-height: 1.4;
             display: inline-block; 
-            visibility: hidden; /* Default to hidden */
-            min-height: 1.5em; /* Reserve space even if empty, adjust as needed */
+            visibility: hidden; 
+            min-height: 1.5em; 
         }
-        .evolution-tier-label.has-tier { /* JS adds this class if there's text */
+        .evolution-tier-label.has-tier { 
             visibility: visible;
         }
         
-        /* BASE STYLING FOR ALL EVOLUTION OPTIONS */
         #evolutionScreen .evolutionOption,
         #freeUpgradeScreen .freeUpgradeOption {
-            background-color: #101018; /* Darkest neutral base for all cards */
+            background-color: #101018; 
             border: 2px solid #444466; 
             padding: 15px;
             border-radius: 10px;
@@ -105,9 +155,24 @@
             min-height: 100px; 
             text-align: center;
             box-sizing: border-box; 
+            position: relative; /* For chain overlay */
+        }
+        /* Chain overlay for block mode */
+        .evolutionOption.primed-for-block::after {
+            content: '🔗'; /* Or use an image, or SVG */
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 50px; /* Adjust size */
+            color: rgba(200, 200, 200, 0.5); /* Semi-transparent white chains */
+            background-color: rgba(0,0,0,0.3); /* Slight dark overlay */
+            pointer-events: none; /* So it doesn't interfere with clicks on card */
+            z-index: 4; /* Above card content, below block button if any */
         }
         
-        /* TEXT STYLING (consistent for all cards) */
+        
         #evolutionScreen .evolutionOption h3, 
         #freeUpgradeScreen .freeUpgradeOption h3 { 
             margin-top: 0; 
@@ -125,13 +190,12 @@
         /* --- CLASS-BASED BACKGROUNDS (scoped to #evolutionScreen for specificity) --- */
         #evolutionScreen .evolutionOption[data-class="attack"] { background-color: rgba(230, 80, 80, 0.28); } 
         #evolutionScreen .evolutionOption[data-class="tank"]   { background-color: rgba(50, 220, 50, 0.35); } 
-        #evolutionScreen .evolutionOption[data-class="ability"]{ background-color: rgba(130, 50, 200, 0.35); }
+        #evolutionScreen .evolutionOption[data-class="ability"]{ background-color: rgba(130, 50, 200, 0.35); } 
 
         #evolutionScreen .evolutionOption[data-class="attack"]:hover { background-color: rgba(250, 100, 100, 0.38); }
         #evolutionScreen .evolutionOption[data-class="tank"]:hover   { background-color: rgba(70, 240, 70, 0.45); }
-        #evolutionScreen .evolutionOption[data-class="ability"]:hover{ background-color: rgba(150, 70, 220, 0.45); }
+        #evolutionScreen .evolutionOption[data-class="ability"]:hover{ background-color: rgba(150, 70, 220, 0.45); } 
         
-        /* Specific override for higher-tier TANK to make its green background more translucent to compensate for contrasting glow */
         #evolutionScreen .evolutionOption[data-tier="epic"][data-class="tank"],
         #evolutionScreen .evolutionOption[data-tier="legendary"][data-class="tank"] {
             background-color: rgba(50, 220, 50, 0.25) !important; 
@@ -535,7 +599,21 @@
     <div id="countdownOverlay">3</div>
     <div id="gameOverScreen" class="messageScreenBase"></div>
 
-    <div id="evolutionScreen" class="messageScreenBase"><h2>Choose Your Evolution!</h2><div id="evolutionOptionsContainer"></div></div>
+    <div id="evolutionScreen" class="messageScreenBase">
+        <h2>Choose Your Evolution!</h2>
+        <div id="evolutionInteractionControls">
+            <div id="rerollControlArea">
+                <button id="rerollEvolutionButton">Re-roll (R)</button>
+                <span id="rerollInfo">Re-rolls left: 0</span>
+            </div>
+            <div id="blockControlArea">
+                <button id="toggleBlockModeButton">Enable Block (X)</button> <!-- New Button -->
+                <span id="blockInfo">Blocks left: 0/0</span>
+            </div>
+        </div>
+        <div id="evolutionOptionsContainer"></div>
+    </div>
+
     <div id="freeUpgradeScreen" class="messageScreenBase"><h2>Bonus Upgrade!</h2><div id="freeUpgradeOptionContainer"></div><button id="closeFreeUpgradeButton">Continue</button></div>
     <div id="lootChoiceScreen" class="messageScreenBase">
         <h2>Salvaged Technology!</h2>

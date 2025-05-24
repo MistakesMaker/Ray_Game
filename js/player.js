@@ -19,7 +19,9 @@ import {
     BERSERKERS_ECHO_SPEED_PER_10_HP,   
     DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL,
     DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL,
-    KINETIC_INITIAL_DAMAGE_BONUS
+    KINETIC_INITIAL_DAMAGE_BONUS,
+    // MAX_EVOLUTION_REROLLS, // Not strictly needed here if only used for init in main.js
+    // MAX_EVOLUTION_BLOCKS   // Not strictly needed here if only used for init in main.js
 } from './constants.js'; 
 
 import { checkCollision, hexToRgb, lightenColor, isLineSegmentIntersectingCircle } from './utils.js';
@@ -126,6 +128,11 @@ export class Player {
         this.omegaLaserWidth = OMEGA_LASER_WIDTH;
         this.originalPlayerSpeed = initialPlayerSpeed;
         this.currentSpeed = initialPlayerSpeed; 
+
+        // Evolution Interaction Properties
+        this.evolutionReRollsRemaining = 0; // Will be initialized in main.js using CONSTANTS.MAX_EVOLUTION_REROLLS
+        this.blockedEvolutionIds = [];      // Will be reset in main.js
+        this.evolutionBlocksRemaining = 0;  // Will be initialized in main.js using CONSTANTS.MAX_EVOLUTION_BLOCKS
     }
 
     drawHpBar(ctx) {

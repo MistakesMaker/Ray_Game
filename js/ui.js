@@ -1,5 +1,4 @@
 // js/ui.js
-// console.log("[Debug UI_JS_LOAD] ui.js is being parsed/executed."); 
 
 import * as CONSTANTS from './constants.js';
 
@@ -19,6 +18,12 @@ export const settingsScreen = document.getElementById('settingsScreen');
 export const gameOverScreen = document.getElementById('gameOverScreen');
 export const evolutionScreen = document.getElementById('evolutionScreen');
 export const evolutionOptionsContainer = document.getElementById('evolutionOptionsContainer');
+
+const rerollEvolutionButton = document.getElementById('rerollEvolutionButton'); 
+const rerollInfoSpan = document.getElementById('rerollInfo');
+const blockInfoSpan = document.getElementById('blockInfo');
+const toggleBlockModeButton = document.getElementById('toggleBlockModeButton'); 
+
 export const freeUpgradeScreen = document.getElementById('freeUpgradeScreen');
 export const freeUpgradeOptionContainer = document.getElementById('freeUpgradeOptionContainer');
 export const closeFreeUpgradeButton = document.getElementById('closeFreeUpgradeButton');
@@ -292,8 +297,9 @@ export function showScreen(screenElementToShow, cameFromPauseMenu = false, callb
         }
     }
 
+    // Call height equalization logic if the specific screen is being shown
     if (screenElementToShow === evolutionScreen) {
-        equalizeEvolutionCardHeights();
+        // The call to equalizeEvolutionCardHeights is now at the end of populateEvolutionOptionsUI
     }
     if (screenElementToShow === freeUpgradeScreen) {
         equalizeFreeUpgradeCardHeights();
@@ -394,17 +400,50 @@ function equalizeLootCardHeights() {
 }
 
 
-export function populateEvolutionOptionsUI(choices, playerInstance, evolutionSelectCallback, currentShrinkMeCooldown, getReadableColorNameFunc) {
+export function populateEvolutionOptionsUI(
+    choices, 
+    playerInstance, 
+    evolutionSelectCallback, 
+    rerollCallback, 
+    toggleBlockModeCallback, // For the main "Enable Block" button
+    currentShrinkMeCooldown, 
+    getReadableColorNameFunc
+) {
     if (!evolutionOptionsContainer || !playerInstance) return;
     evolutionOptionsContainer.innerHTML = '';
 
-    choices.forEach(uiChoiceData => { 
+    // Update Re-roll Button and Info
+    if (rerollEvolutionButton && rerollInfoSpan) {
+        rerollEvolutionButton.disabled = playerInstance.evolutionReRollsRemaining <= 0;
+        rerollEvolutionButton.onclick = rerollCallback; 
+        rerollInfoSpan.textContent = `Re-rolls left: ${playerInstance.evolutionReRollsRemaining || 0}`;
+    }
+
+    // Update Block Mode Button and Info
+    if (toggleBlockModeButton && blockInfoSpan) {
+        const maxBlocks = playerInstance.maxEvolutionBlocks !== undefined ? playerInstance.maxEvolutionBlocks : CONSTANTS.MAX_EVOLUTION_BLOCKS;
+        toggleBlockModeButton.disabled = playerInstance.evolutionBlocksRemaining <= 0 && !playerInstance.isBlockModeActive;
+        
+        if (playerInstance.isBlockModeActive) {
+            toggleBlockModeButton.textContent = "Block Active (Cancel X)";
+            toggleBlockModeButton.classList.add('block-mode-active');
+        } else {
+            toggleBlockModeButton.textContent = `Enable Block (X)`;
+            toggleBlockModeButton.classList.remove('block-mode-active');
+        }
+        toggleBlockModeButton.onclick = toggleBlockModeCallback;
+        blockInfoSpan.textContent = `Blocks left: ${playerInstance.evolutionBlocksRemaining !== undefined ? playerInstance.evolutionBlocksRemaining : maxBlocks}/${maxBlocks}`;
+    }
+
+
+    choices.forEach((uiChoiceData, index) => { 
         const choiceWrapper = document.createElement('div');
         choiceWrapper.classList.add('evolution-choice-wrapper');
 
         const optionDiv = document.createElement('div');
         optionDiv.classList.add('evolutionOption');
         optionDiv.dataset.class = uiChoiceData.classType;
+        optionDiv.dataset.baseId = uiChoiceData.baseId; 
 
         const tierLabel = document.createElement('span');
         tierLabel.classList.add('evolution-tier-label'); 
@@ -431,8 +470,19 @@ export function populateEvolutionOptionsUI(choices, playerInstance, evolutionSel
         }
         optionDiv.innerHTML = displayText;
 
+        // No individual block buttons are added here anymore.
+        // Hover effect for block mode is handled by card's mouseover/mouseout.
+
         if (uiChoiceData.detailedDescription && evolutionTooltip) {
             optionDiv.onmouseover = (event) => { 
+                if (playerInstance.isBlockModeActive && 
+                    uiChoiceData.baseId !== 'noMoreEvolutions' && 
+                    !uiChoiceData.baseId.startsWith('empty_slot_') &&
+                    !(playerInstance.blockedEvolutionIds && playerInstance.blockedEvolutionIds.includes(uiChoiceData.baseId)) &&
+                    playerInstance.evolutionBlocksRemaining > 0) {
+                    optionDiv.classList.add('primed-for-block');
+                }
+
                 let tooltipText = "";
                 let effectiveTierForTooltip = "core"; 
                 if (uiChoiceData.originalEvolution.isTiered && uiChoiceData.rolledTier && uiChoiceData.rolledTier !== "none") {
@@ -452,33 +502,45 @@ export function populateEvolutionOptionsUI(choices, playerInstance, evolutionSel
                 evolutionTooltip.style.left = `${event.pageX + 15}px`; 
                 evolutionTooltip.style.top = `${event.pageY + 15}px`;
             };
-            optionDiv.onmouseout = () => { evolutionTooltip.style.display = 'none'; };
+            optionDiv.onmouseout = () => { 
+                optionDiv.classList.remove('primed-for-block'); 
+                evolutionTooltip.style.display = 'none'; 
+            };
         }
 
         const baseEvoForMaxCheck = uiChoiceData.originalEvolution;
         const isMaxed = baseEvoForMaxCheck.isMaxed ? baseEvoForMaxCheck.isMaxed(playerInstance) : false;
+        const isAlreadyBlockedByPlayer = playerInstance.blockedEvolutionIds && playerInstance.blockedEvolutionIds.includes(uiChoiceData.baseId);
 
-        if (baseEvoForMaxCheck.id === 'noMoreEvolutions' || isMaxed ) {
+        if (baseEvoForMaxCheck.id === 'noMoreEvolutions' || baseEvoForMaxCheck.id.startsWith('empty_slot_') || isMaxed || isAlreadyBlockedByPlayer ) {
             optionDiv.classList.add('disabled');
             if (optionDiv.dataset.tier !== "core" || !isMaxed) { 
                  optionDiv.dataset.tier = 'disabled';
-            } else if (optionDiv.dataset.tier === "core" && isMaxed) {
+            } 
+            if(isAlreadyBlockedByPlayer && !optionDiv.classList.contains('disabled')){
+                const h3 = optionDiv.querySelector('h3');
+                if (h3) h3.innerHTML += `<p style="font-size:10px; color:#ff8080;">(Blocked)</p>`;
+                 optionDiv.classList.add('disabled'); // Ensure it's styled as disabled
+                 optionDiv.dataset.tier = 'disabled'; // Use disabled tier styling
             }
 
 
             if (baseEvoForMaxCheck.id === 'smallerPlayer' && currentShrinkMeCooldown > 0) {
                 const h3 = optionDiv.querySelector('h3');
                 if (h3) {
-                    h3.innerHTML += `<p style="font-size:10px; color:#aaa;">(Available in ${currentShrinkMeCooldown} more evolution${currentShrinkMeCooldown !== 1 ? 's' : ''})</p>`;
+                    h3.innerHTML += `<p style="font-size:10px; color:#aaa;">(Cooldown: ${currentShrinkMeCooldown})</p>`;
                 }
             }
         } else {
-            optionDiv.onclick = () => evolutionSelectCallback(uiChoiceData); 
+            // Pass index of the card in the current offers
+            optionDiv.onclick = () => evolutionSelectCallback(uiChoiceData, index); 
         }
         
         choiceWrapper.appendChild(optionDiv); 
         evolutionOptionsContainer.appendChild(choiceWrapper); 
     });
+    // Equalize heights AFTER all cards are populated
+    equalizeEvolutionCardHeights();
 }
 
 export function populateFreeUpgradeOptionUI(chosenUpgrade, onContinueCallback) {
@@ -668,11 +730,61 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, getReadableColorNam
         coreHTML += `<p><span class="stat-label">Ability Crit Damage:</span><span class="stat-value">${formatMultiplier(playerData.abilityCritDamageMultiplier)}</span></p>`;
     }
     
+    if (playerData.evolutionReRollsRemaining !== undefined) {
+        coreHTML += `<p><span class="stat-label">Evo Re-rolls Left:</span><span class="stat-value">${playerData.evolutionReRollsRemaining}</span></p>`;
+    }
+    if (playerData.evolutionBlocksRemaining !== undefined && CONSTANTS.MAX_EVOLUTION_BLOCKS !== undefined) {
+        coreHTML += `<p><span class="stat-label">Evo Blocks Left:</span><span class="stat-value">${playerData.evolutionBlocksRemaining}/${CONSTANTS.MAX_EVOLUTION_BLOCKS}</span></p>`;
+    }
+
     statsCoreDiv.innerHTML = coreHTML;
 
     statsUpgradesUl.innerHTML = '';
-    if (playerData.displayedUpgrades && playerData.displayedUpgrades.length > 0) { playerData.displayedUpgrades.forEach(upg => { const li = document.createElement('li'); li.innerHTML = `<span class="stat-label">${upg.name}</span><span class="stat-value">${upg.description || 'Active'}</span>`; statsUpgradesUl.appendChild(li); });}
-    else { statsUpgradesUl.innerHTML = '<li><span style="color: #aaa; font-size:11px;">No upgrades acquired.</span></li>';}
+    if (playerData.displayedUpgrades && playerData.displayedUpgrades.length > 0) { 
+        playerData.displayedUpgrades.forEach(upg => { 
+            const li = document.createElement('li'); 
+            li.innerHTML = `<span class="stat-label">${upg.name}</span><span class="stat-value">${upg.description || 'Active'}</span>`; 
+            statsUpgradesUl.appendChild(li); 
+        });
+    } else { 
+        statsUpgradesUl.innerHTML = '<li><span style="color: #aaa; font-size:11px;">No upgrades acquired.</span></li>';
+    }
+
+    let existingBlockedHeader = pausePlayerStatsPanel.querySelector('#blockedEvolutionsHeader');
+    if (existingBlockedHeader) existingBlockedHeader.remove();
+    let existingBlockedList = pausePlayerStatsPanel.querySelector('#blockedEvolutionsList');
+    if (existingBlockedList) existingBlockedList.remove();
+
+    if (playerData.blockedEvolutionIds && playerData.blockedEvolutionIds.length > 0) {
+        const blockedHeader = document.createElement('h4');
+        blockedHeader.classList.add('stats-header');
+        blockedHeader.id = 'blockedEvolutionsHeader'; 
+        blockedHeader.textContent = 'Blocked Evolutions';
+        
+        const blockedList = document.createElement('ul');
+        blockedList.id = 'blockedEvolutionsList'; 
+        blockedList.classList.add('stats-section');
+        blockedList.style.listStyleType = 'none';
+        blockedList.style.padding = '0';
+        blockedList.style.margin = '0 0 10px 0'; 
+        playerData.blockedEvolutionIds.forEach(id => {
+            const li = document.createElement('li');
+            const evoDetail = CONSTANTS.evolutionChoicesMasterList?.find(e => e.id === id); 
+            const evoName = evoDetail ? evoDetail.text : id.replace(/([A-Z])/g, ' $1').trim();
+            li.innerHTML = `<span class="stat-label" style="color: #ff8080;">${evoName}</span><span class="stat-value">(Blocked)</span>`;
+            blockedList.appendChild(li);
+        });
+
+        const abilitiesHeader = statsAbilitiesDiv.previousElementSibling; 
+        if (abilitiesHeader && abilitiesHeader.classList.contains('stats-header')) {
+            abilitiesHeader.parentNode.insertBefore(blockedHeader, abilitiesHeader);
+            abilitiesHeader.parentNode.insertBefore(blockedList, abilitiesHeader);
+        } else { 
+            statsUpgradesUl.parentNode.appendChild(blockedHeader);
+            statsUpgradesUl.parentNode.appendChild(blockedList);
+        }
+    }
+
 
     statsImmunitiesContainer.innerHTML = '';
     if (playerData.immuneColorsList && playerData.immuneColorsList.length > 0) { playerData.immuneColorsList.forEach(color => { const s = document.createElement('div'); s.className = 'immunity-swatch-pause'; s.style.backgroundColor = color; if (getReadableColorNameFunc) s.title = getReadableColorNameFunc(color); statsImmunitiesContainer.appendChild(s); });}

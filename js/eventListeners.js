@@ -14,7 +14,7 @@ export function setupEventListeners(canvasElement, gameContext) {
              gameContext.inputState.keys[keyLower] = true;
         }
 
-        // --- MODIFIED ESCAPE KEY LOGIC ---
+        // --- ESCAPE KEY LOGIC ---
         if (e.key === 'Escape') {
             const activeScreen = gameContext.getCurrentActiveScreen ? gameContext.getCurrentActiveScreen() : null;
             const settingsScreenElement = gameContext.getSettingsScreenElement ? gameContext.getSettingsScreenElement() : null;
@@ -22,7 +22,7 @@ export function setupEventListeners(canvasElement, gameContext) {
 
 
             if (activeScreen === settingsScreenElement && gameContext.callbacks.goBackFromSettings) {
-                e.preventDefault(); // Prevent any other ESC action
+                e.preventDefault(); 
                 gameContext.callbacks.goBackFromSettings();
             } else if (activeScreen === detailedHighScoresScreenElement && gameContext.callbacks.goBackFromDetailedHighScores) {
                 e.preventDefault();
@@ -39,20 +39,37 @@ export function setupEventListeners(canvasElement, gameContext) {
                 }
             }
         }
-        // --- END MODIFIED ESCAPE KEY LOGIC ---
-
-        // ---- CORRECTED ABILITY KEY HANDLING ----
-        // Get playerInstance here, inside the keydown listener's scope
+        
+        // --- ABILITY & INTERACTION KEY LOGIC ---
         const playerInstance = gameContext.getPlayerInstance ? gameContext.getPlayerInstance() : null; 
 
-        if (playerInstance && gameContext.isGameRunning && gameContext.isGameRunning() && (!gameContext.isAnyPauseActiveExceptEsc || !gameContext.isAnyPauseActiveExceptEsc())) { 
+        if (playerInstance && gameContext.isGameRunning && gameContext.isGameRunning() && 
+            (!gameContext.isAnyPauseActiveExceptEsc || !gameContext.isAnyPauseActiveExceptEsc()) && 
+            (!gameContext.isGamePausedByEsc || !gameContext.isGamePausedByEsc()) 
+           ) { 
+            // Numbered Abilities (1, 2, 3)
             const abilityContext = gameContext.getForPlayerAbilityContext ? gameContext.getForPlayerAbilityContext() : {};
             if (e.key === '1') playerInstance.activateAbility('1', abilityContext);
             else if (e.key === '2') playerInstance.activateAbility('2', abilityContext);
             else if (e.key === '3') playerInstance.activateAbility('3', abilityContext);
             if (['1', '2', '3'].includes(e.key)) e.preventDefault();
         }
-        // ---- END CORRECTED ABILITY KEY HANDLING ----
+
+        // Re-roll listener (R key) - only if evolution screen is active
+        if (keyLower === 'r' && 
+            gameContext.isEvolutionScreenActive && gameContext.isEvolutionScreenActive() && 
+            gameContext.callbacks.handleEvolutionReRoll) {
+            e.preventDefault();
+            gameContext.callbacks.handleEvolutionReRoll();
+        }
+
+        // Toggle Block Mode listener (X key) - only if evolution screen is active
+        if (keyLower === 'x' &&
+            gameContext.isEvolutionScreenActive && gameContext.isEvolutionScreenActive() &&
+            gameContext.callbacks.toggleBlockMode) {
+            e.preventDefault();
+            gameContext.callbacks.toggleBlockMode();
+        }
 
 
         if (e.key === 'F1') { 
@@ -84,20 +101,23 @@ export function setupEventListeners(canvasElement, gameContext) {
     });
 
     canvasElement.addEventListener('mousedown', (e) => {
-        const playerInstance = gameContext.getPlayerInstance ? gameContext.getPlayerInstance() : null; // This one was correct
+        const playerInstance = gameContext.getPlayerInstance ? gameContext.getPlayerInstance() : null; 
         const activeBuffsArray = gameContext.getActiveBuffNotificationsArray ? gameContext.getActiveBuffNotificationsArray() : [];
-        const abilityContext = gameContext.getForPlayerAbilityContext ? gameContext.getForPlayerAbilityContext() : {}; // Added for mouse abilities
+        const abilityContext = gameContext.getForPlayerAbilityContext ? gameContext.getForPlayerAbilityContext() : {};
 
 
-        if (playerInstance && gameContext.isGameRunning && gameContext.isGameRunning() && (!gameContext.isAnyPauseActiveExceptEsc || !gameContext.isAnyPauseActiveExceptEsc())) { 
+        if (playerInstance && gameContext.isGameRunning && gameContext.isGameRunning() && 
+            (!gameContext.isAnyPauseActiveExceptEsc || !gameContext.isAnyPauseActiveExceptEsc()) &&
+            (!gameContext.isGamePausedByEsc || !gameContext.isGamePausedByEsc())
+            ) { 
             if (e.button === 0) { 
                 if (playerInstance.hasOmegaLaser) {
-                    playerInstance.activateOmegaLaser(activeBuffsArray, abilityContext); // Pass abilityContext
+                    playerInstance.activateOmegaLaser(activeBuffsArray, abilityContext); 
                     e.preventDefault();
                 }
             } else if (e.button === 2) { 
                 if (playerInstance.hasShieldOvercharge) {
-                    playerInstance.activateShieldOvercharge(activeBuffsArray, abilityContext); // Pass abilityContext
+                    playerInstance.activateShieldOvercharge(activeBuffsArray, abilityContext); 
                     e.preventDefault();
                 }
             }
@@ -110,7 +130,7 @@ export function setupEventListeners(canvasElement, gameContext) {
         if (gameContext.callbacks.onWindowResize) gameContext.callbacks.onWindowResize();
     });
 
-    // Button Event Listeners
+    // Button Event Listeners 
     const startGameButton = document.getElementById('startGameButton');
     if (startGameButton && gameContext.callbacks.startGame) {
         startGameButton.addEventListener('click', gameContext.callbacks.startGame);
