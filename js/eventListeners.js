@@ -47,7 +47,6 @@ export function setupEventListeners(canvasElement, gameContext) {
             (!gameContext.isAnyPauseActiveExceptEsc || !gameContext.isAnyPauseActiveExceptEsc()) &&
             (!gameContext.isGamePausedByEsc || !gameContext.isGamePausedByEsc())
            ) {
-            // Numbered Abilities (1, 2, 3)
             const abilityContext = gameContext.getForPlayerAbilityContext ? gameContext.getForPlayerAbilityContext() : {};
             if (e.key === '1') playerInstance.activateAbility('1', abilityContext);
             else if (e.key === '2') playerInstance.activateAbility('2', abilityContext);
@@ -55,7 +54,6 @@ export function setupEventListeners(canvasElement, gameContext) {
             if (['1', '2', '3'].includes(e.key)) e.preventDefault();
         }
 
-        // Re-roll listener (R key) - only if evolution screen is active
         if (keyLower === 'r' &&
             gameContext.isEvolutionScreenActive && gameContext.isEvolutionScreenActive() &&
             gameContext.callbacks.handleEvolutionReRoll) {
@@ -63,7 +61,6 @@ export function setupEventListeners(canvasElement, gameContext) {
             gameContext.callbacks.handleEvolutionReRoll();
         }
 
-        // Toggle Block Mode listener (X key) - only if evolution screen is active
         if (keyLower === 'x' &&
             gameContext.isEvolutionScreenActive && gameContext.isEvolutionScreenActive() &&
             gameContext.callbacks.toggleBlockMode) {
@@ -71,10 +68,9 @@ export function setupEventListeners(canvasElement, gameContext) {
             gameContext.callbacks.toggleBlockMode();
         }
 
-        // Toggle Freeze Mode listener (F key) - only if evolution screen is active
         if (keyLower === 'f' &&
             gameContext.isEvolutionScreenActive && gameContext.isEvolutionScreenActive() &&
-            gameContext.callbacks.toggleFreezeMode) { // New callback for freeze
+            gameContext.callbacks.toggleFreezeMode) {
             e.preventDefault();
             gameContext.callbacks.toggleFreezeMode();
         }
@@ -102,28 +98,39 @@ export function setupEventListeners(canvasElement, gameContext) {
        }
     });
 
-    canvasElement.addEventListener('mousemove', (e) => {
-        const rect = canvasElement.getBoundingClientRect();
-        gameContext.inputState.mouseX = e.clientX - rect.left;
-        gameContext.inputState.mouseY = e.clientY - rect.top;
-    });
+    // --- MODIFIED MOUSEMOVE LISTENER: Attached to window ---
+    window.addEventListener('mousemove', (e) => {
+        if (!canvasElement || !gameContext || !gameContext.inputState) return; // Basic safety checks
 
+        const rect = canvasElement.getBoundingClientRect();
+
+        // e.clientX and e.clientY are viewport coordinates
+        const canvasMouseX = e.clientX - rect.left;
+        const canvasMouseY = e.clientY - rect.top;
+
+        // Update inputState with coordinates relative to the canvas
+        gameContext.inputState.mouseX = canvasMouseX;
+        gameContext.inputState.mouseY = canvasMouseY;
+    });
+    // --- END MODIFIED MOUSEMOVE LISTENER ---
+
+    // Original mousedown on canvas is fine because mousedown implies direct interaction with game/canvas features
     canvasElement.addEventListener('mousedown', (e) => {
         const playerInstance = gameContext.getPlayerInstance ? gameContext.getPlayerInstance() : null;
         const activeBuffsArray = gameContext.getActiveBuffNotificationsArray ? gameContext.getActiveBuffNotificationsArray() : [];
         const abilityContext = gameContext.getForPlayerAbilityContext ? gameContext.getForPlayerAbilityContext() : {};
 
-
         if (playerInstance && gameContext.isGameRunning && gameContext.isGameRunning() &&
             (!gameContext.isAnyPauseActiveExceptEsc || !gameContext.isAnyPauseActiveExceptEsc()) &&
             (!gameContext.isGamePausedByEsc || !gameContext.isGamePausedByEsc())
             ) {
-            if (e.button === 0) {
+            if (e.button === 0) { // Left click
                 if (playerInstance.hasOmegaLaser) {
                     playerInstance.activateOmegaLaser(activeBuffsArray, abilityContext);
                     e.preventDefault();
                 }
-            } else if (e.button === 2) {
+                // The default shooting is handled in player.update based on shootCooldownTimer, not directly on mousedown.
+            } else if (e.button === 2) { // Right click
                 if (playerInstance.hasShieldOvercharge) {
                     playerInstance.activateShieldOvercharge(activeBuffsArray, abilityContext);
                     e.preventDefault();

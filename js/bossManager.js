@@ -12,6 +12,23 @@ reflectorSpawnSound as audioReflectorSpawnSoundLocal,
 singularitySpawnSound as audioSingularitySpawnSoundLocal,
 nexusWeaverSpawnSound as audioNexusWeaverSpawnSoundLocal
 } from './audio.js';
+import { PENDING_RECORD_NAME } from './highScoreManager.js'; // <<< IMPORT PENDING_RECORD_NAME
+
+
+function formatMillisecondsToTimeInternal(ms) {
+    if (typeof ms !== 'number' || isNaN(ms)) return "N/A";
+    let milliseconds = Math.floor((ms % 1000) / 10);
+    let seconds = Math.floor((ms / 1000) % 60);
+    let minutes = Math.floor((ms / (1000 * 60)) % 60);
+
+    minutes = (minutes < 10) ? "0" + minutes : minutes.toString();
+    seconds = (seconds < 10) ? "0" + seconds : seconds.toString();
+    milliseconds = (milliseconds < 10) ? "0" + milliseconds : milliseconds.toString();
+    if (milliseconds.length === 1) milliseconds = "0" + milliseconds; 
+
+    return minutes + ":" + seconds + "." + milliseconds;
+}
+
 
 export class BossManager {
 constructor(initialBossSpawnStartScore, initialBossSpawnScoreInterval, audioContextConfig) {
@@ -29,7 +46,7 @@ this.standardAvailableBossTypes = [ChaserBoss, MirrorShieldBoss, GravityWellBoss
     this.nexusWeaverBossType = NexusWeaverBoss;
     this.nexusWeaverBossName = "NEXUS WEAVER";
     this.nexusWeaverBossKey = "nexusWeaver";
-    this.nexusWeaverSpawnInterval = 5;
+    this.nexusWeaverSpawnInterval = 5; 
     this.totalBossEncountersTriggered = 0;
 
     this.isWaveInProgress = false;
@@ -56,32 +73,25 @@ trySpawnBoss(currentScore) {
         if (currentScore >= this.nextBossScoreThreshold) {
             this.totalBossEncountersTriggered++;
             let scoreOverThreshold = currentScore - this.nextBossScoreThreshold;
-            let numIntervalsPassed = 1 + Math.floor(scoreOverThreshold / this.bossSpawnScoreInterval); 
+            let numIntervalsPassed = 1 + Math.floor(scoreOverThreshold / this.bossSpawnScoreInterval);
 
             let highestTierThisWave = 0;
             let firstBossTierOfWave = 0;
             let bossTypeToSpawnThisEncounter;
             let bossNameToSpawnThisEncounter;
             let bossKeyToSpawnThisEncounter;
-            let spawnSoundToPlay;
 
-            if (this.totalBossEncountersTriggered % this.nexusWeaverSpawnInterval === 0) {
+            if (this.totalBossEncountersTriggered > 0 && (this.totalBossEncountersTriggered % this.nexusWeaverSpawnInterval === 0)) {
                 this.bossesToSpawnInCurrentWave = 1; 
                 bossTypeToSpawnThisEncounter = this.nexusWeaverBossType;
                 bossNameToSpawnThisEncounter = this.nexusWeaverBossName;
                 bossKeyToSpawnThisEncounter = this.nexusWeaverBossKey;
-                spawnSoundToPlay = this.audioNexusWeaverSpawnSound;
             } else {
-                // ... (standard boss wave logic) ...
                 this.bossesToSpawnInCurrentWave = Math.min(numIntervalsPassed, CONSTANTS_IMPORTED.MAX_BOSSES_IN_WAVE_CAP);
                 const randomIndex = Math.floor(Math.random() * this.standardAvailableBossTypes.length);
                 bossTypeToSpawnThisEncounter = this.standardAvailableBossTypes[randomIndex];
                 bossNameToSpawnThisEncounter = this.standardBossTypeNames[randomIndex];
                 bossKeyToSpawnThisEncounter = this.standardBossTypeKeys[randomIndex];
-
-                if (bossKeyToSpawnThisEncounter === 'chaser') spawnSoundToPlay = this.audioChaserSpawnSound;
-                else if (bossKeyToSpawnThisEncounter === 'reflector') spawnSoundToPlay = this.audioReflectorSpawnSound;
-                else if (bossKeyToSpawnThisEncounter === 'singularity') spawnSoundToPlay = this.audioSingularitySpawnSound;
             }
 
             for (let i = 0; i < this.bossesToSpawnInCurrentWave; i++) {
@@ -99,15 +109,6 @@ trySpawnBoss(currentScore) {
 
                 let tierForThisSpecificBossInstance = (this.bossTiers[currentBossKey] || 0) + 1;
 
-                // <<< --- TEMPORARY MODIFICATION FOR TESTING --- >>>
-                const FORCE_NEXUS_WEAVER_TIER = 3; // Set to null or remove this line for normal behavior
-                if (currentBossKey === this.nexusWeaverBossKey && FORCE_NEXUS_WEAVER_TIER !== null) {
-                    tierForThisSpecificBossInstance = FORCE_NEXUS_WEAVER_TIER;
-                    console.warn(`BossManager: Forcing Nexus Weaver to Tier ${FORCE_NEXUS_WEAVER_TIER} for testing.`);
-                }
-                // <<< --- END OF TEMPORARY MODIFICATION --- >>>
-
-
                 if (i === 0) {
                     firstBossTierOfWave = tierForThisSpecificBossInstance;
                 }
@@ -115,10 +116,9 @@ trySpawnBoss(currentScore) {
 
                 this.bossSpawnQueue.push({
                     constructor: currentBossType,
-                    tier: tierForThisSpecificBossInstance, 
+                    tier: tierForThisSpecificBossInstance,
                     name: currentBossName,
-                    typeKey: currentBossKey,
-                    isNexusWeaverSpecialSpawn: (currentBossKey === this.nexusWeaverBossKey && this.totalBossEncountersTriggered % this.nexusWeaverSpawnInterval === 0)
+                    typeKey: currentBossKey
                 });
             }
 
@@ -135,7 +135,7 @@ trySpawnBoss(currentScore) {
             this.bossWarningActive = true;
             this.bossWarningTimer = CONSTANTS_IMPORTED.BOSS_WARNING_DURATION;
 
-            if (firstBossInWaveInfo.typeKey === 'nexusWeaver') this.playSound(this.audioNexusWeaverSpawnSound);
+            if (firstBossInWaveInfo.typeKey === this.nexusWeaverBossKey) this.playSound(this.audioNexusWeaverSpawnSound);
             else if (firstBossInWaveInfo.typeKey === 'chaser') this.playSound(this.audioChaserSpawnSound);
             else if (firstBossInWaveInfo.typeKey === 'reflector') this.playSound(this.audioReflectorSpawnSound);
             else if (firstBossInWaveInfo.typeKey === 'singularity') this.playSound(this.audioSingularitySpawnSound);
@@ -151,28 +151,26 @@ processBossSpawnQueue(gameContext) {
 
         const spawnX = gameContext.canvasWidth / 2 + (Math.random() - 0.5) * 200;
         const spawnY = 100 + (Math.random() - 0.5) * 50;
-        const newBoss = new bossInfo.constructor(spawnX, spawnY, bossInfo.tier);
-        this.activeBosses.push(newBoss);
+        const newBoss = new bossInfo.constructor(spawnX, spawnY, bossInfo.tier); 
 
-        if (this.activeBosses.length > 0 && gameContext.callbacks && gameContext.callbacks.pausePickups) {
-            gameContext.callbacks.pausePickups(true);
+        if (gameContext.callbacks && gameContext.callbacks.getGameplayTimeElapsed) {
+            newBoss.spawnTimestamp = gameContext.callbacks.getGameplayTimeElapsed();
+        } else {
+            newBoss.spawnTimestamp = 0; 
         }
 
+        this.activeBosses.push(newBoss);
+
+
         if (this.bossSpawnQueue.length > 0 && this.activeBosses.length < this.bossesToSpawnInCurrentWave && this.activeBosses.length < CONSTANTS_IMPORTED.MAX_BOSSES_IN_WAVE_CAP) {
+            // More bosses in queue for this wave
         } else {
             this.nextBossToSpawnInfo = null;
         }
     }
 }
 
-update(playerInstance, gameContext) { // gameContext here IS contextForBossMan from main.js
-    // console.log("BOSSMANAGER.JS: Received gameContext:", gameContext); // Your debug log
-    // if (gameContext && gameContext.callbacks && typeof gameContext.callbacks.onPlayerMinionCollision === 'function') {
-    //     console.log("BOSSMANAGER.JS: gameContext.callbacks.onPlayerMinionCollision IS a function.");
-    // } else {
-    //     console.error("BOSSMANAGER.JS: gameContext.callbacks.onPlayerMinionCollision IS NOT a function or callbacks is missing!");
-    // }
-
+update(playerInstance, gameContext) {
     if (!gameContext || typeof gameContext.dt === 'undefined') {
         return;
     }
@@ -203,14 +201,9 @@ update(playerInstance, gameContext) { // gameContext here IS contextForBossMan f
         playerCollidedWithBossAttack: null,
         CONSTANTS: gameContext.CONSTANTS,
         getPooledRay: gameContext.getPooledRay,
-        callbacks: gameContext.callbacks // <<< ENSURE THIS LINE IS PRESENT AND CORRECT
+        callbacks: gameContext.callbacks, 
+        nexusWeaverShootsOrbiterProjectile: gameContext.callbacks ? gameContext.callbacks.nexusWeaverShootsOrbiterProjectile : null
     };
-    // console.log("BOSSMANAGER.JS: bossUpdateContext being passed to boss.update:", bossUpdateContext); // Your debug log
-    //  if (bossUpdateContext.callbacks && typeof bossUpdateContext.callbacks.onPlayerMinionCollision === 'function') {
-    //     console.log("BOSSMANAGER.JS: onPlayerMinionCollision IS a function in bossUpdateContext.callbacks");
-    // } else {
-    //     console.error("BOSSMANAGER.JS: onPlayerMinionCollision IS NOT a function or callbacks object is missing in bossUpdateContext!");
-    // }
 
 
     for (let i = this.activeBosses.length - 1; i >= 0; i--) {
@@ -230,6 +223,7 @@ update(playerInstance, gameContext) { // gameContext here IS contextForBossMan f
             bossUpdateContext.playerCollidedWithBossAttack = null;
         }
 
+
         if (boss.health <= 0) {
             this.handleBossDefeat(boss, i, playerInstance, gameContext);
         }
@@ -239,7 +233,8 @@ update(playerInstance, gameContext) { // gameContext here IS contextForBossMan f
 
 handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
     if (!defeatedBoss) return;
-    if (!gameContext || !gameContext.callbacks || !gameContext.firstBossDefeatedThisRunRef) {
+    if (!gameContext || !gameContext.callbacks || !gameContext.firstBossDefeatedThisRunRef || typeof gameContext.currentRunId === 'undefined') { // <<< CHECK FOR currentRunId
+        console.error("[BossManager] handleBossDefeat: Missing critical gameContext properties (including currentRunId).");
         return;
     }
 
@@ -259,6 +254,54 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
         gameContext.bossDefeatEffectsArray.push({ x: defeatedBoss.x, y: defeatedBoss.y, radius: defeatedBoss.radius * 1.2, opacity: 1, timer: 800, duration: 800, initialRadius: defeatedBoss.radius * 1.2, color: 'rgba(255, 255, 180, opacity)' });
     }
     this.activeBosses.splice(index, 1);
+
+    if (defeatedBoss instanceof NexusWeaverBoss &&
+        gameContext.callbacks.hasNexusWeaverTierTimeBeenRecordedThisRun &&
+        !gameContext.callbacks.hasNexusWeaverTierTimeBeenRecordedThisRun(defeatedBoss.tier) &&
+        gameContext.callbacks.getGameplayTimeElapsed) {
+
+        const gameplayTimeAtKill = gameContext.callbacks.getGameplayTimeElapsed();
+        const category = `nexusWeaverTier${defeatedBoss.tier}Time`;
+        let statsSnapshotForBossKill = null;
+
+        if (gameContext.callbacks.createStatsSnapshotForBossKill && playerInstance) {
+            statsSnapshotForBossKill = gameContext.callbacks.createStatsSnapshotForBossKill(playerInstance, this.bossTiers);
+        }
+
+        let currentCategoryHighScores = [];
+        if (gameContext.callbacks.getSpecificHighScores) {
+            currentCategoryHighScores = gameContext.callbacks.getSpecificHighScores(category);
+        }
+        
+        let isNewRecord = false;
+        const MAX_ENTRIES_PER_CAT = 10; 
+        if (currentCategoryHighScores.length < MAX_ENTRIES_PER_CAT) {
+            isNewRecord = true;
+        } else {
+            const slowestRecordTime = currentCategoryHighScores[currentCategoryHighScores.length - 1].value; 
+            if (gameplayTimeAtKill < slowestRecordTime) {
+                isNewRecord = true;
+            }
+        }
+
+        if (isNewRecord) {
+            // const playerNameForRecord = playerInstance ? (playerInstance.name || "CHAMPION") : "CHAMPION"; // Old way
+            if (gameContext.callbacks.recordBossKillTime) {
+                // Pass PENDING_RECORD_NAME and currentRunId. The actual name will be updated later by main.js if a survival score is submitted.
+                gameContext.callbacks.recordBossKillTime(category, PENDING_RECORD_NAME, gameplayTimeAtKill, statsSnapshotForBossKill, gameContext.currentRunId); // <<< PASS runId
+            }
+            if (gameContext.activeBuffNotificationsArray && playerInstance) {
+                gameContext.activeBuffNotificationsArray.push({
+                    text: `New Record! Nexus T${defeatedBoss.tier}: ${formatMillisecondsToTimeInternal(gameplayTimeAtKill)}`,
+                    timer: CONSTANTS_IMPORTED.BUFF_NOTIFICATION_DURATION * 2
+                });
+            }
+        }
+        if (gameContext.callbacks.markNexusWeaverTierTimeRecordedThisRun) {
+            gameContext.callbacks.markNexusWeaverTierTimeRecordedThisRun(defeatedBoss.tier);
+        }
+    }
+
 
     let wasFirstBoss = !gameContext.firstBossDefeatedThisRunRef.get();
 
@@ -298,7 +341,10 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
                     return true;
                 });
                 let choices = [];
-                if (availableUpgrades.length > 0) { choices = [...availableUpgrades].sort(() => 0.5 - Math.random()).slice(0, 3); }
+                if (availableUpgrades.length > 0) {
+                    choices = [...availableUpgrades].sort(() => 0.5 - Math.random()).slice(0, 3);
+                }
+
                 if (choices.length > 0) {
                     const loot = new LootDrop(defeatedBoss.x, defeatedBoss.y, choices);
                     loot.isFirstBossLoot = false;
@@ -312,15 +358,14 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
                 evolutionTriggeredByThisDefeat = gameContext.callbacks.checkEvolutionEligibility(!lootGeneratedThisTurn);
             }
 
+
             if (!lootGeneratedThisTurn && !evolutionTriggeredByThisDefeat && gameContext.callbacks.pausePickups) {
-                gameContext.callbacks.pausePickups(false);
             }
         } else if (this.bossSpawnQueue.length > 0 && this.activeBosses.length < CONSTANTS_IMPORTED.MAX_BOSSES_IN_WAVE_CAP && !this.bossWarningActive) {
             this.processBossSpawnQueue(gameContext);
         } else if (this.activeBosses.length === 0 && this.bossSpawnQueue.length === 0 && this.isWaveInProgress) {
             this.isWaveInProgress = false;
              if (gameContext.callbacks.pausePickups) {
-                gameContext.callbacks.pausePickups(false);
             }
         }
     } else {
@@ -329,7 +374,6 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
             gameContext.firstBossDefeatedThisRunRef.set(true);
         } else if (this.activeBosses.length === 0 && this.bossSpawnQueue.length === 0) {
              if (gameContext.callbacks.pausePickups) {
-                gameContext.callbacks.pausePickups(false);
             }
              if (!wasFirstBoss && gameContext.bossLootPool && playerInstance && gameContext.lootDropsArray) {
                 const availableUpgrades = gameContext.bossLootPool.filter(upgrade => {
@@ -407,4 +451,41 @@ reset() {
 isBossSequenceActive() { return this.activeBosses.length > 0 || this.bossWarningActive || this.bossSpawnQueue.length > 0; }
 isBossWarningActiveProp() { return this.bossWarningActive; }
 isBossInQueue() { return this.bossSpawnQueue.length > 0; }
+
+debugSpawnBoss(tierToSpawn, bossTypeKey = 'nexusWeaver') {
+    let constructorToUse;
+    let nameToUse;
+    switch(bossTypeKey) {
+        case 'chaser': constructorToUse = ChaserBoss; nameToUse = "CHASER"; break;
+        case 'reflector': constructorToUse = MirrorShieldBoss; nameToUse = "REFLECTOR"; break;
+        case 'singularity': constructorToUse = GravityWellBoss; nameToUse = "SINGULARITY"; break;
+        case 'nexusWeaver':
+        default: constructorToUse = NexusWeaverBoss; nameToUse = "NEXUS WEAVER"; break;
+    }
+
+    const tier = tierToSpawn > 0 ? tierToSpawn : (this.bossTiers[bossTypeKey] || 0) + 1;
+    this.bossSpawnQueue.push({
+        constructor: constructorToUse,
+        tier: tier,
+        name: nameToUse,
+        typeKey: bossTypeKey
+    });
+    this.isWaveInProgress = true; 
+    this.waveRewardTier = tier;
+    this.bossesToSpawnInCurrentWave = 1;
+    this.bossesDefeatedInCurrentWave = 0;
+
+    const firstBossInWaveInfo = this.bossSpawnQueue[0];
+    this.nextBossToSpawnInfo = { name: firstBossInWaveInfo.name, tier: firstBossInWaveInfo.tier };
+    this.bossWarningActive = true;
+    this.bossWarningTimer = CONSTANTS_IMPORTED.BOSS_WARNING_DURATION;
+
+    if (firstBossInWaveInfo.typeKey === this.nexusWeaverBossKey) this.playSound(this.audioNexusWeaverSpawnSound);
+     else if (firstBossInWaveInfo.typeKey === 'chaser') this.playSound(this.audioChaserSpawnSound);
+     else if (firstBossInWaveInfo.typeKey === 'reflector') this.playSound(this.audioReflectorSpawnSound);
+     else if (firstBossInWaveInfo.typeKey === 'singularity') this.playSound(this.audioSingularitySpawnSound);
+    console.log(`[BossManager Debug] Spawning Tier ${tier} ${nameToUse}`);
+}
+
+
 }

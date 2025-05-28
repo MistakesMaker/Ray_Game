@@ -52,15 +52,15 @@
             box-shadow: 0 0 30px rgba(150, 150, 255, 0.7);
             padding: 30px;
             width: 80%;
-            max-width: 700px; 
+            max-width: 700px;
             box-sizing: border-box;
         }
         #evolutionScreen h2, #freeUpgradeScreen h2 { color: #99ccff; font-size: 30px; margin-bottom: 10px; }
 
         #evolutionInteractionControls {
             display: flex;
-            justify-content: space-around; 
-            align-items: flex-start; /* Changed to flex-start for better top alignment if needed */
+            justify-content: space-around;
+            align-items: flex-start;
             width: 100%;
             padding: 5px 10px;
             margin-bottom: 15px;
@@ -72,28 +72,27 @@
         }
         #rerollControlArea, #blockControlArea, #freezeControlArea {
             display: flex;
-            flex-direction: column; 
-            align-items: center; 
+            flex-direction: column;
+            align-items: center;
             gap: 5px;
-            flex: 1; /* <<< ADDED: Make each control area take equal width */
-            text-align: center; /* Ensure text below button is also centered */
+            flex: 1;
+            text-align: center;
         }
         #rerollControlArea button,
         #blockControlArea button,
         #freezeControlArea button {
             padding: 6px 12px;
             font-size: 14px;
-            box-shadow: 0 3px #1f618d; 
-            min-width: 130px; /* Keep a min-width for aesthetics */
-            /* max-width: 150px; /* Optional: prevent buttons from becoming too wide */
+            box-shadow: 0 3px #1f618d;
+            min-width: 130px;
             text-align: center;
-            background-color: #2980b9; 
-            color: white; 
+            background-color: #2980b9;
+            color: white;
             border: none;
             border-radius: 8px;
             cursor: pointer;
             transition: background-color 0.3s, transform 0.1s;
-            margin-bottom: 3px; /* Small space before the info text */
+            margin-bottom: 3px;
         }
         #rerollControlArea button:hover,
         #blockControlArea button:hover,
@@ -111,11 +110,9 @@
             cursor: not-allowed !important;
             box-shadow: 0 3px #222 !important;
         }
-
-        /* Specific active states */
         #blockControlArea button.block-mode-active,
         #freezeControlArea button.freeze-mode-active {
-            background-color: #85c1e9; 
+            background-color: #85c1e9;
             color: #154360;
             box-shadow: 0 3px #5dade2;
         }
@@ -123,37 +120,31 @@
         #freezeControlArea button.freeze-mode-active:hover {
             background-color: #aed6f1;
         }
-
         #freezeControlArea button.has-frozen-choice {
-            background-color: #1abc9c; 
+            background-color: #1abc9c;
             box-shadow: 0 3px #16a085;
         }
         #freezeControlArea button.has-frozen-choice:hover {
             background-color: #17a589;
         }
-
-
         #rerollInfo, #blockInfo, #freezeInfo {
              text-align: center;
              min-height: 1.2em;
-             width: 100%; /* Make info span take full width of its control area */
+             width: 100%;
         }
-
-
         #evolutionOptionsContainer, #freeUpgradeOptionContainer {
             display: flex;
             flex-wrap: wrap;
-            justify-content: space-around; 
-            align-items: flex-start; 
+            justify-content: space-around;
+            align-items: flex-start;
             gap: 20px;
             width:100%;
         }
-
         .evolution-choice-wrapper {
             display: flex;
             flex-direction: column;
-            align-items: center; 
-            flex: 1 1 180px; 
+            align-items: center;
+            flex: 1 1 180px;
             min-width: 170px;
             position: relative;
         }
@@ -167,14 +158,13 @@
             text-shadow: 0 0 3px black;
             letter-spacing: 0.5px;
             line-height: 1.4;
-            display: inline-block; 
-            visibility: hidden; 
-            min-height: 1.5em; 
+            display: inline-block;
+            visibility: hidden;
+            min-height: 1.5em;
         }
         .evolution-tier-label.has-tier {
             visibility: visible;
         }
-
         #evolutionScreen .evolutionOption,
         #freeUpgradeScreen .freeUpgradeOption {
             background-color: #101018;
@@ -183,16 +173,14 @@
             border-radius: 10px;
             cursor: pointer;
             transition: background-color 0.3s, transform 0.2s, box-shadow 0.3s, border-color 0.3s;
-            width: 100%; 
+            width: 100%;
             display: flex; flex-direction: column;
             justify-content: center; align-items: center;
-            min-height: 100px; 
+            min-height: 100px;
             text-align: center;
             box-sizing: border-box;
-            position: relative; 
+            position: relative;
         }
-
-        /* Chain overlay for block mode */
         .evolutionOption.primed-for-block::after {
             content: '🔗';
             position: absolute; top: 0; left: 0; right: 0; bottom: 0;
@@ -200,7 +188,6 @@
             font-size: 50px; color: rgba(200, 200, 200, 0.5);
             background-color: rgba(0,0,0,0.3); pointer-events: none; z-index: 4;
         }
-        /* Icy overlay for freeze mode */
         .evolutionOption.primed-for-freeze::after {
             content: '❄️';
             position: absolute; top: 0; left: 0; right: 0; bottom: 0;
@@ -211,7 +198,6 @@
             pointer-events: none;
             z-index: 5;
         }
-        /* Style for an actually frozen card */
         .evolutionOption.actually-frozen {
             border-color: #85c1e9 !important;
             box-shadow: 0 0 25px 8px rgba(100, 180, 255, 0.8), 0 0 10px rgba(150, 200, 255, 0.6) inset !important;
@@ -226,8 +212,6 @@
             z-index: 6;
             opacity: 0.8;
         }
-
-
         #evolutionScreen .evolutionOption h3,
         #freeUpgradeScreen .freeUpgradeOption h3 {
             margin-top: 0;
@@ -241,16 +225,12 @@
             margin-top: 5px;
             margin-bottom: 0;
         }
-
-        /* --- CLASS-BASED BACKGROUNDS (scoped to #evolutionScreen for specificity) --- */
         #evolutionScreen .evolutionOption[data-class="attack"] { background-color: rgba(230, 80, 80, 0.28); }
         #evolutionScreen .evolutionOption[data-class="tank"]   { background-color: rgba(50, 220, 50, 0.35); }
         #evolutionScreen .evolutionOption[data-class="ability"]{ background-color: rgba(130, 50, 200, 0.35); }
-
         #evolutionScreen .evolutionOption[data-class="attack"]:hover { background-color: rgba(250, 100, 100, 0.38); }
         #evolutionScreen .evolutionOption[data-class="tank"]:hover   { background-color: rgba(70, 240, 70, 0.45); }
         #evolutionScreen .evolutionOption[data-class="ability"]:hover{ background-color: rgba(150, 70, 220, 0.45); }
-
         #evolutionScreen .evolutionOption[data-tier="epic"][data-class="tank"],
         #evolutionScreen .evolutionOption[data-tier="legendary"][data-class="tank"] {
             background-color: rgba(50, 220, 50, 0.25) !important;
@@ -259,10 +239,6 @@
         #evolutionScreen .evolutionOption[data-tier="legendary"][data-class="tank"]:hover {
             background-color: rgba(70, 240, 70, 0.35) !important;
         }
-
-
-        /* --- TIER-BASED GLOWS & BORDERS (CORE background is special) --- */
-        /* CORE */
         #evolutionScreen .evolutionOption[data-tier="core"] {
             border-color: #40A0D0;
             box-shadow: 0 0 20px 7px rgba(60,180,255,0.6), 0 0 7px rgba(100,200,255,0.4) inset;
@@ -275,8 +251,6 @@
             box-shadow: 0 0 30px 9px rgba(80,200,255,0.8), 0 0 12px rgba(120,220,255,0.6) inset;
             background-color: rgba(40, 90, 160, 0.65) !important;
         }
-
-        /* COMMON */
         #evolutionScreen .evolutionOption[data-tier="common"] {
             border-color: #78788f;
             box-shadow: 0 0 10px 2px rgba(120,150,150,0.3), 0 0 3px rgba(150,180,180,0.2) inset;
@@ -287,8 +261,6 @@
             transform: translateY(-2px) scale(1.01);
             box-shadow: 0 0 12px 3px rgba(120,150,150,0.35), 0 0 4px rgba(150,180,180,0.25) inset;
         }
-
-        /* RARE */
         #evolutionScreen .evolutionOption[data-tier="rare"] {
             border-color: #30aa30;
             box-shadow: 0 0 20px 7px rgba(60,255,60,0.6), 0 0  7px rgba(80,255,80,0.4) inset;
@@ -299,8 +271,6 @@
             transform: translateY(-3px) scale(1.02);
             box-shadow: 0 0 30px 9px rgba(50,255,50,0.8), 0 0 12px rgba(100,255,100,0.6) inset;
         }
-
-        /* EPIC */
         #evolutionScreen .evolutionOption[data-tier="epic"] {
             border-width: 2px;
             border-color: #a050d0;
@@ -312,8 +282,6 @@
             transform: translateY(-5px) scale(1.05);
             box-shadow: 0 0 50px 14px rgba(200,60,255,1), 0 0 18px rgba(220,100,255,0.9) inset, 0 0 5px #fff;
         }
-
-        /* LEGENDARY */
         #evolutionScreen .evolutionOption[data-tier="legendary"] {
             border-width: 3px;
             border-color: #FFC000;
@@ -325,10 +293,8 @@
             transform: translateY(-5px) scale(1.05);
             box-shadow: 0 0 70px 20px rgba(255,180,0,1), 0 0 30px rgba(255,215,0,1) inset, 0 0 15px #FFFACD;
         }
-        /* --- End Tiered Styling --- */
-
-        #evolutionScreen .evolutionOption.disabled { /* More specific for disabled */
-            background-color: #303030 !important; /* Ensure this overrides class and base */
+        #evolutionScreen .evolutionOption.disabled {
+            background-color: #303030 !important;
             border-color: #505050 !important;
             cursor: not-allowed; opacity: 0.6;
             box-shadow: 0 2px #111 !important;
@@ -337,9 +303,6 @@
         #evolutionScreen .evolutionOption.disabled:hover {
             transform: none;
         }
-
-
-        /* --- KEYFRAMES FOR TIER PULSES --- */
         @keyframes corePulse {
             0%, 100% { box-shadow: 0 0 20px 7px rgba(60,180,255,0.55), 0 0 7px rgba(100,200,255,0.35) inset; }
             50% { box-shadow: 0 0 25px 9px rgba(80,200,255,0.7), 0 0 10px rgba(120,220,255,0.5) inset; }
@@ -496,37 +459,61 @@
         #pausePlayerStatsPanel .stats-immunities { display: flex; flex-wrap: wrap; gap: 4px; padding-top: 5px; }
         #pausePlayerStatsPanel .immunity-swatch-pause { width: 18px; height: 18px; border: 1px solid #777; border-radius: 3px; }
 
+        /* --- Detailed High Scores Screen Styling --- */
         #detailedHighScoresScreen {
             flex-direction: column;
             align-items: center;
             width: 90%;
             max-width: 1000px;
-            height: 85vh;
-            padding-top: 20px;
-            padding-bottom: 20px;
+            height: 90vh;
+            padding-top: 15px;
+            padding-bottom: 15px;
             box-sizing: border-box;
         }
         #detailedHighScoresScreen h2 {
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             flex-shrink: 0;
         }
-        #detailedScoresListContainer {
+        #highScoreCategorySelectorContainer {
+            margin-bottom: 12px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        #highScoreCategorySelectorContainer label {
+            font-size: 16px;
+            color: #ddeeff;
+        }
+        #highScoreCategorySelect {
+            padding: 8px 12px;
+            font-size: 16px;
+            background-color: #2a2a5a;
+            color: #ddeeff;
+            border: 1px solid #445577;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #highScoreCategorySelect:hover {
+            background-color: #3a3a7a;
+        }
+        #detailedScoresListContainer { /* This container holds both list and preview/stats area */
             width: 100%;
             display: flex;
-            flex-direction: row;
-            gap: 20px;
-            flex-grow: 1;
-            overflow: hidden;
-            padding: 0 10px;
-            margin-bottom: 15px;
+            flex-direction: row; /* List on left, preview/stats on right */
+            gap: 15px;
+            flex-grow: 1; /* Takes up available vertical space */
+            overflow: hidden; /* Important for children to scroll */
+            padding: 0 5px;
+            margin-bottom: 12px;
             box-sizing: border-box;
-            min-height: 0;
+            min-height: 0; /* For flex overflow */
         }
         #detailedScoresList {
             list-style-type: none;
             padding: 10px;
             margin: 0;
-            width: 300px;
+            width: 280px;
             flex-shrink: 0;
             height: 100%;
             overflow-y: auto;
@@ -534,63 +521,81 @@
             background-color: rgba(20,20,40,0.7);
             border-radius: 8px;
             box-sizing: border-box;
+            scrollbar-width: thin;
+            scrollbar-color: #55aaff #2c2c3e;
         }
+        #detailedScoresList::-webkit-scrollbar { width: 8px; }
+        #detailedScoresList::-webkit-scrollbar-track { background: #2c2c3e; border-radius: 4px;}
+        #detailedScoresList::-webkit-scrollbar-thumb { background-color: #55aaff; border-radius: 4px; border: 2px solid #2c2c3e;}
+
         #detailedScoresList li {
-            padding: 8px 12px;
-            margin-bottom: 5px;
-            background-color: #2a2a5a;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background-color 0.2s;
-            border: 1px solid transparent;
-            font-size: 14px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            padding: 8px 12px; margin-bottom: 5px; background-color: #2a2a5a;
+            border-radius: 5px; cursor: pointer; transition: background-color 0.2s;
+            border: 1px solid transparent; font-size: 14px; white-space: nowrap;
+            overflow: hidden; text-overflow: ellipsis;
         }
-        #detailedScoresList li:hover {
-            background-color: #3a3a7a;
-        }
-        #detailedScoresList li.selected-score {
-            background-color: #4a4a9a;
-            border-color: #77aaff;
-            font-weight: bold;
-        }
-        #detailedStatsDisplayContainer {
-            flex-grow: 1;
-            height: 100%;
-            overflow: hidden;
+        #detailedScoresList li:hover { background-color: #3a3a7a; }
+        #detailedScoresList li.selected-score { background-color: #4a4a9a; border-color: #77aaff; font-weight: bold; }
+
+        /* Wrapper for Player Preview and Stats Panel */
+        #playerPreviewAndStatsWrapper {
             display: flex;
-            flex-direction: column;
-            min-width: 0;
+            flex-direction: column; /* Stack preview on top of stats */
+            flex-grow: 1; /* Takes remaining horizontal space */
+            height: 100%; /* Fill height of parent */
+            gap: 15px;
+            min-width: 0; /* For flex overflow */
+        }
+
+        #playerPreviewContainer {
+            flex-basis: 250px; /* Desired height for preview */
+            flex-shrink: 0; /* Don't shrink height */
+            background-color: rgba(0,0,10,0.3);
+            border: 1px solid #202030;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            width: 100%; /* Take full width of its column */
+        }
+
+        #playerPreviewCanvas {
+            /* background-color: #050515; /* Optional: slight differentiation */
+            /* max-width: 100%; max-height: 100%; /* No longer needed with fixed canvas size */
+        }
+
+        #playerPreviewPlaceholder {
+            position: absolute;
+            color: #777;
+            font-size: 14px;
+            text-align: center;
+            padding: 10px;
+            pointer-events: none;
+        }
+
+        #statsPanelWrapper {
+            flex-grow: 1; /* Takes remaining vertical space */
+            overflow: hidden;
+            position: relative;
+            display: flex;
             border: 1px solid #303050;
             border-radius: 8px;
             background-color: rgba(10, 10, 20, 0.85);
-            box-sizing: border-box;
         }
-        #detailedStatsDisplayContainer > #pausePlayerStatsPanel {
-            position: relative;
-            display: block;
-            width: 100%;
-            height: 100%;
-            overflow-y: auto;
-            right: auto;
-            top: auto;
-            transform: none;
-            box-shadow: none;
-            margin: 0;
-            border: none;
-            padding: 15px;
-            box-sizing: border-box;
+        #statsPanelWrapper > #pausePlayerStatsPanel {
+            width: 100% !important; height: 100% !important; position: relative !important;
+            top: auto !important; right: auto !important; transform: none !important;
+            box-shadow: none !important; margin: 0 !important; border: none !important;
+            padding: 15px !important; box-sizing: border-box !important;
         }
-        #detailedStatsDisplayContainer > #pausePlayerStatsPanel .stats-header#statsPanelTitle {
-            margin-top: 0;
-        }
+        #statsPanelWrapper > #pausePlayerStatsPanel .stats-header#statsPanelTitle { margin-top: 0; }
+        /* --- End Player Preview Wrapper --- */
+
         #detailedHighScoresScreen button#backToMainMenuFromScoresButton {
-            margin-top: auto;
+            margin-top: 15px;
             flex-shrink: 0;
         }
-
     </style>
 </head>
 <body>
@@ -682,12 +687,24 @@
 
     <div id="detailedHighScoresScreen" class="messageScreenBase" style="display: none;">
         <h2>Hall of Fame</h2>
+        <div id="highScoreCategorySelectorContainer">
+            <label for="highScoreCategorySelect">Category:</label>
+            <select id="highScoreCategorySelect">
+            </select>
+        </div>
         <div id="detailedScoresListContainer">
             <ol id="detailedScoresList"></ol>
-            <div id="detailedStatsDisplayContainer">
+            <div id="playerPreviewAndStatsWrapper">
+                <div id="playerPreviewContainer">
+                    <canvas id="playerPreviewCanvas" width="220" height="220"></canvas>
+                    <p id="playerPreviewPlaceholder">Select a score to see player preview.</p>
+                </div>
+                <div id="statsPanelWrapper">
+                    <!-- The #pausePlayerStatsPanel will be moved here by JavaScript -->
+                </div>
             </div>
         </div>
-        <button id="backToMainMenuFromScoresButton" style="margin-top: 20px;">Back to Main Menu</button>
+        <button id="backToMainMenuFromScoresButton">Back to Main Menu</button>
     </div>
 
     <div id="kineticChargeUI">
