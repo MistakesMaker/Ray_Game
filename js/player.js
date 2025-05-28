@@ -65,6 +65,8 @@ export class Player {
         this.temporalEchoChance = 0.0;
         this.temporalEchoFixedReduction = 2000;
 
+        this.globalCooldownReduction = 0.0; // <<< NEW: For Streamlined Systems
+
         this.rayCritChance = 0.0;
         this.rayCritDamageMultiplier = 1.5;
         this.abilityCritChance = 0.0;
@@ -172,6 +174,7 @@ export class Player {
         this.hpPickupBonus = 0;
         this.abilityDamageMultiplier = 1.0;
         this.temporalEchoChance = 0.0;
+        this.globalCooldownReduction = 0.0; // <<< RESET
         this.rayCritChance = 0.0;
         this.rayCritDamageMultiplier = 1.5;
         this.abilityCritChance = 0.0;
@@ -483,7 +486,7 @@ export class Player {
         if (!ctx || !snapshotPlayerData) return;
 
         const now = Date.now();
-        const PREVIEW_MAX_RADIUS = 100; // Max radius in preview canvas to prevent overflow
+        const PREVIEW_MAX_RADIUS = 100; 
 
         const actualRadius = snapshotPlayerData.finalRadius || PLAYER_BASE_RADIUS;
         let displayScale = 1;
@@ -674,13 +677,16 @@ export class Player {
         let numericAbilityUIUpdateNeeded = false;
         for (const slot in this.activeAbilities) {
              if (this.activeAbilities[slot]) {
-                let effectiveCooldownMultiplier = 1.0;
+                let effectiveCooldownMultiplier = 1.0 - this.globalCooldownReduction; // Start with global
                 if (this.isHarmonized && this.hasPerfectHarmonyHelm) {
                     effectiveCooldownMultiplier *= (1.0 - PERFECT_HARMONY_COOLDOWN_REDUCTION);
                 }
                 if (this.hasUltimateConfigurationHelm) {
-                    effectiveCooldownMultiplier *= 1.5;
+                    effectiveCooldownMultiplier *= 1.5; // This is a penalty, so it increases needed time
                 }
+                // Ensure multiplier doesn't go to zero or negative, 0.1 means 90% reduction max from stacking beneficial effects
+                effectiveCooldownMultiplier = Math.max(0.1, effectiveCooldownMultiplier);
+
 
                 if (this.activeAbilities[slot].cooldownTimer > 0) {
                     this.activeAbilities[slot].cooldownTimer -= dt / effectiveCooldownMultiplier;
@@ -700,16 +706,19 @@ export class Player {
 
         let mouseAbilityUIUpdateNeeded = false;
         const updateMouseAbility = (abilityStateProp, abilityTimerProp, abilityCooldownTimerProp, abilityCooldownConst) => {
-            let effectiveCooldownMultiplier = 1.0;
+            let effectiveCooldownMultiplier = 1.0 - this.globalCooldownReduction; // Start with global
             if (this.isHarmonized && this.hasPerfectHarmonyHelm) {
                 effectiveCooldownMultiplier *= (1.0 - PERFECT_HARMONY_COOLDOWN_REDUCTION);
             }
+             // Mouse abilities are not affected by Ultimate Configuration penalty
+            effectiveCooldownMultiplier = Math.max(0.1, effectiveCooldownMultiplier);
+
 
             if (this[abilityStateProp]) {
                 this[abilityTimerProp] -= dt;
                 mouseAbilityUIUpdateNeeded = true;
                 if (this[abilityTimerProp] <= 0) {
-                    return true;
+                    return true; // Indicates ability duration ended
                 }
             } else if (this[abilityCooldownTimerProp] > 0) {
                 this[abilityCooldownTimerProp] -= dt / effectiveCooldownMultiplier;
@@ -722,7 +731,10 @@ export class Player {
         if (this.hasShieldOvercharge) {
             if(updateMouseAbility('isShieldOvercharging', 'shieldOverchargeTimer', 'shieldOverchargeCooldownTimer', this.shieldOverchargeCooldown)){
                 this.isShieldOvercharging = false;
-                this.shieldOverchargeCooldownTimer = this.shieldOverchargeCooldown;
+                this.shieldOverchargeCooldownTimer = this.shieldOverchargeCooldown * (1.0 - this.globalCooldownReduction); // Apply global reduction to base
+                 if (this.isHarmonized && this.hasPerfectHarmonyHelm) { this.shieldOverchargeCooldownTimer *= (1.0 - PERFECT_HARMONY_COOLDOWN_REDUCTION); }
+                 this.shieldOverchargeCooldownTimer = Math.max(this.shieldOverchargeCooldown * 0.1, this.shieldOverchargeCooldownTimer);
+
             }
         }
 
@@ -743,16 +755,20 @@ export class Player {
                 if (this.omegaLaserTimer <= 0) {
                     this.isFiringOmegaLaser = false;
                     stopSound(omegaLaserSound);
-                    this.omegaLaserCooldownTimer = this.omegaLaserCooldown;
+                    this.omegaLaserCooldownTimer = this.omegaLaserCooldown * (1.0 - this.globalCooldownReduction); // Apply global reduction to base
+                    if (this.isHarmonized && this.hasPerfectHarmonyHelm) { this.omegaLaserCooldownTimer *= (1.0 - PERFECT_HARMONY_COOLDOWN_REDUCTION); }
+                    this.omegaLaserCooldownTimer = Math.max(this.omegaLaserCooldown * 0.1, this.omegaLaserCooldownTimer);
                     this.currentOmegaLaserKineticBoost = 1.0;
                 }
             } else {
-                if (this.omegaLaserCooldownTimer > 0) {
-                     let effectiveCooldownMultiplier = 1.0;
+                 if (this.omegaLaserCooldownTimer > 0) {
+                    let effectiveCooldownMultiplier = 1.0 - this.globalCooldownReduction;
                     if (this.isHarmonized && this.hasPerfectHarmonyHelm) {
                         effectiveCooldownMultiplier *= (1.0 - PERFECT_HARMONY_COOLDOWN_REDUCTION);
                     }
+                    effectiveCooldownMultiplier = Math.max(0.1, effectiveCooldownMultiplier);
                     this.omegaLaserCooldownTimer -= dt / effectiveCooldownMultiplier;
+
                     mouseAbilityUIUpdateNeeded = true;
                     if (this.omegaLaserCooldownTimer < 0) this.omegaLaserCooldownTimer = 0;
                 }
@@ -1094,36 +1110,43 @@ export class Player {
         if (!ability) return;
 
         let abilityUsedSuccessfully = false;
-        let actualCooldownDuration = ability.cooldownDuration;
-
+        
+        // Calculate effective base cooldown duration for THIS ability
+        let baseCooldownForThisAbility = ability.cooldownDuration;
         if (this.hasUltimateConfigurationHelm) {
-            actualCooldownDuration *= 1.5;
+            baseCooldownForThisAbility *= 1.5;
         }
+        // This is the cooldown that will be SET after use, affected by global reduction
+        let effectiveCooldownToSet = baseCooldownForThisAbility * (1.0 - this.globalCooldownReduction);
+        effectiveCooldownToSet = Math.max(baseCooldownForThisAbility * 0.1, effectiveCooldownToSet); // Ensure min 10% of original base
 
 
         if (ability.id === 'miniGravityWell') {
             if (this.activeMiniWell && this.activeMiniWell.isActive) {
                 this.currentGravityWellKineticBoost = this.consumeKineticChargeForDamageBoost();
                 this.activeMiniWell.detonate({ targetX: abilityContext.mouseX, targetY: abilityContext.mouseY, player: this });
-                ability.cooldownTimer = actualCooldownDuration;
+                ability.cooldownTimer = effectiveCooldownToSet;
                 ability.justBecameReady = false;
                 abilityUsedSuccessfully = true;
             } else if (ability.cooldownTimer <= 0) {
                 this.deployMiniGravityWell(ability.duration, abilityContext.decoysArray, abilityContext.mouseX, abilityContext.mouseY);
                 if (this.activeMiniWell) {
                     abilityUsedSuccessfully = true;
+                     // Cooldown is set when deploying, not when detonating existing.
+                    ability.cooldownTimer = effectiveCooldownToSet; 
+                    ability.justBecameReady = false;
                 }
             }
         } else if (ability.cooldownTimer <= 0) {
             switch (ability.id) {
                 case 'teleport':
                     this.doTeleport(abilityContext.bossDefeatEffectsArray, abilityContext.mouseX, abilityContext.mouseY, abilityContext.canvasWidth, abilityContext.canvasHeight);
-                    ability.cooldownTimer = actualCooldownDuration;
+                    ability.cooldownTimer = effectiveCooldownToSet;
                     abilityUsedSuccessfully = true;
                     break;
                 case 'empBurst':
                     this.triggerEmpBurst(abilityContext.bossDefeatEffectsArray, abilityContext.allRays, abilityContext.screenShakeParams, abilityContext.canvasWidth, abilityContext.canvasHeight);
-                    ability.cooldownTimer = actualCooldownDuration;
+                    ability.cooldownTimer = effectiveCooldownToSet;
                     abilityUsedSuccessfully = true;
                     break;
             }
@@ -1195,7 +1218,6 @@ export class Player {
             this.isFiringOmegaLaser = true;
             this.omegaLaserTimer = this.omegaLaserDuration;
             this.omegaLaserCurrentTickTimer = 0;
-            // this.omegaLaserAngle = this.aimAngle; // Angle is set in update if firing
             playSound(omegaLaserSound, true);
             if(activeBuffNotificationsArray) activeBuffNotificationsArray.push({ text: `Omega Laser Firing!`, timer: this.omegaLaserDuration });
 

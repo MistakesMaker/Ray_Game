@@ -15,10 +15,22 @@ function getFormattedActiveAbilitiesForStats(playerInstance, bossLootPoolRef) {
         if (a) {
             const d = bossLootPoolRef.find(l => l.id === a.id && l.type === 'ability');
             if (d) {
-                let cdValue = a.cooldownDuration;
+                let cdValue = a.cooldownDuration; // This is the base cooldown from lootManager
+                
+                // Apply Ultimate Configuration penalty first if applicable
                 if (playerInstance.hasUltimateConfigurationHelm) {
                     cdValue *= 1.5;
                 }
+
+                // Then apply global percentage reduction
+                cdValue *= (1.0 - (playerInstance.globalCooldownReduction || 0));
+                
+                // Ensure cooldown doesn't go below a minimum (e.g., 10% of original base before any mods)
+                // or a very small flat minimum to prevent zero/negative cooldowns from extreme stacking.
+                let minCooldown = (a.cooldownDuration || CONSTANTS.OMEGA_LASER_COOLDOWN) * 0.1; // Use original base for min
+                cdValue = Math.max(minCooldown, cdValue);
+
+
                 let cd = (cdValue / 1000).toFixed(1) + 's';
                 if (playerInstance.hasUltimateConfigurationHelm) cd += ' (Ult.Cfg)';
                 if (a.duration) cd += ` (Dur: ${(a.duration / 1000).toFixed(1)}s)`;
@@ -32,8 +44,16 @@ function getFormattedActiveAbilitiesForStats(playerInstance, bossLootPoolRef) {
 function getFormattedMouseAbilitiesForStats(playerInstance) {
     if (!playerInstance) return [];
     let abs = [];
-    if (playerInstance.hasOmegaLaser) abs.push({ name: "Omega Laser", desc: `${(CONSTANTS.OMEGA_LASER_COOLDOWN / 1000)}s CD` });
-    if (playerInstance.hasShieldOvercharge) abs.push({ name: "Shield Overcharge", desc: `${(CONSTANTS.SHIELD_OVERCHARGE_COOLDOWN / 1000)}s CD` });
+    if (playerInstance.hasOmegaLaser) {
+        let cdValue = CONSTANTS.OMEGA_LASER_COOLDOWN * (1.0 - (playerInstance.globalCooldownReduction || 0));
+        cdValue = Math.max(CONSTANTS.OMEGA_LASER_COOLDOWN * 0.1, cdValue);
+        abs.push({ name: "Omega Laser", desc: `${(cdValue / 1000).toFixed(1)}s CD` });
+    }
+    if (playerInstance.hasShieldOvercharge) {
+        let cdValue = CONSTANTS.SHIELD_OVERCHARGE_COOLDOWN * (1.0 - (playerInstance.globalCooldownReduction || 0));
+        cdValue = Math.max(CONSTANTS.SHIELD_OVERCHARGE_COOLDOWN * 0.1, cdValue);
+        abs.push({ name: "Shield Overcharge", desc: `${(cdValue / 1000).toFixed(1)}s CD` });
+    }
     return abs;
 }
 
@@ -53,24 +73,47 @@ function prepareDisplayedUpgradesForStats(playerInstance, masterEvolutionListSna
     masterEvolutionListSnapshot.forEach(e => {
         let displayThisUpgrade = false;
         let desc = "";
-        const currentEvoLevel = e.level || 0;
+        const currentEvoLevel = e.level || 0; 
 
         if (currentEvoLevel > 0) {
             displayThisUpgrade = true;
-        } else {
+        } else { 
             if (e.id === 'rayCritChance' && playerInstance.rayCritChance > 0) displayThisUpgrade = true;
             else if (e.id === 'rayCritDamage' && playerInstance.rayCritDamageMultiplier > 1.5) displayThisUpgrade = true;
             else if (e.id === 'abilityCritChance' && playerInstance.abilityCritChance > 0) displayThisUpgrade = true;
             else if (e.id === 'abilityCritDamage' && playerInstance.abilityCritDamageMultiplier > 1.5) displayThisUpgrade = true;
             else if (e.id === 'systemOvercharge' && playerInstance.evolutionIntervalModifier < 1.0) displayThisUpgrade = true;
+            else if (e.id === 'unstableCore' && (playerInstance.chainReactionChance || 0) > 0) displayThisUpgrade = true; 
+            else if (e.id === 'streamlinedSystems' && (playerInstance.globalCooldownReduction || 0) > 0) displayThisUpgrade = true;
         }
 
         if (displayThisUpgrade) {
             if (typeof e.getEffectString === 'function') {
-                desc = e.getEffectString(playerInstance);
+                desc = e.getEffectString(playerInstance, currentEvoLevel); 
             } else {
-                desc = `Level ${currentEvoLevel}`;
+                // Only fallback to Level if currentEvoLevel is > 0, otherwise it means it's a base stat effect
+                desc = currentEvoLevel > 0 ? `Level ${currentEvoLevel}` : "Base Effect"; 
             }
+
+            // If getEffectString returned something like "Not Acquired" or an empty string for a level 0 that *is* active
+            // (e.g. base crit chance before picking the evolution), or if the fallback resulted in "Level 0"
+            // for such cases, try to get a more meaningful string or default to "Active".
+            if ((desc === "Not Acquired" || desc === "" || desc === "Level 0" || desc === "Base Effect") && currentEvoLevel === 0) {
+                let isActiveDueToBase = false;
+                if (e.id === 'rayCritChance' && playerInstance.rayCritChance > 0) isActiveDueToBase = true;
+                else if (e.id === 'rayCritDamage' && playerInstance.rayCritDamageMultiplier > 1.5) isActiveDueToBase = true;
+                else if (e.id === 'abilityCritChance' && playerInstance.abilityCritChance > 0) isActiveDueToBase = true;
+                else if (e.id === 'abilityCritDamage' && playerInstance.abilityCritDamageMultiplier > 1.5) isActiveDueToBase = true;
+                else if (e.id === 'unstableCore' && (playerInstance.chainReactionChance || 0) > 0) isActiveDueToBase = true;
+                else if (e.id === 'streamlinedSystems' && (playerInstance.globalCooldownReduction || 0) > 0) isActiveDueToBase = true;
+                
+                if(isActiveDueToBase && typeof e.getEffectString === 'function') {
+                    desc = e.getEffectString(playerInstance, 0); // Get effect string for level 0 state
+                } else if (isActiveDueToBase) {
+                    desc = "Active (Base)";
+                }
+            }
+
 
             if (desc) {
                 let nameToDisplay = e.text;
@@ -108,23 +151,48 @@ function prepareDisplayedUpgradesForStats(playerInstance, masterEvolutionListSna
  * @returns {Object} A comprehensive statistics snapshot.
  */
 export function createFinalStatsSnapshot(playerInstance, bossTiers, bossLootPoolRef) {
-    if (!playerInstance) {
+    if (!playerInstance) { 
         return {
             playerData: {
-                damageTakenMultiplier: 1.0, baseRadius: CONSTANTS.PLAYER_BASE_RADIUS, finalRadius: CONSTANTS.PLAYER_BASE_RADIUS,
-                scoreSizeFactor: GameState.getCurrentEffectiveDefaultGrowthFactor(), scoreOffsetForSizing: 0, scoreBasedSizeActual: 0,
-                kineticConversionLevelSnapshot: 0, maxHp: CONSTANTS.PLAYER_MAX_HP, currentSpeed: CONSTANTS.PLAYER_SPEED_BASE,
-                timesHit: 0, totalDamageDealt: 0, immuneColorsList: [], activeAbilities: {},
-                visualModifiers: {}, helmType: null,
-                ablativeAnimTimer: Date.now(), momentumAnimTimer: Date.now(), naniteAnimTimer: Date.now(), // Default animation timers
-                formattedActiveAbilities: [], formattedMouseAbilities: [], displayedUpgrades: [],
-                rayCritChance: 0, rayCritDamageMultiplier: 1.5, abilityCritChance: 0, abilityCritDamageMultiplier: 1.5,
+                hp: PLAYER_MAX_HP,
+                maxHp: PLAYER_MAX_HP,
+                finalRadius: PLAYER_BASE_RADIUS,
+                currentSpeed: PLAYER_SPEED_BASE,
+                timesHit: 0, 
+                totalDamageDealt: 0,
+                baseRadius: PLAYER_BASE_RADIUS,
+                scoreSizeFactor: GameState.getCurrentEffectiveDefaultGrowthFactor(), 
+                scoreOffsetForSizing: 0, 
+                scoreBasedSizeActual: 0,
+                damageTakenMultiplier: 1.0, 
+                immuneColorsList: [], 
+                rayDamageBonus: 0,
+                chainReactionChance: 0, 
+                rayCritChance: 0, 
+                rayCritDamageMultiplier: 1.5,
+                abilityDamageMultiplier: 1.0,
+                abilityCritChance: 0, 
+                abilityCritDamageMultiplier: 1.5,
+                temporalEchoChance: 0,
+                globalCooldownReduction: 0,
+                kineticConversionLevelSnapshot: 0, 
+                initialKineticDamageBonus: CONSTANTS.KINETIC_INITIAL_DAMAGE_BONUS,
+                effectiveKineticAdditionalDamageBonusPerLevel: CONSTANTS.DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL,
+                baseKineticChargeRate: CONSTANTS.KINETIC_BASE_CHARGE_RATE,
+                effectiveKineticChargeRatePerLevel: CONSTANTS.DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL,
+                activeAbilities: {}, 
+                hasOmegaLaser: false, 
+                hasShieldOvercharge: false,
                 evolutionReRollsRemaining: CONSTANTS.MAX_EVOLUTION_REROLLS,
                 evolutionBlocksRemaining: CONSTANTS.MAX_EVOLUTION_BLOCKS,
                 blockedEvolutionIds: [],
                 isBlockModeActive: false,
                 evolutionFreezesRemaining: CONSTANTS.MAX_EVOLUTION_FREEZES_PER_RUN,
-                frozenEvolutionChoice: null
+                frozenEvolutionChoice: null,
+                visualModifiers: {}, 
+                helmType: null,
+                ablativeAnimTimer: Date.now(), momentumAnimTimer: Date.now(), naniteAnimTimer: Date.now(),
+                formattedActiveAbilities: [], formattedMouseAbilities: [], displayedUpgrades: []
             },
             bossTierData: bossTiers || { chaser: 0, reflector: 0, singularity: 0, nexusWeaver: 0 },
             gameplayTimeData: GameState.getGameplayTimeElapsed()
@@ -147,39 +215,68 @@ export function createFinalStatsSnapshot(playerInstance, bossTiers, bossLootPool
     else if (playerInstance.hasUltimateConfigurationHelm) currentHelmType = "ultimateConfiguration";
 
     const playerDataSnapshot = {
-        baseRadius: playerInstance.baseRadius,
+        // Core Stats
+        hp: playerInstance.hp, 
+        maxHp: playerInstance.maxHp,
         finalRadius: playerInstance.radius,
+        currentSpeed: playerInstance.currentSpeed,
+        timesHit: playerInstance.timesHit,
+        totalDamageDealt: playerInstance.totalDamageDealt,
+        
+        // Sizing and Growth
+        baseRadius: playerInstance.baseRadius,
         scoreSizeFactor: determinedScoreSizeFactor,
         scoreOffsetForSizing: playerInstance.scoreOffsetForSizing,
         scoreBasedSizeActual: playerInstance.scoreBasedSize,
-        kineticConversionLevelSnapshot: playerInstance.kineticConversionLevel,
+
+        // Defensive Stats
         damageTakenMultiplier: playerInstance.damageTakenMultiplier,
-        maxHp: playerInstance.maxHp, currentSpeed: playerInstance.currentSpeed,
-        timesHit: playerInstance.timesHit, totalDamageDealt: playerInstance.totalDamageDealt,
         immuneColorsList: [...playerInstance.immuneColorsList],
+        
+        // Offensive Stats
+        rayDamageBonus: playerInstance.rayDamageBonus,
+        chainReactionChance: playerInstance.chainReactionChance || 0,
+        rayCritChance: playerInstance.rayCritChance || 0,
+        rayCritDamageMultiplier: playerInstance.rayCritDamageMultiplier || 1.5,
+        
+        // Ability Stats
+        abilityDamageMultiplier: playerInstance.abilityDamageMultiplier || 1.0,
+        abilityCritChance: playerInstance.abilityCritChance || 0,
+        abilityCritDamageMultiplier: playerInstance.abilityCritDamageMultiplier || 1.5,
+        temporalEchoChance: playerInstance.temporalEchoChance || 0,
+        globalCooldownReduction: playerInstance.globalCooldownReduction || 0,
+
+        // Kinetic Conversion
+        kineticConversionLevelSnapshot: playerInstance.kineticConversionLevel || 0,
+        initialKineticDamageBonus: playerInstance.initialKineticDamageBonus,
+        effectiveKineticAdditionalDamageBonusPerLevel: playerInstance.effectiveKineticAdditionalDamageBonusPerLevel,
+        baseKineticChargeRate: playerInstance.baseKineticChargeRate,
+        effectiveKineticChargeRatePerLevel: playerInstance.effectiveKineticChargeRatePerLevel,
+
+        // Active Abilities (state for UI, not full objects)
         activeAbilities: JSON.parse(JSON.stringify(playerInstance.activeAbilities)),
-        hasOmegaLaser: playerInstance.hasOmegaLaser, hasShieldOvercharge: playerInstance.hasShieldOvercharge,
-        rayCritChance: playerInstance.rayCritChance,
-        rayCritDamageMultiplier: playerInstance.rayCritDamageMultiplier,
-        abilityCritChance: playerInstance.abilityCritChance,
-        abilityCritDamageMultiplier: playerInstance.abilityCritDamageMultiplier,
+        hasOmegaLaser: playerInstance.hasOmegaLaser,
+        hasShieldOvercharge: playerInstance.hasShieldOvercharge,
+        
+        // Evolution Interaction State
         evolutionReRollsRemaining: playerInstance.evolutionReRollsRemaining,
         evolutionBlocksRemaining: playerInstance.evolutionBlocksRemaining,
         blockedEvolutionIds: [...playerInstance.blockedEvolutionIds],
-        isBlockModeActive: playerInstance.isBlockModeActive,
+        isBlockModeActive: playerInstance.isBlockModeActive, 
         evolutionFreezesRemaining: playerInstance.evolutionFreezesRemaining,
         frozenEvolutionChoice: playerInstance.frozenEvolutionChoice ? JSON.parse(JSON.stringify(playerInstance.frozenEvolutionChoice)) : null,
 
+        // Visuals and Path
         visualModifiers: JSON.parse(JSON.stringify(playerInstance.visualModifiers || {})),
         helmType: currentHelmType,
-        // Capture live animation timers from the player instance
         ablativeAnimTimer: playerInstance.ablativeAnimTimer,
         momentumAnimTimer: playerInstance.momentumAnimTimer,
-        naniteAnimTimer: playerInstance.naniteAnimTimer, // Will be undefined if player doesn't have it, which is fine
+        naniteAnimTimer: playerInstance.naniteAnimTimer,
 
+        // Formatted for direct display
         formattedActiveAbilities: getFormattedActiveAbilitiesForStats(playerInstance, bossLootPoolRef),
         formattedMouseAbilities: getFormattedMouseAbilitiesForStats(playerInstance),
-        displayedUpgrades: prepareDisplayedUpgradesForStats(playerInstance, masterEvolutionListSnapshot, bossLootPoolRef)
+        displayedUpgrades: prepareDisplayedUpgradesForStats(playerInstance, masterEvolutionListSnapshot, bossLootPoolRef) 
     };
 
     const bossTierSnapshot = bossTiers || { chaser: 0, reflector: 0, singularity: 0, nexusWeaver: 0 };
