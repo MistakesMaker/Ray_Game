@@ -4,6 +4,7 @@ import * as CONSTANTS from './constants.js';
 import * as GameState from './gameState.js';
 import * as EvolutionManager from './evolutionManager.js';
 import { getReadableColorName as getReadableColorNameFromUtils } from './utils.js';
+// LootManager is NOT directly imported here, it's passed into createFinalStatsSnapshot
 
 // --- Internal Helper Functions ---
 
@@ -30,12 +31,14 @@ function getFormattedAbilitiesForStats(playerInstance, bossLootPoolRef) {
                     effectiveCooldown = Math.max(baseCooldown * 0.1, effectiveCooldown); // Ensure min 10%
 
                     let desc = `CD: ${(effectiveCooldown / 1000).toFixed(1)}s`;
-                    if (definition.duration) {
-                        desc += `, Dur: ${(definition.duration / 1000).toFixed(1)}s`;
-                    }
+                    // if (definition.duration) { // <<< MODIFICATION: Commented out or removed duration
+                    //     desc += `, Dur: ${(definition.duration / 1000).toFixed(1)}s`;
+                    // }
                     // Add damage if applicable (example for EMP, could be extended)
                     if (definition.id === "empBurst") currentDamage = "Clears Rays"; // Special case description
                     // For miniGravityWell, damage comes from launched rays, not direct.
+                    if (definition.id === "teleport") currentDamage = "Immunity"; // Special case description
+
 
                     formattedAbilities.push({
                         name: `${definition.name} (Slot ${slotKey})`,
@@ -53,13 +56,13 @@ function getFormattedAbilitiesForStats(playerInstance, bossLootPoolRef) {
         let baseCooldown = CONSTANTS.OMEGA_LASER_COOLDOWN;
         let effectiveCooldown = baseCooldown * (1.0 - (playerInstance.globalCooldownReduction || 0));
         effectiveCooldown = Math.max(baseCooldown * 0.1, effectiveCooldown);
-        
+
         let damagePerTick = CONSTANTS.OMEGA_LASER_DAMAGE_PER_TICK * (playerInstance.abilityDamageMultiplier || 1.0);
         if (playerInstance.hasUltimateConfigurationHelm) damagePerTick *= 2;
 
         formattedAbilities.push({
             name: "Omega Laser (LMB)",
-            description: `CD: ${(effectiveCooldown / 1000).toFixed(1)}s`,
+            description: `CD: ${(effectiveCooldown / 1000).toFixed(1)}s`, // Duration not typically shown for channeled abilities here
             damage: `${damagePerTick.toFixed(1)}/tick`,
             isMouseAbility: true
         });
@@ -71,8 +74,9 @@ function getFormattedAbilitiesForStats(playerInstance, bossLootPoolRef) {
 
         formattedAbilities.push({
             name: "Shield Overcharge (RMB)",
-            description: `CD: ${(effectiveCooldown / 1000).toFixed(1)}s, Heal: ${CONSTANTS.SHIELD_OVERCHARGE_HEAL_PER_RAY}/ray`,
-            damage: "Invulnerability", // Or "Heals on absorb"
+            // Duration for Shield Overcharge IS relevant as it's a timed buff, so we keep it.
+            description: `CD: ${(effectiveCooldown / 1000).toFixed(1)}s, Dur: ${(CONSTANTS.SHIELD_OVERCHARGE_DURATION / 1000).toFixed(1)}s`,
+            damage: "Invulnerability, Heal: " + CONSTANTS.SHIELD_OVERCHARGE_HEAL_PER_RAY + "/ray",
             isMouseAbility: true
         });
     }
@@ -80,21 +84,18 @@ function getFormattedAbilitiesForStats(playerInstance, bossLootPoolRef) {
 }
 
 
-function prepareGearForStats(playerInstance, bossLootPoolRef) {
-    if (!playerInstance || !bossLootPoolRef) return [];
+function prepareGearForStats(playerInstance, bossLootPoolRef, lootManagerRef) {
+    if (!playerInstance || !bossLootPoolRef || !lootManagerRef) return [];
     let gearList = [];
 
     // Path Buffs (Helms)
     let chosenPathName = null;
-    let pathDescription = "(Chosen Path)";
     if (playerInstance.hasPerfectHarmonyHelm) chosenPathName = "Path of Harmony";
     else if (playerInstance.hasBerserkersEchoHelm) chosenPathName = "Path of Fury";
     else if (playerInstance.hasUltimateConfigurationHelm) chosenPathName = "Path of Power (Offense)";
-    
+
     if (chosenPathName) {
-        const pathDef = LootManager.getFirstPathChoices().find(p => p.name === chosenPathName);
-        if(pathDef) pathDescription = pathDef.description.split('.')[0]; // First sentence as short desc
-        gearList.push({ name: chosenPathName, description: pathDescription });
+        gearList.push({ name: chosenPathName, description: "(Path Buff)" });
     }
 
     // Acquired Boss Gear
@@ -117,14 +118,15 @@ function prepareGearForStats(playerInstance, bossLootPoolRef) {
  * @param {Object} playerInstance - The current player object.
  * @param {Object} bossTiers - An object containing boss tiers (e.g., from BossManager).
  * @param {Array} bossLootPoolRef - Reference to the bossLootPool array.
+ * @param {Object} lootManagerRef - Reference to the LootManager module/object.
  * @returns {Object} A comprehensive statistics snapshot.
  */
-export function createFinalStatsSnapshot(playerInstance, bossTiers, bossLootPoolRef) {
-    if (!playerInstance) { 
+export function createFinalStatsSnapshot(playerInstance, bossTiers, bossLootPoolRef, lootManagerRef) {
+    if (!playerInstance) {
         const defaultRunStats = { timesHit: 0, totalDamageDealt: 0, gameplayTime: 0 };
         const defaultPlayerCoreStats = {
             hp: PLAYER_MAX_HP, maxHp: PLAYER_MAX_HP, finalRadius: PLAYER_BASE_RADIUS,
-            damageTakenMultiplier: 1.0, 
+            damageTakenMultiplier: 1.0,
             rayDamageBonus: 0, chainReactionChance: 0,
             rayCritChance: 0, rayCritDamageMultiplier: 1.5,
             abilityDamageMultiplier: 1.0, abilityCritChance: 0, abilityCritDamageMultiplier: 1.5,
@@ -145,9 +147,9 @@ export function createFinalStatsSnapshot(playerInstance, bossTiers, bossLootPool
             runStats: defaultRunStats,
             playerCoreStats: defaultPlayerCoreStats,
             playerDataForPreview: defaultPlayerDataForPreview, // For Player.drawFromSnapshot
-            immunities: [], 
-            gear: [], 
-            abilities: [], 
+            immunities: [],
+            gear: [],
+            abilities: [],
             blockedEvolutions: [],
             bossTierData: bossTiers || { chaser: 0, reflector: 0, singularity: 0, nexusWeaver: 0 },
         };
@@ -168,11 +170,6 @@ export function createFinalStatsSnapshot(playerInstance, bossTiers, bossLootPool
         hp: playerInstance.hp,
         maxHp: playerInstance.maxHp,
         finalRadius: playerInstance.radius,
-        // Sizing details (could be added if needed for deeper analysis, but finalRadius is key for display)
-        // baseRadius: playerInstance.initialBaseRadius + playerInstance.bonusBaseRadius,
-        // scoreSizeFactor: determinedScoreSizeFactor,
-        // scoreOffsetForSizing: playerInstance.scoreOffsetForSizing,
-        // scoreBasedSizeActual: playerInstance.scoreBasedSize,
         damageTakenMultiplier: playerInstance.damageTakenMultiplier,
         rayDamageBonus: playerInstance.rayDamageBonus || 0,
         chainReactionChance: playerInstance.chainReactionChance || 0,
@@ -183,24 +180,21 @@ export function createFinalStatsSnapshot(playerInstance, bossTiers, bossLootPool
         abilityCritDamageMultiplier: playerInstance.abilityCritDamageMultiplier || 1.5,
         temporalEchoChance: playerInstance.temporalEchoChance || 0,
         globalCooldownReduction: playerInstance.globalCooldownReduction || 0,
-        
+
         kineticConversionLevel: playerInstance.kineticConversionLevel || 0,
         initialKineticDamageBonus: playerInstance.initialKineticDamageBonus || CONSTANTS.KINETIC_INITIAL_DAMAGE_BONUS,
         effectiveKineticAdditionalDamageBonusPerLevel: playerInstance.effectiveKineticAdditionalDamageBonusPerLevel || CONSTANTS.DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL,
         baseKineticChargeRate: playerInstance.baseKineticChargeRate || CONSTANTS.KINETIC_BASE_CHARGE_RATE,
         effectiveKineticChargeRatePerLevel: playerInstance.effectiveKineticChargeRatePerLevel || CONSTANTS.DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL,
-        
-        // Add evolution effects to core stats
-        evolutions: {} // Store textual descriptions from getEffectString
+
+        evolutions: {}
     };
-    
+
     masterEvolutionListWithFunctions.forEach(evo => {
-        if (evo.level > 0 || 
+        if (evo.level > 0 ||
             (evo.id === 'systemOvercharge' && playerInstance.evolutionIntervalModifier < 1.0) ||
-            (evo.id === 'colorImmunity')) { // Always include color immunity to show count even if 0 initially
+            (evo.id === 'colorImmunity')) {
             if (typeof evo.getEffectString === 'function') {
-                 // For evolutions that directly modify core stats, we'll rely on playerInstance already having the final value.
-                 // For things like "Color Immunity", "System Overcharge", "Smaller Player Cooldown" we store the descriptive string.
                 if (evo.id === 'colorImmunity' || evo.id === 'systemOvercharge' || evo.id === 'smallerPlayer' || evo.id === 'vitalitySurge' || evo.id === 'kineticConversion') {
                      playerCoreStats.evolutions[evo.text] = evo.getEffectString(playerInstance);
                 }
@@ -213,8 +207,8 @@ export function createFinalStatsSnapshot(playerInstance, bossTiers, bossLootPool
     const immunities = [...playerInstance.immuneColorsList];
 
     // --- GEAR ---
-    const gear = prepareGearForStats(playerInstance, bossLootPoolRef);
-    
+    const gear = prepareGearForStats(playerInstance, bossLootPoolRef, lootManagerRef);
+
     // --- ABILITIES ---
     const abilities = getFormattedAbilitiesForStats(playerInstance, bossLootPoolRef);
 
@@ -238,22 +232,19 @@ export function createFinalStatsSnapshot(playerInstance, bossTiers, bossLootPool
         ablativeAnimTimer: playerInstance.ablativeAnimTimer,
         momentumAnimTimer: playerInstance.momentumAnimTimer,
         naniteAnimTimer: playerInstance.naniteAnimTimer,
-        hp: playerInstance.hp, // For Berserker helm visual
-        maxHp: playerInstance.maxHp // For Berserker helm visual
+        hp: playerInstance.hp,
+        maxHp: playerInstance.maxHp
     };
 
 
     return {
         runStats,
         playerCoreStats,
-        playerDataForPreview, // This is what Player.drawFromSnapshot will use
+        playerDataForPreview,
         immunities,
         gear,
         abilities,
         blockedEvolutions,
         bossTierData: bossTiers || { chaser: 0, reflector: 0, singularity: 0, nexusWeaver: 0 },
-        // Note: We are not explicitly passing the full `playerDataSnapshot` from the old structure.
-        // Instead, UIManager will build its display from these more organized categories.
-        // The `playerDataForPreview` is specifically for the visual rendering of the player.
     };
 }

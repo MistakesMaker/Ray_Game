@@ -7,7 +7,7 @@ import * as UIManager from './uiManager.js';
 import { getHighScores, addHighScore, updatePendingTierRecordNames } from './highScoreManager.js';
 import { initGameLoop, startGameLoop, stopGameLoop } from './gameLoop.js';
 import * as EvolutionManager from './evolutionManager.js';
-import * as LootManager from './lootManager.js';
+import * as LootManager from './lootManager.js'; // Already imported, good.
 import { createFinalStatsSnapshot } from './playerDataManager.js';
 import {
     initializeGameLogic as importedInitializeGameLogic,
@@ -59,14 +59,14 @@ import { setupEventListeners } from './eventListeners.js';
 // --- Module-level variables for main.js (coordinator) ---
 let lastEvolutionScore = 0;
 let wasLastEvolutionScoreBased = true;
-let currentPlayerNameForHighScores = "CHAMPION"; 
-let currentRunId = null; 
+let currentPlayerNameForHighScores = "CHAMPION";
+let currentRunId = null;
 
 const inputState = {
     keys: { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false, w: false, a: false, s: false, d: false },
     mouseX: window.innerWidth / 2,
     mouseY: window.innerHeight / 2,
-    shiftPressed: false // <<< ADDED for shift key state
+    shiftPressed: false
 };
 
 let freeUpgradeChoicesData = [];
@@ -237,39 +237,18 @@ function triggerEvolutionInternal(isScoreBased = true) {
                 innerBossManager.processBossSpawnQueue(getGameContextForBossManager(LootManager));
             }
         },
-        inputState: inputState // <<< Pass inputState for Shift key check
+        inputState: inputState
     };
 
     EvolutionManager.presentEvolutionUI(currentPlayer, evolutionDependencies);
     orchestrateScreenChange(evolutionScreen);
 }
 
-// <<< NEW CALLBACK FUNCTION FOR REDRAWING EVOLUTION OPTIONS >>>
 function redrawEvolutionOptionsInternal() {
     const currentPlayer = gameLogicGetPlayerFunc ? gameLogicGetPlayerFunc() : null;
     if (currentPlayer && GameState.isGamePausedForEvolution()) {
-        const evolutionDependencies = {
-            UIManager: UIManager,
-            playSound: playSound,
-            onEvolutionCompleteCallback: evolutionCycleConcludedCallback,
-            audioTargetHitSound: audioTargetHitSound,
-            audioEvolutionSound: audioEvolutionSound,
-            audioUpgradeSound: audioUpgradeSound,
-            activeBuffNotificationsArray: gameLogicGetActiveBuffsFunc ? gameLogicGetActiveBuffsFunc() : [],
-            inputState: inputState
-        };
-        // We need to re-use the currently displayed offers, not generate new ones
-        const currentOffers = EvolutionManager.getCurrentlyDisplayedOffers(); 
-        UIManager.populateEvolutionOptionsUI(
-            currentOffers,
-            currentPlayer,
-            (choice, index) => EvolutionManager.confirmEvolutionChoice(choice, index, currentPlayer), // Delegate to EvoManager
-            () => EvolutionManager.handleEvolutionReRoll(currentPlayer), // Delegate
-            () => EvolutionManager.toggleBlockMode(currentPlayer),      // Delegate
-            GameState.getShrinkMeCooldown(),
-            () => EvolutionManager.toggleFreezeMode(currentPlayer),     // Delegate
-            (choice, index) => EvolutionManager.handleFreezeSelection(choice, index, currentPlayer) // Delegate
-        );
+        // Pass all necessary dependencies, including inputState
+        EvolutionManager.redrawEvolutionOptionsWithShiftState(currentPlayer);
     }
 }
 
@@ -407,8 +386,8 @@ function initGame() {
     GameState.resetCoreGameState();
     EvolutionManager.initializeEvolutionMasterList();
     EvolutionManager.resetEvolutionLevels();
-    currentPlayerNameForHighScores = "CHAMPION"; 
-    currentRunId = Date.now(); 
+    currentPlayerNameForHighScores = "CHAMPION";
+    currentRunId = Date.now();
 
     const mainCallbacksForLogic = {
         endGameInternal: endGameInternal,
@@ -472,8 +451,9 @@ function endGameInternal() {
     if (currentPlayer && currentPlayer.isFiringOmegaLaser) stopSound(omegaLaserSound);
 
     const currentBossManager = gameLogicGetBossManagerFunc ? gameLogicGetBossManagerFunc() : null;
-    const currentLootPool = LootManager.getBossLootPoolReference();
-    const finalStatsSnapshot = createFinalStatsSnapshot(currentPlayer, currentBossManager ? currentBossManager.bossTiers : {}, currentLootPool);
+    // Pass LootManager to createFinalStatsSnapshot
+    const finalStatsSnapshot = createFinalStatsSnapshot(currentPlayer, currentBossManager ? currentBossManager.bossTiers : {}, LootManager.getBossLootPoolReference(), LootManager);
+
 
     prepareAndShowPauseStats("Game Over - Final Stats");
     if (uiPausePlayerStatsPanel) {
@@ -494,12 +474,11 @@ function endGameInternal() {
             uiPausePlayerStatsPanel.style.display = 'block';
         }
     }
-    
-    const achievedPlacements = []; 
+
+    const achievedPlacements = [];
     const allScores = getHighScores();
     const currentSurvivalScore = GameState.getScore();
 
-    let isNewDisplayableSurvivalRecord = false;
     if (currentSurvivalScore > 0) {
         const survivalScores = allScores.survival || [];
         let tempSurvivalScores = [...survivalScores, { name: "TEMP_PLAYER_FOR_RANK_CHECK", value: currentSurvivalScore, runId: currentRunId }];
@@ -507,10 +486,9 @@ function endGameInternal() {
         const survivalRank = tempSurvivalScores.findIndex(s => s.runId === currentRunId);
         if (survivalRank !== -1 && survivalRank < CONSTANTS.MAX_ENTRIES_PER_CATEGORY) {
             achievedPlacements.push(`Survival: ${survivalRank + 1}${getOrdinalSuffix(survivalRank + 1)}`);
-            isNewDisplayableSurvivalRecord = true; 
         }
     }
-    
+
     const tierCategories = [
         { key: "nexusWeaverTier1Time", label: "Nexus T1" },
         { key: "nexusWeaverTier2Time", label: "Nexus T2" },
@@ -523,11 +501,11 @@ function endGameInternal() {
         const pendingEntryForThisRun = (allScores[catInfo.key] || []).find(entry => entry.runId === currentRunId && entry.name === "PENDING...");
         if (pendingEntryForThisRun) {
             const tierTimeValue = pendingEntryForThisRun.value;
-            let tempTierScores = [...(allScores[catInfo.key] || [])]; 
+            let tempTierScores = [...(allScores[catInfo.key] || [])];
             tempTierScores = tempTierScores.filter(s => !(s.runId === currentRunId && s.name === "PENDING..."));
             tempTierScores.push({ name: "TEMP_PLAYER_FOR_RANK_CHECK", value: tierTimeValue, runId: currentRunId });
             tempTierScores.sort((a, b) => a.value - b.value);
-            
+
             const tierRank = tempTierScores.findIndex(s => s.runId === currentRunId);
             if (tierRank !== -1 && tierRank < CONSTANTS.MAX_ENTRIES_PER_CATEGORY) {
                 achievedPlacements.push(`${catInfo.label}: ${tierRank + 1}${getOrdinalSuffix(tierRank + 1)}`);
@@ -537,21 +515,21 @@ function endGameInternal() {
 
     const showNameInput = GameState.getScore() > 0;
 
-    UIManager.displayGameOverScreenContent( 
-        currentSurvivalScore, 
-        showNameInput, 
-        achievedPlacements, 
-        (name) => { 
+    UIManager.displayGameOverScreenContent(
+        currentSurvivalScore,
+        showNameInput,
+        achievedPlacements,
+        (name) => {
             currentPlayerNameForHighScores = name || "CHAMPION";
-            
-            if (currentSurvivalScore > 0) { // Attempt to add survival score if > 0
-                 addHighScore("survival", currentPlayerNameForHighScores, currentSurvivalScore, finalStatsSnapshot, currentRunId); 
+
+            if (currentSurvivalScore > 0) {
+                 addHighScore("survival", currentPlayerNameForHighScores, currentSurvivalScore, finalStatsSnapshot, currentRunId);
             }
-            
+
             if (typeof updatePendingTierRecordNames === 'function') {
                 updatePendingTierRecordNames(currentRunId, currentPlayerNameForHighScores);
             }
-            UIManager.updateAllHighScoreDisplays(getHighScores()); 
+            UIManager.updateAllHighScoreDisplays(getHighScores());
         },
         () => { if(uiPausePlayerStatsPanel) uiPausePlayerStatsPanel.style.display = 'none'; initGame(); },
         () => { if(uiPausePlayerStatsPanel) uiPausePlayerStatsPanel.style.display = 'none'; showStartScreenWithUpdatesInternal(); }
@@ -560,12 +538,32 @@ function endGameInternal() {
 }
 
 function togglePauseMenu() {
-    if (GameState.isGameOver() || GameState.getIsCountingDownToResume() || GameState.isGamePausedForEvolution() || GameState.isGamePausedForFreeUpgrade() || GameState.isGamePausedForLootChoice()) return;
+    // Condition to check if any popup or uninterruptible state is active
+    if (GameState.isGameOver() || GameState.getIsCountingDownToResume() || GameState.isGamePausedForEvolution() || GameState.isGamePausedForFreeUpgrade() || GameState.isGamePausedForLootChoice()) {
+        return;
+    }
+
     const currentPlayer = gameLogicGetPlayerFunc();
-    if (!GameState.isGamePausedByEsc()) {
-        prepareAndShowPauseStats("Paused - Current Status"); // This sets the title for the panel content implicitly
-        if(currentPlayer) { currentPlayer.isBlockModeActive = false; currentPlayer.isFreezeModeActive = false; }
-        orchestrateScreenChange(pauseScreen);
+    if (!currentPlayer && !GameState.isGamePausedByEsc()) { // Only log if trying to pause without player
+        console.warn("togglePauseMenu: No player instance found, cannot pause.");
+        return;
+    }
+
+
+    if (!GameState.isGamePausedByEsc()) { // If not currently paused by ESC, then pause the game
+        // Robustly clear any other potential pop-up states before pausing with ESC
+        // This is a safeguard, though orchestrateScreenChange(null) should handle these.
+        GameState.setGamePausedForEvolution(false);
+        GameState.setGamePausedForFreeUpgrade(false);
+        GameState.setGamePausedForLootChoice(false);
+        // GameState.setIsCountingDownToResume(false); // This should already be false if we passed the initial check
+
+        if(currentPlayer) { // These modes are only relevant if there's a player
+             currentPlayer.isBlockModeActive = false;
+             currentPlayer.isFreezeModeActive = false;
+        }
+        prepareAndShowPauseStats("Paused");
+        orchestrateScreenChange(pauseScreen); // This will set GameState.setGamePausedByEsc(true);
         if(uiPausePlayerStatsPanel) {
             if (uiPausePlayerStatsPanel.parentElement !== document.body && UIManager.getCurrentActiveScreen() !== detailedHighScoresScreen) {
                 document.body.appendChild(uiPausePlayerStatsPanel);
@@ -576,7 +574,7 @@ function togglePauseMenu() {
                 uiPausePlayerStatsPanel.style.display = 'block';
             }
         }
-    } else {
+    } else { // If already paused by ESC, then resume the game
         if(uiPausePlayerStatsPanel) uiPausePlayerStatsPanel.style.display = 'none';
         startResumeCountdownInternal();
     }
@@ -585,7 +583,7 @@ function togglePauseMenu() {
 function startResumeCountdownInternal() {
     if(uiPausePlayerStatsPanel) uiPausePlayerStatsPanel.style.display = 'none';
     const currentPlayer = gameLogicGetPlayerFunc();
-    GameState.setGamePausedByEsc(true); GameState.setIsCountingDownToResume(true);
+    GameState.setGamePausedByEsc(true); GameState.setIsCountingDownToResume(true); // isGamePausedByEsc remains true during countdown
     orchestrateScreenChange(countdownOverlay);
     let countVal = 3;
     if(currentPlayer) { currentPlayer.isBlockModeActive = false; currentPlayer.isFreezeModeActive = false;}
@@ -595,21 +593,19 @@ function startResumeCountdownInternal() {
         countVal--; if (countdownOverlay) countdownOverlay.textContent = countVal > 0 ? countVal.toString() : '';
         if (countVal <= 0) {
             clearInterval(GameState.getResumeCountdownTimerId()); GameState.setResumeCountdownTimerId(null);
-            GameState.setIsCountingDownToResume(false); GameState.setGamePausedByEsc(false);
+            GameState.setIsCountingDownToResume(false); GameState.setGamePausedByEsc(false); // Fully unpause here
             orchestrateScreenChange(null);
         }
     }, 1000));
 }
 
 
-function prepareAndShowPauseStats(titleForPanel) { // Renamed argument for clarity
+function prepareAndShowPauseStats(contextualTitle) {
     const currentPlayer = gameLogicGetPlayerFunc();
     const currentBossManager = gameLogicGetBossManagerFunc ? gameLogicGetBossManagerFunc() : null;
-    const currentLootPool = LootManager.getBossLootPoolReference();
-    const statsSnapshot = createFinalStatsSnapshot(currentPlayer, currentBossManager ? currentBossManager.bossTiers : {}, currentLootPool);
-    // The titleForPanel is for the context of the call, UIManager handles the internal headers.
-    // UIManager.updatePauseScreenStatsDisplay(statsSnapshot, titleForPanel); NO LONGER PASSING TITLE HERE
-    UIManager.updatePauseScreenStatsDisplay(statsSnapshot); 
+    // Pass LootManager to createFinalStatsSnapshot
+    const statsSnapshot = createFinalStatsSnapshot(currentPlayer, currentBossManager ? currentBossManager.bossTiers : {}, LootManager.getBossLootPoolReference(), LootManager);
+    UIManager.updatePauseScreenStatsDisplay(statsSnapshot, contextualTitle); // Pass the contextual title
 }
 
 function showDetailedHighScores() {
@@ -618,23 +614,16 @@ function showDetailedHighScores() {
     UIManager.displayDetailedHighScoresScreenUI(
         highScoresData,
         (statsSnapshotFromStorage, entryName, category) => {
-            // console.log("[Main] High score entry clicked. Category:", category, "Name:", entryName, "Stats object received:", !!statsSnapshotFromStorage); 
-            if (statsSnapshotFromStorage && uiPausePlayerStatsPanel) { 
-                let title = `Stats for ${entryName}`;
-                if(category && category.toLowerCase().includes("time")){
-                    const tierMatch = category.match(/\d+/);
-                    if(tierMatch) title += ` (Nexus T${tierMatch[0]} Kill)`;
-                    else title += ` (Time Trial)`;
-                } else if (category === "survival") {
-                    title += " (Survival)";
-                }
-                // UIManager.updatePauseScreenStatsDisplay(statsSnapshotFromStorage, title); // Title is handled by high score screen itself now
-                UIManager.updatePauseScreenStatsDisplay(statsSnapshotFromStorage); 
-                if (uiPausePlayerStatsPanel) uiPausePlayerStatsPanel.style.display = 'block';
-            } else {
-                 // console.log("[Main] No stats snapshot to display or uiPausePlayerStatsPanel not found.");
-                 if (uiPausePlayerStatsPanel) uiPausePlayerStatsPanel.style.display = 'none';
+            let titleForStatsPanel = `Stats for ${entryName}`;
+            if(category && category.toLowerCase().includes("time")){
+                const tierMatch = category.match(/\d+/);
+                if(tierMatch) titleForStatsPanel += ` (Nexus T${tierMatch[0]} Kill)`;
+                else titleForStatsPanel += ` (Time Trial)`;
+            } else if (category === "survival") {
+                titleForStatsPanel += " (Survival)";
             }
+            UIManager.updatePauseScreenStatsDisplay(statsSnapshotFromStorage, titleForStatsPanel);
+            if (uiPausePlayerStatsPanel) uiPausePlayerStatsPanel.style.display = 'block';
         },
         () => {
             if (uiPausePlayerStatsPanel && uiPausePlayerStatsPanel.parentElement !== document.body) document.body.appendChild(uiPausePlayerStatsPanel);
@@ -680,9 +669,9 @@ function getGameContextForBossManager(lootManagerInstance) {
         evolutionPendingAfterBossRef: { get: GameState.isEvolutionPendingAfterBoss, set: GameState.setEvolutionPendingAfterBoss },
         playerPostDamageImmunityTimer: GameState.getPostDamageImmunityTimer(),
         activeBuffNotificationsArray: gameLogicGetActiveBuffsFunc ? gameLogicGetActiveBuffsFunc() : [],
-        callbacks: gameContextForEventListeners.callbacks, 
+        callbacks: gameContextForEventListeners.callbacks,
         CONSTANTS, getPooledRay,
-        currentRunId: currentRunId 
+        currentRunId: currentRunId
     };
 };
 
@@ -712,7 +701,7 @@ const gameContextForEventListeners = {
             const targetScreenElement = UIManager.getPreviousScreenForSettings() || startScreen;
             orchestrateScreenChange(targetScreenElement);
             if (targetScreenElement === pauseScreen && uiPausePlayerStatsPanel) {
-                prepareAndShowPauseStats("Paused"); // Pass context for screen title
+                prepareAndShowPauseStats("Paused");
                 if (uiPausePlayerStatsPanel.parentElement !== document.body && UIManager.getCurrentActiveScreen() !== detailedHighScoresScreen) document.body.appendChild(uiPausePlayerStatsPanel);
                 if (UIManager.getCurrentActiveScreen() === pauseScreen) {
                      if (uiHighScoreContainer && uiHighScoreContainer.offsetParent !== null) { const r = uiHighScoreContainer.getBoundingClientRect(); uiPausePlayerStatsPanel.style.top = (r.bottom + 10) + 'px';}
@@ -736,22 +725,22 @@ const gameContextForEventListeners = {
         handleEvolutionReRoll: () => {
             const cp = gameLogicGetPlayerFunc();
             if (cp && EvolutionManager && GameState.isGamePausedForEvolution()) {
-                EvolutionManager.handleEvolutionReRoll(cp, { UIManager, playSound, onEvolutionCompleteCallback: evolutionCycleConcludedCallback, audioTargetHitSound, audioEvolutionSound, audioUpgradeSound, activeBuffNotificationsArray: gameLogicGetActiveBuffsFunc ? gameLogicGetActiveBuffsFunc() : [], inputState });
+                EvolutionManager.handleEvolutionReRoll(cp); // Dependencies are now stored in EvoManager
             }
         },
         toggleBlockMode: () => {
             const cp = gameLogicGetPlayerFunc();
              if (cp && EvolutionManager && GameState.isGamePausedForEvolution()) {
-                EvolutionManager.toggleBlockMode(cp, { UIManager, playSound, onEvolutionCompleteCallback: evolutionCycleConcludedCallback, audioTargetHitSound, audioUpgradeSound, activeBuffNotificationsArray: gameLogicGetActiveBuffsFunc ? gameLogicGetActiveBuffsFunc() : [], inputState });
+                EvolutionManager.toggleBlockMode(cp); // Dependencies are now stored in EvoManager
             }
         },
         toggleFreezeMode: () => {
             const cp = gameLogicGetPlayerFunc();
             if (cp && EvolutionManager && GameState.isGamePausedForEvolution()) {
-                EvolutionManager.toggleFreezeMode(cp, { UIManager, playSound, onEvolutionCompleteCallback: evolutionCycleConcludedCallback, audioTargetHitSound, audioEvolutionSound, audioUpgradeSound, activeBuffNotificationsArray: gameLogicGetActiveBuffsFunc ? gameLogicGetActiveBuffsFunc() : [], inputState });
+                EvolutionManager.toggleFreezeMode(cp); // Dependencies are now stored in EvoManager
             }
         },
-        redrawEvolutionOptions: redrawEvolutionOptionsInternal, // <<< ADDED THIS CALLBACK
+        redrawEvolutionOptions: redrawEvolutionOptionsInternal,
         onPlayerBossCollision: (bossThatHit) => {
             const cp = gameLogicGetPlayerFunc();
             if (cp && !cp.isShieldOvercharging && (!cp.teleporting || cp.teleportEffectTimer <= 0) && GameState.getPostDamageImmunityTimer() <= 0) {
@@ -799,14 +788,15 @@ const gameContextForEventListeners = {
         markNexusWeaverTierTimeRecordedThisRun: GameState.recordNexusWeaverTierTimeThisRun,
         getGameplayTimeElapsed: GameState.getGameplayTimeElapsed,
         createStatsSnapshotForBossKill: (playerInst, currentOverallBossTiers) => {
-            return createFinalStatsSnapshot(playerInst, currentOverallBossTiers, LootManager.getBossLootPoolReference());
+            // Pass LootManager to createFinalStatsSnapshot
+            return createFinalStatsSnapshot(playerInst, currentOverallBossTiers, LootManager.getBossLootPoolReference(), LootManager);
         },
         getSpecificHighScores: (category) => {
             const allScores = getHighScores();
             return allScores[category] || [];
         },
-        recordBossKillTime: (category, nameFromBossManager, time, stats, runIdToUse) => { 
-            addHighScore(category, nameFromBossManager, time, stats, runIdToUse); 
+        recordBossKillTime: (category, nameFromBossManager, time, stats, runIdToUse) => {
+            addHighScore(category, nameFromBossManager, time, stats, runIdToUse);
             UIManager.updateAllHighScoreDisplays(getHighScores());
         },
         playSound: playSound,
