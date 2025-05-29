@@ -22,9 +22,9 @@ import {
     blockInfoSpan, toggleBlockModeButton,
     toggleFreezeModeButton, freezeInfoSpan,
     detailedScoresList,
-    statsPanelTitle,
-    statsCoreDiv, statsUpgradesUl, statsImmunitiesContainer,
-    statsAbilitiesDiv, statsMouseAbilitiesDiv, statsBossTiersDiv,
+    // statsPanelTitle as importedStatsPanelTitleElement, // No longer needed as a direct reference here
+    statsImmunitiesContainer,
+    statsBossTiersDiv,
     buffIndicatorContainer, survivalBonusIndicator, activeBuffIndicator,
     highScoreCategorySelect,
     playerPreviewCanvas,
@@ -42,7 +42,7 @@ let localCurrentActiveScreenElement = null;
 let previewCanvasEl = null;
 let previewCtx = null;
 let currentPreviewAimAngle = 0;
-let lastPreviewPlayerDataSnapshot = null;
+let lastPreviewPlayerDataSnapshot = null; 
 let isPreviewAnimating = false;
 let globalPreviewMouseListenerAttached = false;
 
@@ -70,88 +70,50 @@ export function formatMillisecondsToTime(ms) {
 
 // --- Player Preview Canvas Functions ---
 function handleGlobalPreviewMouseMove(e) {
-    // This condition ensures angle updates ONLY for the active detailed high scores preview
     if (!previewCtx || !previewCanvasEl || !localCurrentActiveScreenElement || localCurrentActiveScreenElement.id !== 'detailedHighScoresScreen' || !isPreviewAnimating) {
         return;
     }
-    const rect = previewCanvasEl.getBoundingClientRect(); // Get rect of the preview canvas itself
-    const mouseX = e.clientX - rect.left; // Mouse X relative to preview canvas
-    const mouseY = e.clientY - rect.top; // Mouse Y relative to preview canvas
-
-    currentPreviewAimAngle = Math.atan2(
-        mouseY - (previewCanvasEl.height / 2),
-        mouseX - (previewCanvasEl.width / 2)
-    );
+    const rect = previewCanvasEl.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    currentPreviewAimAngle = Math.atan2(mouseY - (previewCanvasEl.height / 2), mouseX - (previewCanvasEl.width / 2));
 }
-
 
 function initPlayerPreviewCanvas() {
     if (playerPreviewCanvas && !previewCtx) {
         previewCanvasEl = playerPreviewCanvas;
         previewCtx = previewCanvasEl.getContext('2d');
-
-        // Attach mousemove to window for global tracking, but conditionally update angle
         if (!globalPreviewMouseListenerAttached) {
             window.addEventListener('mousemove', handleGlobalPreviewMouseMove);
             globalPreviewMouseListenerAttached = true;
         }
-        
-        console.log("Player Preview Canvas Initialized by UIManager");
     }
 }
 
-
 function playerPreviewAnimationLoop() {
-    if (!isPreviewAnimating) {
-        return;
-    }
-    if (!previewCtx || !previewCanvasEl) {
-        isPreviewAnimating = false;
-        return;
-    }
-
+    if (!isPreviewAnimating) return;
+    if (!previewCtx || !previewCanvasEl) { isPreviewAnimating = false; return; }
     previewCtx.clearRect(0, 0, previewCanvasEl.width, previewCanvasEl.height);
-
-    if (lastPreviewPlayerDataSnapshot) {
+    if (lastPreviewPlayerDataSnapshot) { 
         if (playerPreviewPlaceholder) playerPreviewPlaceholder.style.display = 'none';
-        Player.drawFromSnapshot(
-            previewCtx,
-            lastPreviewPlayerDataSnapshot,
-            previewCanvasEl.width / 2,
-            previewCanvasEl.height / 2,
-            currentPreviewAimAngle
-        );
+        Player.drawFromSnapshot(previewCtx, lastPreviewPlayerDataSnapshot, previewCanvasEl.width / 2, previewCanvasEl.height / 2, currentPreviewAimAngle);
     } else {
         if (playerPreviewPlaceholder) playerPreviewPlaceholder.style.display = 'block';
     }
-    
     requestAnimationFrame(playerPreviewAnimationLoop);
 }
 
-function startOrUpdatePreviewAnimation(playerData) {
-    lastPreviewPlayerDataSnapshot = playerData;
-
-    if (playerData && !isPreviewAnimating) {
+function startOrUpdatePreviewAnimation(snapshotForPreview) { 
+    lastPreviewPlayerDataSnapshot = snapshotForPreview; 
+    if (snapshotForPreview && !isPreviewAnimating) {
         isPreviewAnimating = true;
         requestAnimationFrame(playerPreviewAnimationLoop);
-        console.log("Preview animation STARTED with data");
-    } else if (!playerData && isPreviewAnimating) {
-        isPreviewAnimating = false; 
-        if (previewCtx && previewCanvasEl) {
-            previewCtx.clearRect(0, 0, previewCanvasEl.width, previewCanvasEl.height);
-        }
-        if (playerPreviewPlaceholder) playerPreviewPlaceholder.style.display = 'block';
-        console.log("Preview animation STOPPED (no data)");
-    } else if (playerData && isPreviewAnimating) {
-        console.log("Preview animation data UPDATED");
-    } else if (!playerData && !isPreviewAnimating) {
-        if (previewCtx && previewCanvasEl) {
-             previewCtx.clearRect(0, 0, previewCanvasEl.width, previewCanvasEl.height);
-        }
+    } else if (!snapshotForPreview && isPreviewAnimating) {
+        isPreviewAnimating = false;
+        if (previewCtx && previewCanvasEl) previewCtx.clearRect(0, 0, previewCanvasEl.width, previewCanvasEl.height);
         if (playerPreviewPlaceholder) playerPreviewPlaceholder.style.display = 'block';
     }
 }
-
 
 // --- UI Update Functions ---
 export function updateScoreDisplay(currentScoreVal) {
@@ -350,7 +312,7 @@ export function showScreen(screenElementToShow) {
         if (screenElementToShow !== importedPauseScreen && screenElementToShow !== importedGameOverScreen) {
             if (pausePlayerStatsPanel) pausePlayerStatsPanel.style.display = 'none';
         }
-        if (isPreviewAnimating && localCurrentActiveScreenElement !== importedDetailedHighScoresScreen) { // Also check current screen
+        if (isPreviewAnimating && localCurrentActiveScreenElement !== importedDetailedHighScoresScreen) { 
             isPreviewAnimating = false; 
         }
     }
@@ -565,7 +527,7 @@ export function displayGameOverScreenContent(currentScoreVal, showNameInput, ach
             placementsList.appendChild(li);
         });
         importedGameOverScreen.appendChild(placementsList);
-    } else if (showNameInput) { // If no specific placements, but eligible to submit name (e.g., for future tie-breaking or just to record the run)
+    } else if (showNameInput) { 
         const infoP = document.createElement('p');
         infoP.textContent = "Enter your name to record your run.";
         infoP.style.fontSize = '14px';
@@ -635,15 +597,28 @@ export function displayDetailedHighScoresScreenUI(allHighScoresObject, onEntryCl
                 let dateString = scoreEntry.timestamp ? ` (${new Date(scoreEntry.timestamp).toLocaleDateString()})` : '';
                 const valueDisplay = isTimeBased ? formatMillisecondsToTime(scoreEntry.value) : scoreEntry.value.toLocaleString();
                 li.textContent = `${index + 1}. ${scoreEntry.name} - ${valueDisplay}${dateString}`;
+                
+                const previewData = scoreEntry.stats?.playerDataForPreview || scoreEntry.stats?.playerData || null;
 
-                if (scoreEntry.stats && scoreEntry.stats.playerData) {
+                if (scoreEntry.stats) { 
                     li.onclick = () => {
                         const currentSelected = detailedScoresList.querySelector('.selected-score');
                         if (currentSelected) currentSelected.classList.remove('selected-score');
                         li.classList.add('selected-score');
-                        onEntryClickCallback(scoreEntry.stats, scoreEntry.name, categoryKey);
-                        currentPreviewAimAngle = 0; // Reset aim angle on new selection
-                        startOrUpdatePreviewAnimation(scoreEntry.stats.playerData);
+                        
+                        // Construct the title for the stats panel when a high score is clicked
+                        let statsPanelDisplayTitle = `Stats for ${scoreEntry.name}`;
+                        if(categoryKey && categoryKey.toLowerCase().includes("time")){
+                            const tierMatch = categoryKey.match(/\d+/);
+                            if(tierMatch) statsPanelDisplayTitle += ` (Nexus T${tierMatch[0]} Kill)`;
+                            else statsPanelDisplayTitle += ` (Time Trial)`;
+                        } else if (categoryKey === "survival") {
+                            statsPanelDisplayTitle += " (Survival)";
+                        }
+                        updatePauseScreenStatsDisplay(scoreEntry.stats, statsPanelDisplayTitle); // Pass the title here
+
+                        currentPreviewAimAngle = 0; 
+                        startOrUpdatePreviewAnimation(previewData); 
                         if (pausePlayerStatsPanel) pausePlayerStatsPanel.style.display = 'block';
                     };
                 } else {
@@ -680,64 +655,209 @@ export function displayDetailedHighScoresScreenUI(allHighScoresObject, onEntryCl
     }
 }
 
-export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText = "Player Status") {
-    if (!statsCoreDiv || !statsUpgradesUl || !statsImmunitiesContainer || !statsBossTiersDiv || !statsAbilitiesDiv || !statsMouseAbilitiesDiv) {
-        if (pausePlayerStatsPanel) pausePlayerStatsPanel.innerHTML = "<p>Error loading stats sections.</p>";
+export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText = "Current Status") { // Default title if not provided
+    const statsRunDiv = document.getElementById('statsRun');
+    const statsPlayerCoreDiv = document.getElementById('statsPlayerCore');
+    const statsGearUl = document.getElementById('statsGearList');
+    const statsAbilitiesCombinedDiv = document.getElementById('statsAbilities'); 
+
+    // The main title of the PAUSE SCREEN or GAME OVER SCREEN is handled by their own H2 tags.
+    // This function now only populates the content *within* #pausePlayerStatsPanel.
+    // The `panelTitleText` can be used if we decide to add an H4 back *inside* #pausePlayerStatsPanel for context,
+    // but for now, the section headers like "📊 Run Information" serve this purpose.
+
+    if (!statsRunDiv || !statsPlayerCoreDiv || !statsGearUl || !statsImmunitiesContainer || !statsAbilitiesCombinedDiv || !statsBossTiersDiv) {
+        if (pausePlayerStatsPanel) pausePlayerStatsPanel.innerHTML = "<p>Error loading stats sections (new structure).</p>";
         return;
     }
-    if (statsPanelTitle) statsPanelTitle.textContent = panelTitleText;
-    if (!statsSnapshot || !statsSnapshot.playerData) {
-        const noDataMsg = "<p><span style='color: #aaa; font-size:11px;'>No data available for this entry.</span></p>";
-        statsCoreDiv.innerHTML = noDataMsg; statsUpgradesUl.innerHTML = `<li>${noDataMsg.replace(/<p>|<\/p>/g, '')}</li>`;
-        statsImmunitiesContainer.innerHTML = `<span>${noDataMsg.replace(/<p>|<\/p>/g, '')}</span>`; statsAbilitiesDiv.innerHTML = noDataMsg;
-        statsMouseAbilitiesDiv.innerHTML = noDataMsg; statsBossTiersDiv.innerHTML = noDataMsg;
+
+    const isOldFormat = statsSnapshot && statsSnapshot.playerData && !statsSnapshot.runStats;
+    
+    let runStats, playerCoreStats, immunities, gear, abilities, blockedEvolutions, bossTierData;
+
+    if (isOldFormat) {
+        // console.warn("Displaying stats from OLD snapshot format. Some details might be missing or approximated.");
+        const oldPlayerData = statsSnapshot.playerData;
+        runStats = {
+            timesHit: oldPlayerData.timesHit || 0,
+            totalDamageDealt: oldPlayerData.totalDamageDealt || 0,
+            gameplayTime: statsSnapshot.gameplayTimeData 
+        };
+        playerCoreStats = { 
+            hp: oldPlayerData.hp, maxHp: oldPlayerData.maxHp, finalRadius: oldPlayerData.finalRadius,
+            damageTakenMultiplier: oldPlayerData.damageTakenMultiplier !== undefined ? oldPlayerData.damageTakenMultiplier : 1.0,
+            rayDamageBonus: oldPlayerData.rayDamageBonus || 0,
+            chainReactionChance: oldPlayerData.chainReactionChance || 0,
+            rayCritChance: oldPlayerData.rayCritChance || 0,
+            rayCritDamageMultiplier: oldPlayerData.rayCritDamageMultiplier || 1.5,
+            abilityDamageMultiplier: oldPlayerData.abilityDamageMultiplier || 1.0,
+            abilityCritChance: oldPlayerData.abilityCritChance || 0,
+            abilityCritDamageMultiplier: oldPlayerData.abilityCritDamageMultiplier || 1.5,
+            temporalEchoChance: oldPlayerData.temporalEchoChance || 0,
+            globalCooldownReduction: oldPlayerData.globalCooldownReduction || 0,
+            kineticConversionLevel: oldPlayerData.kineticConversionLevelSnapshot || oldPlayerData.kineticConversionLevel || 0, 
+            initialKineticDamageBonus: oldPlayerData.initialKineticDamageBonus || CONSTANTS.KINETIC_INITIAL_DAMAGE_BONUS,
+            effectiveKineticAdditionalDamageBonusPerLevel: oldPlayerData.effectiveKineticAdditionalDamageBonusPerLevel || CONSTANTS.DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL,
+            baseKineticChargeRate: oldPlayerData.baseKineticChargeRate || CONSTANTS.KINETIC_BASE_CHARGE_RATE,
+            effectiveKineticChargeRatePerLevel: oldPlayerData.effectiveKineticChargeRatePerLevel || CONSTANTS.DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL,
+            evolutions: {} 
+        };
+        if (oldPlayerData.displayedUpgrades) {
+            oldPlayerData.displayedUpgrades.forEach(upg => {
+                if (upg.name && upg.description) {
+                    // Only add very specific text-based evolutions that aren't direct stats
+                    if (upg.name.includes("System Overcharge")) playerCoreStats.evolutions["System Overcharge"] = upg.description;
+                    else if (upg.name.includes("Vitality Surge")) playerCoreStats.evolutions["Vitality Surge"] = upg.description;
+                    // Chameleon Plating is handled by the immunities section
+                    else if (upg.name.includes("Evasive Maneuver")) playerCoreStats.evolutions["Evasive Maneuver"] = upg.description;
+                }
+            });
+        }
+
+        immunities = oldPlayerData.immuneColorsList || [];
+        gear = (oldPlayerData.displayedUpgrades || []).filter(u => u.description && (u.description.toLowerCase().includes("path") || u.name.toLowerCase().includes("injectors") || u.name.toLowerCase().includes("sub-layer") || u.name.toLowerCase().includes("adaptive shield")));
+        abilities = [
+            ...(oldPlayerData.formattedActiveAbilities || []), 
+            ...(oldPlayerData.formattedMouseAbilities || [])
+        ];
+        blockedEvolutions = oldPlayerData.blockedEvolutionIds || [];
+        bossTierData = statsSnapshot.bossTierData;
+
+    } else if (statsSnapshot && statsSnapshot.runStats && statsSnapshot.playerCoreStats) { 
+        ({ runStats, playerCoreStats, immunities, gear, abilities, blockedEvolutions, bossTierData } = statsSnapshot);
+    } else {
+        const noDataMsg = "<p><span style='color: #aaa; font-size:11px;'>Snapshot data incomplete.</span></p>";
+        statsRunDiv.innerHTML = noDataMsg; statsPlayerCoreDiv.innerHTML = noDataMsg; 
+        statsGearUl.innerHTML = `<li>${noDataMsg.replace(/<p>|<\/p>/g, '')}</li>`;
+        statsImmunitiesContainer.innerHTML = `<span>${noDataMsg.replace(/<p>|<\/p>/g, '')}</span>`;
+        statsAbilitiesCombinedDiv.innerHTML = noDataMsg;
+        statsBossTiersDiv.innerHTML = noDataMsg;
         return;
     }
-    const { playerData, bossTierData, gameplayTimeData } = statsSnapshot;
+    
     const bossTypeNamesFromSource = CONSTANTS.standardBossTypeNames ? [...CONSTANTS.standardBossTypeNames, CONSTANTS.nexusWeaverBossName] : ["CHASER", "REFLECTOR", "SINGULARITY", "NEXUS WEAVER"];
     const bossTypeKeysFromSource = CONSTANTS.standardBossTypeKeys ? [...CONSTANTS.standardBossTypeKeys, CONSTANTS.nexusWeaverBossKey] : ["chaser", "reflector", "singularity", "nexusWeaver"];
-    let coreHTML = '';
+    
     const formatNum = (val, digits = 1) => (typeof val === 'number' && !isNaN(val) ? val.toFixed(digits) : 'N/A');
     const formatInt = (val) => (typeof val === 'number' && !isNaN(val) ? val.toString() : 'N/A');
     const formatPercent = (val) => (typeof val === 'number' && !isNaN(val) ? (val * 100).toFixed(0) + '%' : '0%');
     const formatMultiplier = (val) => (typeof val === 'number' && !isNaN(val) ? 'x' + val.toFixed(2) : 'x1.00');
-    coreHTML += `<p><span class="stat-label">Max HP:</span><span class="stat-value">${formatInt(playerData.maxHp)}</span></p>`;
-    coreHTML += `<p><span class="stat-label">Player Size:</span><span class="stat-value">${formatNum(playerData.finalRadius)}</span></p>`;
-    coreHTML += `<p><span class="stat-label">Times Hit:</span><span class="stat-value">${formatInt(playerData.timesHit)}</span></p>`;
-    if (gameplayTimeData !== undefined) { coreHTML += `<p><span class="stat-label">Time Played:</span><span class="stat-value">${formatMillisecondsToTime(gameplayTimeData)}</span></p>`; }
-    coreHTML += `<p><span class="stat-label">Damage Dealt:</span><span class="stat-value">${playerData.totalDamageDealt ? playerData.totalDamageDealt.toLocaleString() : 0}</span></p>`;
-    if (playerData.rayCritChance !== undefined && (playerData.rayCritChance > 0 || playerData.rayCritDamageMultiplier > 1.5)) {
-        coreHTML += `<p><span class="stat-label">Ray Crit Chance:</span><span class="stat-value">${formatPercent(playerData.rayCritChance)}</span></p>`;
-        coreHTML += `<p><span class="stat-label">Ray Crit Damage:</span><span class="stat-value">${formatMultiplier(playerData.rayCritDamageMultiplier)}</span></p>`;
+
+    // --- 📊 Run Information --- 
+    let runHTML = '';
+    runHTML += `<p><span class="stat-label">Time Played:</span><span class="stat-value">${formatMillisecondsToTime(runStats.gameplayTime)}</span></p>`;
+    runHTML += `<p><span class="stat-label">Times Hit:</span><span class="stat-value">${formatInt(runStats.timesHit)}</span></p>`;
+    runHTML += `<p><span class="stat-label">Damage Dealt:</span><span class="stat-value">${runStats.totalDamageDealt ? runStats.totalDamageDealt.toLocaleString() : 0}</span></p>`;
+    statsRunDiv.innerHTML = runHTML;
+
+    // --- 👤 Player Stats ---
+    let coreHTML = '';
+    coreHTML += `<p><span class="stat-label">Max HP:</span><span class="stat-value">${formatInt(playerCoreStats.maxHp)}</span></p>`;
+    coreHTML += `<p><span class="stat-label">Player Size:</span><span class="stat-value">${formatNum(playerCoreStats.finalRadius)}</span></p>`;
+    coreHTML += `<p><span class="stat-label">Damage Reduction:</span><span class="stat-value">${formatPercent(1 - (playerCoreStats.damageTakenMultiplier !== undefined ? playerCoreStats.damageTakenMultiplier : 1.0))}</span></p>`;
+    coreHTML += `<p><span class="stat-label">Ray Damage Bonus:</span><span class="stat-value">+${formatNum(playerCoreStats.rayDamageBonus || 0)}</span></p>`;
+    coreHTML += `<p><span class="stat-label">Ray Crit Chance:</span><span class="stat-value">${formatPercent(playerCoreStats.rayCritChance || 0)}</span></p>`;
+    coreHTML += `<p><span class="stat-label">Ray Crit Damage:</span><span class="stat-value">${formatMultiplier(playerCoreStats.rayCritDamageMultiplier || 1.5)}</span></p>`;
+    coreHTML += `<p><span class="stat-label">AOE Explosion Chance:</span><span class="stat-value">${formatPercent(playerCoreStats.chainReactionChance || 0)}</span></p>`;
+    coreHTML += `<p><span class="stat-label">Ability Damage Mult:</span><span class="stat-value">${formatMultiplier(playerCoreStats.abilityDamageMultiplier || 1.0)}</span></p>`;
+    coreHTML += `<p><span class="stat-label">Ability Crit Chance:</span><span class="stat-value">${formatPercent(playerCoreStats.abilityCritChance || 0)}</span></p>`;
+    coreHTML += `<p><span class="stat-label">Ability Crit Damage:</span><span class="stat-value">${formatMultiplier(playerCoreStats.abilityCritDamageMultiplier || 1.5)}</span></p>`;
+    coreHTML += `<p><span class="stat-label">Global CD Reduction:</span><span class="stat-value">${formatPercent(playerCoreStats.globalCooldownReduction || 0)}</span></p>`;
+    coreHTML += `<p><span class="stat-label">Temporal Echo Chance:</span><span class="stat-value">${formatPercent(playerCoreStats.temporalEchoChance || 0)}</span></p>`;
+    
+    // Display textual evolution statuses from playerCoreStats.evolutions
+    if(playerCoreStats.evolutions){ 
+        if(playerCoreStats.evolutions["System Overcharge"]){
+            coreHTML += `<p><span class="stat-label">System Overcharge:</span><span class="stat-value">${playerCoreStats.evolutions["System Overcharge"]}</span></p>`;
+        }
+        if(playerCoreStats.evolutions["Vitality Surge"]){
+            coreHTML += `<p><span class="stat-label">Vitality Surge:</span><span class="stat-value">${playerCoreStats.evolutions["Vitality Surge"]}</span></p>`;
+        }
+        // Chameleon Plating is now only in Immunities section
+        if(playerCoreStats.evolutions["Evasive Maneuver"]){
+            coreHTML += `<p><span class="stat-label">Evasive Maneuver:</span><span class="stat-value">${playerCoreStats.evolutions["Evasive Maneuver"]}</span></p>`;
+        }
     }
-    if (playerData.abilityCritChance !== undefined && (playerData.abilityCritChance > 0 || playerData.abilityCritDamageMultiplier > 1.5)) {
-        coreHTML += `<p><span class="stat-label">Ability Crit Chance:</span><span class="stat-value">${formatPercent(playerData.abilityCritChance)}</span></p>`;
-        coreHTML += `<p><span class="stat-label">Ability Crit Damage:</span><span class="stat-value">${formatMultiplier(playerData.abilityCritDamageMultiplier)}</span></p>`;
+
+    const kineticLevelToDisplay = playerCoreStats.kineticConversionLevel || 0;
+    if(kineticLevelToDisplay > 0){
+        const KCL = kineticLevelToDisplay;
+        const initBonus = playerCoreStats.initialKineticDamageBonus || CONSTANTS.KINETIC_INITIAL_DAMAGE_BONUS;
+        const effectiveBonusPerLvl = playerCoreStats.effectiveKineticAdditionalDamageBonusPerLevel || CONSTANTS.DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL;
+        const baseChargeRate = playerCoreStats.baseKineticChargeRate || CONSTANTS.KINETIC_BASE_CHARGE_RATE;
+        const effectiveChargePerLvl = playerCoreStats.effectiveKineticChargeRatePerLevel || CONSTANTS.DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL;
+
+        const maxPotencyBonus = initBonus + (Math.max(0, KCL - 1) * effectiveBonusPerLvl);
+        const chargeRate = baseChargeRate + (KCL * effectiveChargePerLvl);
+        coreHTML += `<p><span class="stat-label">Kinetic Conversion:</span><span class="stat-value">Lvl ${KCL}, Dmg +${(maxPotencyBonus * 100).toFixed(0)}%, Rate ${chargeRate.toFixed(2)}/s</span></p>`;
+    } else {
+        coreHTML += `<p><span class="stat-label">Kinetic Conversion:</span><span class="stat-value">Not Acquired</span></p>`;
     }
-    statsCoreDiv.innerHTML = coreHTML;
-    statsUpgradesUl.innerHTML = '';
-    if (playerData.displayedUpgrades && playerData.displayedUpgrades.length > 0) {
-        playerData.displayedUpgrades.forEach(upg => { const li = document.createElement('li'); li.innerHTML = `<span class="stat-label">${upg.name}</span><span class="stat-value">${upg.description || 'Active'}</span>`; statsUpgradesUl.appendChild(li); });
-    } else { statsUpgradesUl.innerHTML = '<li><span style="color: #aaa; font-size:11px;">No upgrades acquired.</span></li>'; }
-    let existingBlockedHeader = pausePlayerStatsPanel.querySelector('#blockedEvolutionsHeader'); if (existingBlockedHeader) existingBlockedHeader.remove();
-    let existingBlockedList = pausePlayerStatsPanel.querySelector('#blockedEvolutionsList'); if (existingBlockedList) existingBlockedList.remove();
-    if (playerData.blockedEvolutionIds && playerData.blockedEvolutionIds.length > 0) {
-        const blockedHeader = document.createElement('h4'); blockedHeader.classList.add('stats-header'); blockedHeader.id = 'blockedEvolutionsHeader'; blockedHeader.textContent = 'Blocked Evolutions';
-        const blockedList = document.createElement('ul'); blockedList.id = 'blockedEvolutionsList'; blockedList.classList.add('stats-section'); blockedList.style.listStyleType = 'none'; blockedList.style.padding = '0'; blockedList.style.margin = '0 0 10px 0';
-        playerData.blockedEvolutionIds.forEach(id => { const li = document.createElement('li'); const evoDetail = CONSTANTS.evolutionChoicesMasterList?.find(e => e.id === id); const evoName = evoDetail ? evoDetail.text : id.replace(/([A-Z])/g, ' $1').trim(); li.innerHTML = `<span class="stat-label" style="color: #ff8080;">${evoName}</span><span class="stat-value">(Blocked)</span>`; blockedList.appendChild(li); });
-        const abilitiesHeader = statsAbilitiesDiv.previousElementSibling;
-        if (abilitiesHeader && abilitiesHeader.classList.contains('stats-header')) { abilitiesHeader.parentNode.insertBefore(blockedHeader, abilitiesHeader); abilitiesHeader.parentNode.insertBefore(blockedList, abilitiesHeader); }
-        else if(statsUpgradesUl.parentNode) { statsUpgradesUl.parentNode.appendChild(blockedHeader); statsUpgradesUl.parentNode.appendChild(blockedList); }
-    }
+    statsPlayerCoreDiv.innerHTML = coreHTML;
+    
+    // --- 🛡️ Immunities --- (Moved up)
     statsImmunitiesContainer.innerHTML = '';
-    if (playerData.immuneColorsList && playerData.immuneColorsList.length > 0) { playerData.immuneColorsList.forEach(color => { const s = document.createElement('div'); s.className = 'immunity-swatch-pause'; s.style.backgroundColor = color; s.title = getReadableColorNameFromUtils(color); statsImmunitiesContainer.appendChild(s); });}
+    if (immunities && immunities.length > 0) { immunities.forEach(color => { const s = document.createElement('div'); s.className = 'immunity-swatch-pause'; s.style.backgroundColor = color; s.title = getReadableColorNameFromUtils(color); statsImmunitiesContainer.appendChild(s); });}
     else { statsImmunitiesContainer.innerHTML = '<span style="color: #aaa; font-size:11px;">None</span>'; }
-    statsAbilitiesDiv.innerHTML = ''; let hasNumAbs = false;
-    if (playerData.formattedActiveAbilities && playerData.formattedActiveAbilities.length > 0) { playerData.formattedActiveAbilities.forEach(ab => { hasNumAbs = true; const p = document.createElement('p'); p.innerHTML = `<span class="stat-label">${ab.name} (Slot ${ab.slot}):</span><span class="stat-value">${ab.desc}</span>`; statsAbilitiesDiv.appendChild(p); });}
-    if (!hasNumAbs) { statsAbilitiesDiv.innerHTML = '<p><span style="color: #aaa; font-size:11px;">No numeric key abilities.</span></p>';}
-    statsMouseAbilitiesDiv.innerHTML = ''; let hasMouseAbs = false;
-    if (playerData.formattedMouseAbilities && playerData.formattedMouseAbilities.length > 0) { playerData.formattedMouseAbilities.forEach(ab => { hasMouseAbs = true; const p = document.createElement('p'); p.innerHTML = `<span class="stat-label">${ab.name}:</span><span class="stat-value">${ab.desc}</span>`; statsMouseAbilitiesDiv.appendChild(p); });}
-    if (!hasMouseAbs) { statsMouseAbilitiesDiv.innerHTML = '<p><span style="color: #aaa; font-size:11px;">No mouse abilities.</span></p>';}
+
+    // --- 🛠️ Gear ---
+    statsGearUl.innerHTML = '';
+    if (gear && gear.length > 0) {
+        gear.forEach(g => { const li = document.createElement('li'); li.innerHTML = `<span class="stat-label">${g.name}</span><span class="stat-value">${g.description || 'Active'}</span>`; statsGearUl.appendChild(li); });
+    } else { statsGearUl.innerHTML = '<li><span style="color: #aaa; font-size:11px;">No gear acquired.</span></li>'; }
+    
+    // --- 💡 Abilities (Combined) ---
+    statsAbilitiesCombinedDiv.innerHTML = '';
+    if (abilities && abilities.length > 0) {
+        abilities.forEach(ab => {
+            const p = document.createElement('p');
+            let damageText = "";
+            if (ab.damage && ab.damage !== "N/A") {
+                damageText = ` <span style="color:#ffccaa;">(${ab.damage})</span>`;
+            }
+            const descText = ab.desc || ab.description || 'Details N/A';
+            p.innerHTML = `<span class="stat-label">${ab.name}:</span><span class="stat-value">${descText}${damageText}</span>`;
+            statsAbilitiesCombinedDiv.appendChild(p);
+        });
+    } else { statsAbilitiesCombinedDiv.innerHTML = '<p><span style="color: #aaa; font-size:11px;">No abilities acquired.</span></p>';}
+
+    // --- Blocked Evolutions (if any) ---
+    const abilitiesHeaderElement = document.getElementById('abilitiesHeader');
+    let existingBlockedHeader = pausePlayerStatsPanel.querySelector('#blockedEvolutionsHeader'); 
+    if (existingBlockedHeader) existingBlockedHeader.remove();
+    let existingBlockedList = pausePlayerStatsPanel.querySelector('#blockedEvolutionsList'); 
+    if (existingBlockedList) existingBlockedList.remove();
+
+    if (blockedEvolutions && blockedEvolutions.length > 0) {
+        const blockedHeader = document.createElement('h4'); 
+        blockedHeader.classList.add('stats-header'); 
+        blockedHeader.id = 'blockedEvolutionsHeader'; 
+        blockedHeader.textContent = '🚫 Blocked Evolutions';
+        
+        const blockedListUl = document.createElement('ul'); 
+        blockedListUl.id = 'blockedEvolutionsList'; 
+        blockedListUl.classList.add('stats-section'); 
+        blockedListUl.style.listStyleType = 'none'; 
+        blockedListUl.style.padding = '0'; 
+        blockedListUl.style.margin = '0 0 10px 0';
+        
+        blockedEvolutions.forEach(nameOrObj => { 
+            const li = document.createElement('li'); 
+            const displayName = (typeof nameOrObj === 'object' && nameOrObj.text) ? nameOrObj.text : nameOrObj;
+            li.innerHTML = `<span class="stat-label" style="color: #ff8080;">${displayName}</span><span class="stat-value">(Blocked)</span>`; 
+            blockedListUl.appendChild(li); 
+        });
+        
+        if (abilitiesHeaderElement && abilitiesHeaderElement.parentNode) {
+            abilitiesHeaderElement.parentNode.insertBefore(blockedHeader, abilitiesHeaderElement);
+            abilitiesHeaderElement.parentNode.insertBefore(blockedListUl, abilitiesHeaderElement);
+        } else if (statsImmunitiesContainer.parentNode) { 
+            statsImmunitiesContainer.parentNode.appendChild(blockedHeader);
+            statsImmunitiesContainer.parentNode.appendChild(blockedListUl);
+        }
+    }
+
+    // --- 💀 Boss Encounters ---
     statsBossTiersDiv.innerHTML = '';
     if (bossTierData && bossTypeNamesFromSource && bossTypeKeysFromSource && bossTypeNamesFromSource.length > 0) {
         let encountered = false;

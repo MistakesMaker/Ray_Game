@@ -160,8 +160,7 @@ export class Player {
         this.aimAngle = 0;
         this.shootCooldownTimer = 0;
         this.immuneColorsList = [];
-        this.velX = 0;
-        this.velY = 0;
+        this.velX = 0; this.velY = 0;
         this.pickupAttractionLevel = 0;
         this.pickupAttractionRadius = 0;
         this.evolutionIntervalModifier = 1.0;
@@ -174,7 +173,7 @@ export class Player {
         this.hpPickupBonus = 0;
         this.abilityDamageMultiplier = 1.0;
         this.temporalEchoChance = 0.0;
-        this.globalCooldownReduction = 0.0; // <<< RESET
+        this.globalCooldownReduction = 0.0; 
         this.rayCritChance = 0.0;
         this.rayCritDamageMultiplier = 1.5;
         this.abilityCritChance = 0.0;
@@ -488,7 +487,13 @@ export class Player {
         const now = Date.now();
         const PREVIEW_MAX_RADIUS = 100; 
 
-        const actualRadius = snapshotPlayerData.finalRadius || PLAYER_BASE_RADIUS;
+        // Use snapshotPlayerData directly if it's the old flat format, 
+        // or snapshotPlayerData.playerDataForPreview if it's the new structured one.
+        // For drawing, we mostly care about visual properties.
+        const data = snapshotPlayerData.finalRadius !== undefined ? snapshotPlayerData : (snapshotPlayerData.playerDataForPreview || snapshotPlayerData.playerData || {});
+
+
+        const actualRadius = data.finalRadius || PLAYER_BASE_RADIUS;
         let displayScale = 1;
         if (actualRadius > PREVIEW_MAX_RADIUS) {
             displayScale = PREVIEW_MAX_RADIUS / actualRadius;
@@ -496,24 +501,16 @@ export class Player {
         const radius = actualRadius * displayScale;
 
 
-        const immuneColorsList = snapshotPlayerData.immuneColorsList || [];
-        const visualModifiers = snapshotPlayerData.visualModifiers || {};
+        const immuneColorsList = data.immuneColorsList || [];
+        const visualModifiers = data.visualModifiers || {};
         
-        let inferredHelmType = snapshotPlayerData.helmType || null; 
-
-        if (!inferredHelmType && snapshotPlayerData.displayedUpgrades && Array.isArray(snapshotPlayerData.displayedUpgrades)) {
-            if (snapshotPlayerData.displayedUpgrades.some(upg => upg.name === "Path of Harmony")) {
-                inferredHelmType = "perfectHarmony";
-            } else if (snapshotPlayerData.displayedUpgrades.some(upg => upg.name === "Path of Fury")) {
-                inferredHelmType = "berserkersEcho";
-            } else if (snapshotPlayerData.displayedUpgrades.some(upg => upg.name === "Path of Power (Offense)")) {
-                inferredHelmType = "ultimateConfiguration";
-            }
-        }
+        let inferredHelmType = data.helmType || null; 
+        // No need to infer from displayedUpgrades for old format here, as it complicates drawing.
+        // If helmType isn't directly in the snapshot, it won't be drawn.
         
-        const ablativeAnimTimer = snapshotPlayerData.ablativeAnimTimer !== undefined ? snapshotPlayerData.ablativeAnimTimer : now;
-        const momentumAnimTimer = snapshotPlayerData.momentumAnimTimer !== undefined ? snapshotPlayerData.momentumAnimTimer : now;
-        const naniteAnimTimer = snapshotPlayerData.naniteAnimTimer !== undefined ? snapshotPlayerData.naniteAnimTimer : now;
+        const ablativeAnimTimer = data.ablativeAnimTimer !== undefined ? data.ablativeAnimTimer : now;
+        const momentumAnimTimer = data.momentumAnimTimer !== undefined ? data.momentumAnimTimer : now;
+        const naniteAnimTimer = data.naniteAnimTimer !== undefined ? data.naniteAnimTimer : now;
 
 
         ctx.save();
@@ -527,7 +524,7 @@ export class Player {
             ctx.fillStyle = "rgba(255, 255, 200, 0.6)";
             ctx.strokeStyle = "gold"; ctx.lineWidth = 2 * displayScale;
             ctx.beginPath(); ctx.arc(0, -radius * 0.85, radius * 0.6, 0, Math.PI * 2, false);
-            const isHarmonizedSnapshot = false; 
+            const isHarmonizedSnapshot = false; // Old snapshots won't have this live state
             if (!isHarmonizedSnapshot) { 
                 ctx.globalAlpha = 0.3 + Math.abs(Math.sin(now / 300)) * 0.3;
                 ctx.fill();
@@ -536,24 +533,12 @@ export class Player {
                  ctx.fill(); 
             }
             ctx.stroke();
-
-            if (isHarmonizedSnapshot) { 
-                helmGlowRadius = (15 + Math.sin(now / 200) * 5) * displayScale;
-                helmGlowColor = "rgba(255, 255, 100, 0.7)";
-                ctx.shadowBlur = helmGlowRadius; ctx.shadowColor = helmGlowColor;
-                ctx.lineWidth = 2.5 * displayScale; ctx.strokeStyle = "rgba(255, 255, 180, 1)";
-                ctx.beginPath(); ctx.arc(0, -radius * 0.85, radius * 0.65, 0, Math.PI * 2, false);
-                ctx.stroke();
-                ctx.shadowBlur = 0; ctx.shadowColor = "transparent";
-            }
-
         } else if (inferredHelmType === "berserkersEcho") {
             ctx.fillStyle = "rgb(120, 20, 20)"; ctx.strokeStyle = "rgb(50, 0, 0)"; ctx.lineWidth = 1.5 * displayScale;
             
-            const currentHpSnapshot = typeof snapshotPlayerData.hp === 'number' ? snapshotPlayerData.hp : PLAYER_MAX_HP; 
-            const maxHpSnapshot = typeof snapshotPlayerData.maxHp === 'number' ? snapshotPlayerData.maxHp : PLAYER_MAX_HP; 
+            const currentHpSnapshot = typeof data.hp === 'number' ? data.hp : PLAYER_MAX_HP; 
+            const maxHpSnapshot = typeof data.maxHp === 'number' ? data.maxHp : PLAYER_MAX_HP; 
             const missingHpFactorSnapshot = maxHpSnapshot > 0 ? Math.max(0, (maxHpSnapshot - currentHpSnapshot) / maxHpSnapshot) : 0;
-
 
             if (missingHpFactorSnapshot > 0.05) {
                 helmGlowRadius = (5 + missingHpFactorSnapshot * 20) * displayScale;
@@ -643,7 +628,7 @@ export class Player {
 
         ctx.restore();
     }
-
+    // ... (rest of Player class remains the same) ...
     update(gameContext) {
         const { dt, keys, mouseX, mouseY, canvasWidth, canvasHeight, targets, activeBosses,
                 currentGrowthFactor,

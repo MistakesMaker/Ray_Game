@@ -642,17 +642,25 @@
     </div>
 
     <div id="pausePlayerStatsPanel">
-        <h4 class="stats-header" id="statsPanelTitle">Player Status</h4>
-        <div id="statsCore" class="stats-section"></div>
-        <h4 class="stats-header">Evolutions & Gear</h4>
-        <ul id="statsUpgradesList" class="stats-section" style="list-style-type: none; padding: 0; margin: 0;"></ul>
-        <h4 class="stats-header">Immunities</h4>
+        <!-- Overall Panel Title Removed -->
+        
+        <h4 class="stats-header" id="runStatsHeader">📊 Run Information</h4> 
+        <div id="statsRun" class="stats-section"></div>
+
+        <h4 class="stats-header" id="playerCoreStatsHeader">👤 Player Stats</h4>
+        <div id="statsPlayerCore" class="stats-section"></div>
+
+        <!-- Immunities Moved Before Gear -->
+        <h4 class="stats-header" id="immunitiesHeader">🛡️ Immunities</h4>
         <div id="statsImmunitiesContainer" class="stats-section stats-immunities"></div>
-        <h4 class="stats-header">Active Abilities</h4>
-        <div id="statsAbilities" class="stats-section"></div>
-        <h4 class="stats-header">Mouse Abilities</h4>
-        <div id="statsMouseAbilities" class="stats-section"></div>
-        <h4 class="stats-header">Boss Encounters</h4>
+
+        <h4 class="stats-header" id="gearHeader">🛠️ Gear</h4>
+        <ul id="statsGearList" class="stats-section" style="list-style-type: none; padding: 0; margin: 0;"></ul>
+        
+        <h4 class="stats-header" id="abilitiesHeader">💡 Abilities</h4>
+        <div id="statsAbilities" class="stats-section"></div> 
+        
+        <h4 class="stats-header" id="bossHeader">💀 Boss Encounters</h4>
         <div id="statsBossTiers" class="stats-section"></div>
     </div>
 
