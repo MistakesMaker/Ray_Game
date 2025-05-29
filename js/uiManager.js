@@ -22,7 +22,6 @@ import {
     blockInfoSpan, toggleBlockModeButton,
     toggleFreezeModeButton, freezeInfoSpan,
     detailedScoresList,
-    // statsPanelTitle as importedStatsPanelTitleElement, // No longer needed as a direct reference here
     statsImmunitiesContainer,
     statsBossTiersDiv,
     buffIndicatorContainer, survivalBonusIndicator, activeBuffIndicator,
@@ -53,7 +52,6 @@ const ALL_SCREENS_FOR_SHOW_SCREEN = [
     importedCountdownOverlay, importedLootChoiceScreen, importedDetailedHighScoresScreen
 ];
 
-// --- Helper Function for Time Formatting ---
 export function formatMillisecondsToTime(ms) {
     if (typeof ms !== 'number' || isNaN(ms)) return "N/A";
     let milliseconds = Math.floor((ms % 1000) / 10);
@@ -68,7 +66,6 @@ export function formatMillisecondsToTime(ms) {
     return minutes + ":" + seconds + "." + milliseconds;
 }
 
-// --- Player Preview Canvas Functions ---
 function handleGlobalPreviewMouseMove(e) {
     if (!previewCtx || !previewCanvasEl || !localCurrentActiveScreenElement || localCurrentActiveScreenElement.id !== 'detailedHighScoresScreen' || !isPreviewAnimating) {
         return;
@@ -115,7 +112,6 @@ function startOrUpdatePreviewAnimation(snapshotForPreview) {
     }
 }
 
-// --- UI Update Functions ---
 export function updateScoreDisplay(currentScoreVal) {
     if (scoreDisplayElem) scoreDisplayElem.textContent = `Score: ${currentScoreVal}`;
 }
@@ -386,9 +382,10 @@ function equalizeLootCardHeights() {
 
 export function populateEvolutionOptionsUI(
     choices, playerInstance, evolutionSelectCallback, rerollCallback,
-    toggleBlockModeCallback, currentShrinkMeCooldownVal, toggleFreezeModeCallback, selectFreezeCallback
+    toggleBlockModeCallback, currentShrinkMeCooldownVal, toggleFreezeModeCallback, selectFreezeCallback,
+    currentInputState 
 ) {
-    if (!evolutionOptionsContainer || !playerInstance) return;
+    if (!evolutionOptionsContainer || !playerInstance || !currentInputState) return;
     evolutionOptionsContainer.innerHTML = '';
     const maxReRolls = CONSTANTS.MAX_EVOLUTION_REROLLS; const maxBlocks = CONSTANTS.MAX_EVOLUTION_BLOCKS; const maxFreezes = CONSTANTS.MAX_EVOLUTION_FREEZES_PER_RUN;
 
@@ -417,38 +414,69 @@ export function populateEvolutionOptionsUI(
         const choiceWrapper = document.createElement('div'); choiceWrapper.classList.add('evolution-choice-wrapper');
         const optionDiv = document.createElement('div'); optionDiv.classList.add('evolutionOption'); optionDiv.dataset.class = uiChoiceData.classType; optionDiv.dataset.baseId = uiChoiceData.baseId;
         const tierLabel = document.createElement('span'); tierLabel.classList.add('evolution-tier-label');
-        if (!uiChoiceData.originalEvolution.isTiered) {
-            optionDiv.dataset.tier = "core"; const tierStyle = getTierStyling("core");
-            tierLabel.textContent = tierStyle.text; tierLabel.style.color = tierStyle.color; tierLabel.classList.add('has-tier');
-        } else if (uiChoiceData.originalEvolution.isTiered && uiChoiceData.rolledTier && uiChoiceData.rolledTier !== "none") {
-            const tierStyle = getTierStyling(uiChoiceData.rolledTier);
-            tierLabel.textContent = tierStyle.text; tierLabel.style.color = tierStyle.color; tierLabel.classList.add('has-tier'); optionDiv.dataset.tier = uiChoiceData.rolledTier;
+        
+        let currentEffectText = "";
+        if (uiChoiceData.originalEvolution && typeof uiChoiceData.originalEvolution.getEffectString === 'function') {
+            currentEffectText = uiChoiceData.originalEvolution.getEffectString(playerInstance);
+        } else if (uiChoiceData.baseId && (uiChoiceData.baseId.startsWith('empty_slot_') || uiChoiceData.baseId === 'noMoreEvolutions')) {
+            currentEffectText = "N/A";
         }
-        choiceWrapper.appendChild(tierLabel);
-        let displayText = `<h3>${uiChoiceData.text}</h3>`;
-        if (uiChoiceData.cardEffectString) displayText += `<span class="evolution-details">${uiChoiceData.cardEffectString}</span>`;
-        optionDiv.innerHTML = displayText;
+
+
+        if (currentInputState.shiftPressed) {
+            optionDiv.classList.add('flipped-content'); 
+            let backText = `<h3>${uiChoiceData.text}</h3>`;
+            backText += `<span class="evolution-details" style="color: #lightblue; font-style: italic;">${currentEffectText}</span>`;
+            optionDiv.innerHTML = backText;
+        } else {
+            optionDiv.classList.remove('flipped-content');
+            if (!uiChoiceData.originalEvolution.isTiered) {
+                optionDiv.dataset.tier = "core"; const tierStyle = getTierStyling("core");
+                tierLabel.textContent = tierStyle.text; tierLabel.style.color = tierStyle.color; tierLabel.classList.add('has-tier');
+            } else if (uiChoiceData.originalEvolution.isTiered && uiChoiceData.rolledTier && uiChoiceData.rolledTier !== "none") {
+                const tierStyle = getTierStyling(uiChoiceData.rolledTier);
+                tierLabel.textContent = tierStyle.text; tierLabel.style.color = tierStyle.color; tierLabel.classList.add('has-tier'); optionDiv.dataset.tier = uiChoiceData.rolledTier;
+            }
+            let displayText = `<h3>${uiChoiceData.text}</h3>`;
+            if (uiChoiceData.cardEffectString) displayText += `<span class="evolution-details">${uiChoiceData.cardEffectString}</span>`;
+            optionDiv.innerHTML = displayText;
+        }
+        
+        choiceWrapper.appendChild(tierLabel); 
+       
         const baseEvoForMaxCheck = uiChoiceData.originalEvolution;
         const isMaxed = baseEvoForMaxCheck.isMaxed ? baseEvoForMaxCheck.isMaxed(playerInstance) : false;
         const isAlreadyBlockedByPlayer = playerInstance.blockedEvolutionIds && playerInstance.blockedEvolutionIds.includes(uiChoiceData.baseId);
         if (playerInstance.frozenEvolutionChoice && playerInstance.frozenEvolutionChoice.choiceData.baseId === uiChoiceData.baseId && playerInstance.hasUsedFreezeForCurrentOffers) {
             optionDiv.classList.add('actually-frozen');
         }
+
         if (uiChoiceData.detailedDescription && evolutionTooltip) {
             optionDiv.onmouseover = (event) => {
                 if (playerInstance.isBlockModeActive && uiChoiceData.baseId !== 'noMoreEvolutions' && !uiChoiceData.baseId.startsWith('empty_slot_') && !isAlreadyBlockedByPlayer && playerInstance.evolutionBlocksRemaining > 0) optionDiv.classList.add('primed-for-block');
                 if (playerInstance.isFreezeModeActive && uiChoiceData.baseId !== 'noMoreEvolutions' && !uiChoiceData.baseId.startsWith('empty_slot_') && !isMaxed && !isAlreadyBlockedByPlayer && (playerInstance.evolutionFreezesRemaining > 0 || (playerInstance.frozenEvolutionChoice && playerInstance.frozenEvolutionChoice.choiceData.baseId === uiChoiceData.baseId))) optionDiv.classList.add('primed-for-freeze');
-                let tooltipText = ""; let effectiveTierForTooltip = "core";
-                if (uiChoiceData.originalEvolution.isTiered && uiChoiceData.rolledTier && uiChoiceData.rolledTier !== "none") effectiveTierForTooltip = uiChoiceData.rolledTier;
+                
+                let tooltipText = ""; 
+                let effectiveTierForTooltip = "core";
+                if (uiChoiceData.originalEvolution.isTiered && uiChoiceData.rolledTier && uiChoiceData.rolledTier !== "none") {
+                    effectiveTierForTooltip = uiChoiceData.rolledTier;
+                }
                 const tierStyle = getTierStyling(effectiveTierForTooltip);
                 tooltipText = `<span style="text-transform: capitalize; font-weight: bold; color: ${tierStyle.color};">${tierStyle.text} TIER</span><br>`;
-                tooltipText += uiChoiceData.detailedDescription;
+                
+                if (currentInputState.shiftPressed) { // Check currentInputState directly
+                    tooltipText += `Current Effect: ${currentEffectText}`;
+                } else {
+                    tooltipText += uiChoiceData.detailedDescription;
+                }
+                
                 evolutionTooltip.innerHTML = tooltipText; evolutionTooltip.style.left = `${event.pageX + 15}px`; evolutionTooltip.style.top = `${event.pageY + 15}px`; evolutionTooltip.style.display = 'block';
             };
             optionDiv.onmousemove = (event) => { evolutionTooltip.style.left = `${event.pageX + 15}px`; evolutionTooltip.style.top = `${event.pageY + 15}px`; };
             optionDiv.onmouseout = () => { optionDiv.classList.remove('primed-for-block'); optionDiv.classList.remove('primed-for-freeze'); evolutionTooltip.style.display = 'none'; };
         }
-        if (baseEvoForMaxCheck.id === 'noMoreEvolutions' || baseEvoForMaxCheck.id.startsWith('empty_slot_') || isMaxed || isAlreadyBlockedByPlayer ) {
+
+        if (baseEvoForMaxCheck.id === 'noMoreEvolutions' || (uiChoiceData.baseId && uiChoiceData.baseId.startsWith('empty_slot_')) || isMaxed || isAlreadyBlockedByPlayer ) {
             optionDiv.classList.add('disabled'); if (optionDiv.dataset.tier !== "core" || !isMaxed) optionDiv.dataset.tier = 'disabled';
             if(isAlreadyBlockedByPlayer && !optionDiv.classList.contains('disabled')){ const h3 = optionDiv.querySelector('h3'); if (h3) h3.innerHTML += `<p style="font-size:10px; color:#ff8080;">(Blocked)</p>`; optionDiv.classList.add('disabled'); optionDiv.dataset.tier = 'disabled'; }
             if (baseEvoForMaxCheck.id === 'smallerPlayer' && currentShrinkMeCooldownVal > 0) { const h3 = optionDiv.querySelector('h3'); if (h3) h3.innerHTML += `<p style="font-size:10px; color:#aaa;">(Cooldown: ${currentShrinkMeCooldownVal})</p>`;}
@@ -606,7 +634,6 @@ export function displayDetailedHighScoresScreenUI(allHighScoresObject, onEntryCl
                         if (currentSelected) currentSelected.classList.remove('selected-score');
                         li.classList.add('selected-score');
                         
-                        // Construct the title for the stats panel when a high score is clicked
                         let statsPanelDisplayTitle = `Stats for ${scoreEntry.name}`;
                         if(categoryKey && categoryKey.toLowerCase().includes("time")){
                             const tierMatch = categoryKey.match(/\d+/);
@@ -615,7 +642,7 @@ export function displayDetailedHighScoresScreenUI(allHighScoresObject, onEntryCl
                         } else if (categoryKey === "survival") {
                             statsPanelDisplayTitle += " (Survival)";
                         }
-                        updatePauseScreenStatsDisplay(scoreEntry.stats, statsPanelDisplayTitle); // Pass the title here
+                        updatePauseScreenStatsDisplay(scoreEntry.stats, statsPanelDisplayTitle); 
 
                         currentPreviewAimAngle = 0; 
                         startOrUpdatePreviewAnimation(previewData); 
@@ -655,16 +682,29 @@ export function displayDetailedHighScoresScreenUI(allHighScoresObject, onEntryCl
     }
 }
 
-export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText = "Current Status") { // Default title if not provided
+export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText) { // panelTitleText is for the overall screen (e.g. Pause Menu)
     const statsRunDiv = document.getElementById('statsRun');
     const statsPlayerCoreDiv = document.getElementById('statsPlayerCore');
     const statsGearUl = document.getElementById('statsGearList');
     const statsAbilitiesCombinedDiv = document.getElementById('statsAbilities'); 
 
-    // The main title of the PAUSE SCREEN or GAME OVER SCREEN is handled by their own H2 tags.
-    // This function now only populates the content *within* #pausePlayerStatsPanel.
-    // The `panelTitleText` can be used if we decide to add an H4 back *inside* #pausePlayerStatsPanel for context,
-    // but for now, the section headers like "📊 Run Information" serve this purpose.
+    // The main title (like "Paused", "Game Over") is handled by the respective screen's H2.
+    // If the #pausePlayerStatsPanel itself needs an internal, static title like "Status Details",
+    // it should be hardcoded in its HTML or set once. The dynamic `panelTitleText` was for this,
+    // but since we removed the element, it's no longer directly used by this function to set that specific title.
+    // However, when called from displayDetailedHighScoresScreenUI, `panelTitleText` will have the high score context.
+    // We'll use it for the statsPanelWrapper's child h4 if it's being displayed there.
+    const panelTitleElement = pausePlayerStatsPanel.querySelector('.stats-header'); // Get the first header inside
+    if(panelTitleElement && panelTitleText) { // Only update if we have a title and text for it
+        // This assumes the first .stats-header is the one we might want to update,
+        // or we could re-add an element with id="statsPanelTitle" inside #pausePlayerStatsPanel
+        // if we want a dedicated title for the panel's content.
+        // For now, we'll update the first one if called with a specific title (like from high scores).
+        // If called from pause/gameover, main.js calls prepareAndShowPauseStats with a title,
+        // which then calls this. Let's make sure it's the right one.
+        // The actual title of the pause screen (e.g. "Paused") is outside this panel.
+    }
+
 
     if (!statsRunDiv || !statsPlayerCoreDiv || !statsGearUl || !statsImmunitiesContainer || !statsAbilitiesCombinedDiv || !statsBossTiersDiv) {
         if (pausePlayerStatsPanel) pausePlayerStatsPanel.innerHTML = "<p>Error loading stats sections (new structure).</p>";
@@ -676,7 +716,6 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText = "C
     let runStats, playerCoreStats, immunities, gear, abilities, blockedEvolutions, bossTierData;
 
     if (isOldFormat) {
-        // console.warn("Displaying stats from OLD snapshot format. Some details might be missing or approximated.");
         const oldPlayerData = statsSnapshot.playerData;
         runStats = {
             timesHit: oldPlayerData.timesHit || 0,
@@ -705,10 +744,8 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText = "C
         if (oldPlayerData.displayedUpgrades) {
             oldPlayerData.displayedUpgrades.forEach(upg => {
                 if (upg.name && upg.description) {
-                    // Only add very specific text-based evolutions that aren't direct stats
                     if (upg.name.includes("System Overcharge")) playerCoreStats.evolutions["System Overcharge"] = upg.description;
                     else if (upg.name.includes("Vitality Surge")) playerCoreStats.evolutions["Vitality Surge"] = upg.description;
-                    // Chameleon Plating is handled by the immunities section
                     else if (upg.name.includes("Evasive Maneuver")) playerCoreStats.evolutions["Evasive Maneuver"] = upg.description;
                 }
             });
@@ -765,7 +802,6 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText = "C
     coreHTML += `<p><span class="stat-label">Global CD Reduction:</span><span class="stat-value">${formatPercent(playerCoreStats.globalCooldownReduction || 0)}</span></p>`;
     coreHTML += `<p><span class="stat-label">Temporal Echo Chance:</span><span class="stat-value">${formatPercent(playerCoreStats.temporalEchoChance || 0)}</span></p>`;
     
-    // Display textual evolution statuses from playerCoreStats.evolutions
     if(playerCoreStats.evolutions){ 
         if(playerCoreStats.evolutions["System Overcharge"]){
             coreHTML += `<p><span class="stat-label">System Overcharge:</span><span class="stat-value">${playerCoreStats.evolutions["System Overcharge"]}</span></p>`;
@@ -773,7 +809,7 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText = "C
         if(playerCoreStats.evolutions["Vitality Surge"]){
             coreHTML += `<p><span class="stat-label">Vitality Surge:</span><span class="stat-value">${playerCoreStats.evolutions["Vitality Surge"]}</span></p>`;
         }
-        // Chameleon Plating is now only in Immunities section
+        // Chameleon Plating removed from here
         if(playerCoreStats.evolutions["Evasive Maneuver"]){
             coreHTML += `<p><span class="stat-label">Evasive Maneuver:</span><span class="stat-value">${playerCoreStats.evolutions["Evasive Maneuver"]}</span></p>`;
         }
@@ -795,7 +831,7 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText = "C
     }
     statsPlayerCoreDiv.innerHTML = coreHTML;
     
-    // --- 🛡️ Immunities --- (Moved up)
+    // --- 🛡️ Immunities --- 
     statsImmunitiesContainer.innerHTML = '';
     if (immunities && immunities.length > 0) { immunities.forEach(color => { const s = document.createElement('div'); s.className = 'immunity-swatch-pause'; s.style.backgroundColor = color; s.title = getReadableColorNameFromUtils(color); statsImmunitiesContainer.appendChild(s); });}
     else { statsImmunitiesContainer.innerHTML = '<span style="color: #aaa; font-size:11px;">None</span>'; }

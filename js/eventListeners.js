@@ -1,6 +1,11 @@
 // js/eventListeners.js
 
 export function setupEventListeners(canvasElement, gameContext) {
+    // Initialize shiftPressed state if it doesn't exist
+    if (gameContext.inputState.shiftPressed === undefined) {
+        gameContext.inputState.shiftPressed = false;
+    }
+
     window.addEventListener('keydown', (e) => {
         if (!e.key) {
             return;
@@ -13,6 +18,18 @@ export function setupEventListeners(canvasElement, gameContext) {
         if (['w', 'a', 's', 'd'].includes(keyLower) && gameContext.inputState.keys.hasOwnProperty(keyLower) ) {
              gameContext.inputState.keys[keyLower] = true;
         }
+
+        // --- SHIFT KEY LOGIC for Evolution Screen ---
+        if (e.key === 'Shift') {
+            if (!gameContext.inputState.shiftPressed) { // Prevent re-triggering if already held
+                gameContext.inputState.shiftPressed = true;
+                if (gameContext.isEvolutionScreenActive && gameContext.isEvolutionScreenActive() && gameContext.callbacks.redrawEvolutionOptions) {
+                    gameContext.callbacks.redrawEvolutionOptions();
+                }
+            }
+        }
+        // --- END SHIFT KEY LOGIC ---
+
 
         // --- ESCAPE KEY LOGIC ---
         if (e.key === 'Escape') {
@@ -96,25 +113,31 @@ export function setupEventListeners(canvasElement, gameContext) {
         if (['w', 'a', 's', 'd'].includes(keyLower) && gameContext.inputState.keys.hasOwnProperty(keyLower) ) {
              gameContext.inputState.keys[keyLower] = false;
        }
+
+        // --- SHIFT KEY LOGIC for Evolution Screen ---
+        if (e.key === 'Shift') {
+            if (gameContext.inputState.shiftPressed) {
+                gameContext.inputState.shiftPressed = false;
+                if (gameContext.isEvolutionScreenActive && gameContext.isEvolutionScreenActive() && gameContext.callbacks.redrawEvolutionOptions) {
+                    gameContext.callbacks.redrawEvolutionOptions();
+                }
+            }
+        }
+        // --- END SHIFT KEY LOGIC ---
     });
 
     // --- MODIFIED MOUSEMOVE LISTENER: Attached to window ---
     window.addEventListener('mousemove', (e) => {
-        if (!canvasElement || !gameContext || !gameContext.inputState) return; // Basic safety checks
+        if (!canvasElement || !gameContext || !gameContext.inputState) return; 
 
         const rect = canvasElement.getBoundingClientRect();
-
-        // e.clientX and e.clientY are viewport coordinates
         const canvasMouseX = e.clientX - rect.left;
         const canvasMouseY = e.clientY - rect.top;
 
-        // Update inputState with coordinates relative to the canvas
         gameContext.inputState.mouseX = canvasMouseX;
         gameContext.inputState.mouseY = canvasMouseY;
     });
-    // --- END MODIFIED MOUSEMOVE LISTENER ---
 
-    // Original mousedown on canvas is fine because mousedown implies direct interaction with game/canvas features
     canvasElement.addEventListener('mousedown', (e) => {
         const playerInstance = gameContext.getPlayerInstance ? gameContext.getPlayerInstance() : null;
         const activeBuffsArray = gameContext.getActiveBuffNotificationsArray ? gameContext.getActiveBuffNotificationsArray() : [];
@@ -124,13 +147,12 @@ export function setupEventListeners(canvasElement, gameContext) {
             (!gameContext.isAnyPauseActiveExceptEsc || !gameContext.isAnyPauseActiveExceptEsc()) &&
             (!gameContext.isGamePausedByEsc || !gameContext.isGamePausedByEsc())
             ) {
-            if (e.button === 0) { // Left click
+            if (e.button === 0) { 
                 if (playerInstance.hasOmegaLaser) {
                     playerInstance.activateOmegaLaser(activeBuffsArray, abilityContext);
                     e.preventDefault();
                 }
-                // The default shooting is handled in player.update based on shootCooldownTimer, not directly on mousedown.
-            } else if (e.button === 2) { // Right click
+            } else if (e.button === 2) { 
                 if (playerInstance.hasShieldOvercharge) {
                     playerInstance.activateShieldOvercharge(activeBuffsArray, abilityContext);
                     e.preventDefault();
