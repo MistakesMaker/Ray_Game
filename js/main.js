@@ -463,19 +463,22 @@ function endGameInternal() {
             uiPausePlayerStatsPanel.style.display = 'block';
         }
     }
-
-    const showNameInput = GameState.getScore() > 0; 
-    const achievedPlacements = []; // Array to store strings like "Survival: 1st", "Nexus T1: 3rd"
-
+    
+    const achievedPlacements = []; 
     const allScores = getHighScores();
 
-    // Check Survival Score
-    const survivalScores = allScores.survival || [];
-    let tempSurvivalScores = [...survivalScores, { name: "TEMP", value: GameState.getScore(), runId: currentRunId }];
-    tempSurvivalScores.sort((a, b) => b.value - a.value);
-    const survivalRank = tempSurvivalScores.findIndex(s => s.runId === currentRunId);
-    if (GameState.getScore() > 0 && survivalRank !== -1 && survivalRank < CONSTANTS.MAX_ENTRIES_PER_CATEGORY) {
-        achievedPlacements.push(`Survival: ${survivalRank + 1}${getOrdinalSuffix(survivalRank + 1)}`);
+    // Check Survival Score eligibility first
+    const currentSurvivalScore = GameState.getScore();
+    let isNewSurvivalRecord = false;
+    if (currentSurvivalScore > 0) {
+        const survivalScores = allScores.survival || [];
+        let tempSurvivalScores = [...survivalScores, { name: "TEMP_PLAYER", value: currentSurvivalScore, runId: currentRunId }];
+        tempSurvivalScores.sort((a, b) => b.value - a.value);
+        const survivalRank = tempSurvivalScores.findIndex(s => s.runId === currentRunId);
+        if (survivalRank !== -1 && survivalRank < CONSTANTS.MAX_ENTRIES_PER_CATEGORY) {
+            achievedPlacements.push(`Survival: ${survivalRank + 1}${getOrdinalSuffix(survivalRank + 1)}`);
+            isNewSurvivalRecord = true; 
+        }
     }
     
     // Check Tier Times (only if recorded during this run)
@@ -487,16 +490,15 @@ function endGameInternal() {
         { key: "nexusWeaverTier5Time", label: "Nexus T5" },
     ];
 
+    let hasAchievedAnyTierRecord = false;
     tierCategories.forEach(catInfo => {
-        // Find if a "PENDING..." record exists for this tier *from the current run*
         const pendingEntryForThisRun = (allScores[catInfo.key] || []).find(entry => entry.runId === currentRunId && entry.name === "PENDING...");
-        
         if (pendingEntryForThisRun) {
+            hasAchievedAnyTierRecord = true; // Mark that at least one tier time was set this run
             const tierTimeValue = pendingEntryForThisRun.value;
             let tempTierScores = [...(allScores[catInfo.key] || [])]; 
-            // Remove the old pending entry if it exists, to re-evaluate rank with the actual time
             tempTierScores = tempTierScores.filter(s => !(s.runId === currentRunId && s.name === "PENDING..."));
-            tempTierScores.push({ name: "TEMP", value: tierTimeValue, runId: currentRunId });
+            tempTierScores.push({ name: "TEMP_PLAYER", value: tierTimeValue, runId: currentRunId });
             tempTierScores.sort((a, b) => a.value - b.value);
             
             const tierRank = tempTierScores.findIndex(s => s.runId === currentRunId);
@@ -506,6 +508,9 @@ function endGameInternal() {
         }
     });
 
+    // Show name input if EITHER a new survival record OR any tier record for this run was made OR score > 0 for general recording
+    const showNameInput = GameState.getScore() > 0;
+
     UIManager.displayGameOverScreenContent( 
         GameState.getScore(), 
         showNameInput, 
@@ -513,15 +518,13 @@ function endGameInternal() {
         (name) => { 
             currentPlayerNameForHighScores = name || "CHAMPION";
             
-            // Add survival score if eligible (re-check eligibility based on final list)
-            const finalAllScores = getHighScores(); // Get fresh list in case it changed
-            const finalSurvivalScores = finalAllScores.survival || [];
-            const finalLowTopSurvival = finalSurvivalScores.length < CONSTANTS.MAX_ENTRIES_PER_CATEGORY ? 0 : (finalSurvivalScores[finalSurvivalScores.length-1]?.value || 0);
-            if (GameState.getScore() > 0 && (GameState.getScore() > finalLowTopSurvival || finalSurvivalScores.length < CONSTANTS.MAX_ENTRIES_PER_CATEGORY)) {
-                 addHighScore("survival", currentPlayerNameForHighScores, GameState.getScore(), finalStatsSnapshot, currentRunId); 
+            // Add survival score if it was determined to be a new record
+            if (isNewSurvivalRecord) {
+                 addHighScore("survival", currentPlayerNameForHighScores, currentSurvivalScore, finalStatsSnapshot, currentRunId); 
             }
             
             // Always update any "PENDING" tier records from THIS run with the new name
+            // This will only affect those PENDING records that actually made the top 10 for their tier.
             if (typeof updatePendingTierRecordNames === 'function') {
                 updatePendingTierRecordNames(currentRunId, currentPlayerNameForHighScores);
             }
