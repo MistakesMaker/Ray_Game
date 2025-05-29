@@ -540,18 +540,47 @@ export function populateLootOptionsUI(choices, playerInstance, onSelectLootCallb
 }
 
 
-export function displayGameOverScreenContent(currentScoreVal, isNewHighScore, onSubmitScoreCallback, onRestartCallback, onMainMenuCallback) {
+export function displayGameOverScreenContent(currentScoreVal, showNameInput, achievedPlacements, onSubmitScoreCallback, onRestartCallback, onMainMenuCallback) {
     if (!importedGameOverScreen) return;
     importedGameOverScreen.innerHTML = '';
     const title = document.createElement('h2'); title.textContent = "Game Over!"; importedGameOverScreen.appendChild(title);
     const scoreP = document.createElement('p'); scoreP.textContent = `Your final score: ${currentScoreVal}`; importedGameOverScreen.appendChild(scoreP);
-    if (isNewHighScore) {
-        const newHSP = document.createElement('p'); newHSP.style.color = '#0f0'; newHSP.textContent = "New High Score!"; importedGameOverScreen.appendChild(newHSP);
+    
+    if (achievedPlacements && achievedPlacements.length > 0) {
+        const placementsTitle = document.createElement('p');
+        placementsTitle.style.color = '#0f0';
+        placementsTitle.style.fontWeight = 'bold';
+        placementsTitle.textContent = "New High Score Placements!";
+        importedGameOverScreen.appendChild(placementsTitle);
+
+        const placementsList = document.createElement('ul');
+        placementsList.style.listStyleType = 'none';
+        placementsList.style.paddingLeft = '0';
+        placementsList.style.marginTop = '5px';
+        achievedPlacements.forEach(placementText => {
+            const li = document.createElement('li');
+            li.textContent = placementText;
+            li.style.color = '#ccffcc';
+            li.style.fontSize = '14px';
+            placementsList.appendChild(li);
+        });
+        importedGameOverScreen.appendChild(placementsList);
+    } else if (showNameInput) { // If no specific placements, but eligible to submit name (e.g., for future tie-breaking or just to record the run)
+        const infoP = document.createElement('p');
+        infoP.textContent = "Enter your name to record your run.";
+        infoP.style.fontSize = '14px';
+        infoP.style.color = '#ccc';
+        importedGameOverScreen.appendChild(infoP);
+    }
+
+
+    if (showNameInput) { 
         const nameInput = document.createElement('input'); nameInput.type = 'text'; nameInput.id = 'playerNameInputGameOver'; nameInput.placeholder = "Enter name (max 10)"; nameInput.maxLength = 10; importedGameOverScreen.appendChild(nameInput);
-        const submitButton = document.createElement('button'); submitButton.id = 'submitScoreButtonGameOver'; submitButton.textContent = "Submit";
+        const submitButton = document.createElement('button'); submitButton.id = 'submitScoreButtonGameOver'; submitButton.textContent = "Submit Score";
         submitButton.onclick = () => { const name = (nameInput.value.trim().substring(0,10)||"ANON").toUpperCase(); onSubmitScoreCallback(name); submitButton.disabled = true; submitButton.textContent = "Submitted!"; };
         importedGameOverScreen.appendChild(submitButton);
     }
+    
     const restartButton = document.createElement('button'); restartButton.id = 'restartButtonGOScreen'; restartButton.textContent = "Play Again"; restartButton.onclick = onRestartCallback; importedGameOverScreen.appendChild(restartButton);
     const mainMenuButton = document.createElement('button'); mainMenuButton.id = 'mainMenuButtonGOScreen'; mainMenuButton.textContent = "Main Menu"; mainMenuButton.onclick = onMainMenuCallback; importedGameOverScreen.appendChild(mainMenuButton);
 }
