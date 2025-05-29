@@ -29,6 +29,47 @@ function rollTier() {
     return 'common';
 }
 
+// Helper to generate a single new offer, avoiding existing ones and blocked ones
+function generateSingleNewOffer(playerInstance, existingOfferBaseIds, additionalExclusionId = null) {
+    const exclusionList = [...playerInstance.blockedEvolutionIds, ...existingOfferBaseIds];
+    if (additionalExclusionId && !exclusionList.includes(additionalExclusionId)) {
+        exclusionList.push(additionalExclusionId);
+    }
+
+    const availableChoices = evolutionChoicesMasterList.filter(c => {
+        if (exclusionList.includes(c.id)) return false;
+        return !(c.isMaxed && c.isMaxed(playerInstance));
+    });
+
+    if (availableChoices.length > 0) {
+        const baseEvo = availableChoices[Math.floor(Math.random() * availableChoices.length)]; // Pick one randomly
+        let rolledTierIfApplicable = baseEvo.isTiered ? rollTier() : 'common';
+        const tierSpecificData = baseEvo.isTiered ? baseEvo.tiers[rolledTierIfApplicable] : baseEvo;
+
+        return {
+            baseId: baseEvo.id,
+            classType: baseEvo.classType,
+            rolledTier: baseEvo.isTiered ? rolledTierIfApplicable : null,
+            text: baseEvo.text,
+            detailedDescription: baseEvo.isTiered && tierSpecificData
+                ? (typeof tierSpecificData.description === 'function' ? tierSpecificData.description(playerInstance, rolledTierIfApplicable) : tierSpecificData.description)
+                : (typeof baseEvo.detailedDescription === 'function' ? baseEvo.detailedDescription(playerInstance) : baseEvo.detailedDescription),
+            applyEffect: baseEvo.isTiered && tierSpecificData ? tierSpecificData.apply : baseEvo.apply,
+            cardEffectString: (typeof baseEvo.getCardEffectString === 'function')
+                ? baseEvo.getCardEffectString(rolledTierIfApplicable, playerInstance)
+                : (baseEvo.getEffectString ? baseEvo.getEffectString(playerInstance) : 'Effect details vary'),
+            originalEvolution: baseEvo
+        };
+    }
+    // Fallback if no valid new offer can be generated
+    return {
+        baseId: `empty_slot_replacement`, classType: 'ability', text:"No More Options", rolledTier: null,
+        detailedDescription: "No further upgrades available for this slot.", applyEffect: ()=>{},
+        cardEffectString: "Unavailable", originalEvolution: { id: `empty_slot_replacement`, isMaxed: ()=>true, isTiered: false, getEffectString: (p) => "N/A" }
+    };
+}
+
+
 export function initializeEvolutionMasterList() {
     const allColors = GameState.getAllPossibleRayColors();
     if (!allColors || allColors.length === 0) {
@@ -86,7 +127,6 @@ export function initializeEvolutionMasterList() {
                 GameState.setShrinkMeCooldown(3);
                 return `Effective size reduced! Growth paused this cycle. (Cooldown: ${GameState.getShrinkMeCooldown()} evos)`;
             },
-            // getEffectString will be handled by playerDataManager to show "Taken xN"
             getEffectString: function(p) { return `Shrink Cooldown: ${GameState.getShrinkMeCooldown()} evolutions remaining. Player size is currently ${p ? p.radius.toFixed(1) : 'N/A'}.`; },
             getCardEffectString: function() { return `Reduce size, pause growth`; }
         },
@@ -100,7 +140,7 @@ export function initializeEvolutionMasterList() {
                 playerInstance.evolutionIntervalModifier = 0.70;
                 return `Evolution interval permanently reduced by 30%! (Now 70%)`;
             },
-            getEffectString: function(playerInstance) { // <<< MODIFIED
+            getEffectString: function(playerInstance) {
                 return (playerInstance && playerInstance.evolutionIntervalModifier <= 0.70) ? "Acquired" : "Not Acquired";
             },
             getCardEffectString: function() { return `Evo Interval: 70%`;}
@@ -133,7 +173,7 @@ export function initializeEvolutionMasterList() {
                 epic:      { description: `Increases HP regen by ${CONSTANTS.VITALITY_SURGE_TIER_BONUS.epic} HP/tick.`, apply: function(p) { p.hpRegenBonusFromEvolution += CONSTANTS.VITALITY_SURGE_TIER_BONUS.epic; }},
                 legendary: { description: `Increases HP regen by ${CONSTANTS.VITALITY_SURGE_TIER_BONUS.legendary} HP/tick.`, apply: function(p) { p.hpRegenBonusFromEvolution += CONSTANTS.VITALITY_SURGE_TIER_BONUS.legendary; }}
             },
-            getEffectString: function(playerInstance) { // <<< MODIFIED
+            getEffectString: function(playerInstance) {
                 const bonus = playerInstance ? playerInstance.hpRegenBonusFromEvolution : 0;
                 return bonus > 0 ? `+${bonus.toFixed(1)} HP/tick` : "No Bonus";
             },
@@ -222,7 +262,7 @@ export function initializeEvolutionMasterList() {
                 }
                 const maxPotencyBonus = playerInstance.initialKineticDamageBonus + (Math.max(0, KCL - 1) * playerInstance.effectiveKineticAdditionalDamageBonusPerLevel);
                 const chargeRate = playerInstance.baseKineticChargeRate + (KCL * playerInstance.effectiveKineticChargeRatePerLevel);
-                return `Lvl ${KCL}: Dmg +${(maxPotencyBonus * 100).toFixed(0)}%, Rate ${chargeRate.toFixed(2)}/s`; // Simplified
+                return `Lvl ${KCL}: Dmg +${(maxPotencyBonus * 100).toFixed(0)}%, Rate ${chargeRate.toFixed(2)}/s`;
             },
             getCardEffectString: function(tier, playerInstance) {
                  const KCL = playerInstance ? (playerInstance.kineticConversionLevel || 0) + 1 : 1;
@@ -415,7 +455,7 @@ export function generateEvolutionOffers(playerInstance) {
             if (!filledIndices[i]) {
                 if (shuffledAvailable.length > 0) {
                     const baseEvo = shuffledAvailable.shift();
-                    let rolledTierIfApplicable = baseEvo.isTiered ? rollTier() : 'common'; // Default to common if not tiered for cardEffectString
+                    let rolledTierIfApplicable = baseEvo.isTiered ? rollTier() : 'common';
                     const tierSpecificData = baseEvo.isTiered ? baseEvo.tiers[rolledTierIfApplicable] : baseEvo;
 
                     const offer = {
@@ -428,7 +468,7 @@ export function generateEvolutionOffers(playerInstance) {
                             : (typeof baseEvo.detailedDescription === 'function' ? baseEvo.detailedDescription(playerInstance) : baseEvo.detailedDescription),
                         applyEffect: baseEvo.isTiered && tierSpecificData ? tierSpecificData.apply : baseEvo.apply,
                         cardEffectString: (typeof baseEvo.getCardEffectString === 'function')
-                            ? baseEvo.getCardEffectString(rolledTierIfApplicable, playerInstance) // Pass tier even if not strictly tiered for consistency
+                            ? baseEvo.getCardEffectString(rolledTierIfApplicable, playerInstance)
                             : (baseEvo.getEffectString ? baseEvo.getEffectString(playerInstance) : 'Effect details vary'),
                         originalEvolution: baseEvo
                     };
@@ -459,18 +499,17 @@ export function generateEvolutionOffers(playerInstance) {
         if(!offers[2]) offers[2] = { baseId: `empty_slot_2`, classType: 'ability', text:"No More Options", rolledTier: null, detailedDescription: "N/A", applyEffect: ()=>{}, cardEffectString: "Unavailable", originalEvolution: { id: `empty_slot_2`, isMaxed: ()=>true, isTiered: false, getEffectString: (p) => "N/A" }};
     }
     for(let i=0; i < 3; i++) {
-        if (offers[i] === null) { // Should not happen with the above logic, but as a fallback
+        if (offers[i] === null) {
             offers[i] = { baseId: `empty_slot_${i}_fallback`, classType: 'ability', text:"No More Options", rolledTier: null, detailedDescription: "N/A", applyEffect: ()=>{}, cardEffectString: "Unavailable", originalEvolution: { id: `empty_slot_${i}_fallback`, isMaxed: ()=>true, isTiered: false, getEffectString: (p) => "N/A" }};
         }
     }
 
-    _currentlyDisplayedEvolutionOffers = offers.map(offer => ({...offer})); // Store a copy that includes originalEvolution
+    _currentlyDisplayedEvolutionOffers = offers.map(offer => ({...offer}));
     return offers;
 }
 
 
 export function getCurrentlyDisplayedOffers() {
-    // Return the internally stored offers. UIManager will directly use these.
     return _currentlyDisplayedEvolutionOffers;
 }
 
@@ -492,7 +531,6 @@ export function presentEvolutionUI(playerInstance, dependencies) {
     playerInstance.isBlockModeActive = false;
 
     const offers = generateEvolutionOffers(playerInstance);
-    // _currentlyDisplayedEvolutionOffers is now set by generateEvolutionOffers
 
     _dependencies.UIManager.populateEvolutionOptionsUI(
         _currentlyDisplayedEvolutionOffers,
@@ -513,7 +551,7 @@ export function redrawEvolutionOptionsWithShiftState(playerInstance) {
         return;
     }
      _dependencies.UIManager.populateEvolutionOptionsUI(
-        _currentlyDisplayedEvolutionOffers, // Use the already generated and stored offers
+        _currentlyDisplayedEvolutionOffers,
         playerInstance,
         (choice, index) => confirmEvolutionChoice(choice, index, playerInstance),
         () => handleEvolutionReRoll(playerInstance),
@@ -521,7 +559,7 @@ export function redrawEvolutionOptionsWithShiftState(playerInstance) {
         GameState.getShrinkMeCooldown(),
         () => toggleFreezeMode(playerInstance),
         (choice, index) => handleFreezeSelection(choice, index, playerInstance),
-        _dependencies.inputState // Crucially, pass the current inputState
+        _dependencies.inputState
     );
 }
 
@@ -537,7 +575,7 @@ function handleEvolutionReRoll(playerInstance) {
     playerInstance.frozenEvolutionChoice = null;
     playerInstance.hasUsedFreezeForCurrentOffers = false;
 
-    generateEvolutionOffers(playerInstance); // This updates _currentlyDisplayedEvolutionOffers
+    generateEvolutionOffers(playerInstance);
     _dependencies.UIManager.populateEvolutionOptionsUI(
         _currentlyDisplayedEvolutionOffers, playerInstance,
         (choice, index) => confirmEvolutionChoice(choice, index, playerInstance),
@@ -695,7 +733,14 @@ function handleBlockActionOnCard(baseIdToBlock, playerInstance) {
     const blockedCardIndex = _currentlyDisplayedEvolutionOffers.findIndex(offer => offer.baseId === baseIdToBlock);
 
     if (blockedCardIndex !== -1) {
-        generateEvolutionOffers(playerInstance); // Regenerate all offers to ensure valid replacements and update _currentlyDisplayedEvolutionOffers
+        // Get IDs of other offers to exclude them from the single new roll
+        const otherOfferIds = _currentlyDisplayedEvolutionOffers
+            .filter((_, idx) => idx !== blockedCardIndex)
+            .map(offer => offer.baseId);
+
+        // Generate just one new offer for the blocked slot
+        const newSingleOffer = generateSingleNewOffer(playerInstance, otherOfferIds, baseIdToBlock);
+        _currentlyDisplayedEvolutionOffers[blockedCardIndex] = newSingleOffer;
     }
 
     _dependencies.UIManager.populateEvolutionOptionsUI(
