@@ -386,9 +386,10 @@ export function populateEvolutionOptionsUI(
     currentInputState
 ) {
     if (!evolutionOptionsContainer || !playerInstance || !currentInputState) return;
-    evolutionOptionsContainer.innerHTML = '';
+    evolutionOptionsContainer.innerHTML = ''; // Clear previous cards first
     const maxReRolls = CONSTANTS.MAX_EVOLUTION_REROLLS; const maxBlocks = CONSTANTS.MAX_EVOLUTION_BLOCKS; const maxFreezes = CONSTANTS.MAX_EVOLUTION_FREEZES_PER_RUN;
 
+    // Reroll, Block, Freeze controls (these are outside the loop, so they are set once)
     if (rerollEvolutionButton && rerollInfoSpan) {
         rerollEvolutionButton.disabled = playerInstance.evolutionReRollsRemaining <= 0 || playerInstance.isFreezeModeActive || playerInstance.isBlockModeActive;
         rerollEvolutionButton.onclick = rerollCallback;
@@ -410,10 +411,49 @@ export function populateEvolutionOptionsUI(
         freezeInfoSpan.textContent = `Freezes left: ${playerInstance.evolutionFreezesRemaining || 0}/${maxFreezes}`;
     }
 
+    // Shift key prompt
+    let shiftPrompt = evolutionOptionsContainer.parentNode.querySelector('.shift-prompt-evo'); // Search within parent of container
+    if (!shiftPrompt && importedEvolutionScreen) { // Fallback to search in whole screen if not found in parent
+        shiftPrompt = importedEvolutionScreen.querySelector('.shift-prompt-evo');
+    }
+    if (!shiftPrompt && importedEvolutionScreen) { // If still not found, create and prepend to evolutionScreen
+        shiftPrompt = document.createElement('p');
+        shiftPrompt.classList.add('shift-prompt-evo');
+        shiftPrompt.style.textAlign = 'center';
+        shiftPrompt.style.fontSize = '13px';
+        shiftPrompt.style.color = '#a0b0d0';
+        shiftPrompt.style.width = '100%';
+        shiftPrompt.style.marginBottom = '15px'; // Placed above options container
+        shiftPrompt.style.order = "-1"; // Try to put it before the options flex container
+        if (evolutionOptionsContainer.parentNode) { // Insert before the options container
+            evolutionOptionsContainer.parentNode.insertBefore(shiftPrompt, evolutionOptionsContainer);
+        } else { // Fallback if container has no parent yet (should not happen if structure is as expected)
+            importedEvolutionScreen.insertBefore(shiftPrompt, importedEvolutionScreen.firstChild);
+        }
+    }
+    if (shiftPrompt) {
+        shiftPrompt.textContent = currentInputState.shiftPressed ? "Release Shift to see upgrade effects." : "Hold Shift to see current stats.";
+    }
+
+
     choices.forEach((uiChoiceData, index) => {
         const choiceWrapper = document.createElement('div'); choiceWrapper.classList.add('evolution-choice-wrapper');
         const optionDiv = document.createElement('div'); optionDiv.classList.add('evolutionOption'); optionDiv.dataset.class = uiChoiceData.classType; optionDiv.dataset.baseId = uiChoiceData.baseId;
+
+        // Always set the data-tier attribute for CSS styling
+        if (!uiChoiceData.originalEvolution.isTiered) {
+            optionDiv.dataset.tier = "core";
+        } else if (uiChoiceData.originalEvolution.isTiered && uiChoiceData.rolledTier && uiChoiceData.rolledTier !== "none") {
+            optionDiv.dataset.tier = uiChoiceData.rolledTier;
+        } else {
+            optionDiv.dataset.tier = 'disabled'; // Fallback if tier is unknown for a tiered item
+        }
+
         const tierLabel = document.createElement('span'); tierLabel.classList.add('evolution-tier-label');
+        const tierStyle = getTierStyling(optionDiv.dataset.tier);
+        tierLabel.textContent = tierStyle.text;
+        tierLabel.style.color = tierStyle.color;
+        tierLabel.classList.add('has-tier'); // Make it visible
 
         let currentEffectText = "";
         if (uiChoiceData.originalEvolution && typeof uiChoiceData.originalEvolution.getEffectString === 'function') {
@@ -430,13 +470,6 @@ export function populateEvolutionOptionsUI(
             optionDiv.innerHTML = backText;
         } else {
             optionDiv.classList.remove('flipped-content');
-            if (!uiChoiceData.originalEvolution.isTiered) {
-                optionDiv.dataset.tier = "core"; const tierStyle = getTierStyling("core");
-                tierLabel.textContent = tierStyle.text; tierLabel.style.color = tierStyle.color; tierLabel.classList.add('has-tier');
-            } else if (uiChoiceData.originalEvolution.isTiered && uiChoiceData.rolledTier && uiChoiceData.rolledTier !== "none") {
-                const tierStyle = getTierStyling(uiChoiceData.rolledTier);
-                tierLabel.textContent = tierStyle.text; tierLabel.style.color = tierStyle.color; tierLabel.classList.add('has-tier'); optionDiv.dataset.tier = uiChoiceData.rolledTier;
-            }
             let displayText = `<h3>${uiChoiceData.text}</h3>`;
             if (uiChoiceData.cardEffectString) displayText += `<span class="evolution-details">${uiChoiceData.cardEffectString}</span>`;
             optionDiv.innerHTML = displayText;
@@ -457,14 +490,10 @@ export function populateEvolutionOptionsUI(
                 if (playerInstance.isFreezeModeActive && uiChoiceData.baseId !== 'noMoreEvolutions' && !uiChoiceData.baseId.startsWith('empty_slot_') && !isMaxed && !isAlreadyBlockedByPlayer && (playerInstance.evolutionFreezesRemaining > 0 || (playerInstance.frozenEvolutionChoice && playerInstance.frozenEvolutionChoice.choiceData.baseId === uiChoiceData.baseId))) optionDiv.classList.add('primed-for-freeze');
 
                 let tooltipText = "";
-                let effectiveTierForTooltip = "core";
-                if (uiChoiceData.originalEvolution.isTiered && uiChoiceData.rolledTier && uiChoiceData.rolledTier !== "none") {
-                    effectiveTierForTooltip = uiChoiceData.rolledTier;
-                }
-                const tierStyle = getTierStyling(effectiveTierForTooltip);
-                tooltipText = `<span style="text-transform: capitalize; font-weight: bold; color: ${tierStyle.color};">${tierStyle.text} TIER</span><br>`;
+                const ttTierStyle = getTierStyling(optionDiv.dataset.tier); // Get tier from the div itself
+                tooltipText = `<span style="text-transform: capitalize; font-weight: bold; color: ${ttTierStyle.color};">${ttTierStyle.text} TIER</span><br>`;
 
-                if (currentInputState.shiftPressed) { // Check currentInputState directly
+                if (currentInputState.shiftPressed) {
                     tooltipText += `Current Effect: ${currentEffectText}`;
                 } else {
                     tooltipText += uiChoiceData.detailedDescription;
@@ -477,8 +506,9 @@ export function populateEvolutionOptionsUI(
         }
 
         if (baseEvoForMaxCheck.id === 'noMoreEvolutions' || (uiChoiceData.baseId && uiChoiceData.baseId.startsWith('empty_slot_')) || isMaxed || isAlreadyBlockedByPlayer ) {
-            optionDiv.classList.add('disabled'); if (optionDiv.dataset.tier !== "core" || !isMaxed) optionDiv.dataset.tier = 'disabled';
-            if(isAlreadyBlockedByPlayer && !optionDiv.classList.contains('disabled')){ const h3 = optionDiv.querySelector('h3'); if (h3) h3.innerHTML += `<p style="font-size:10px; color:#ff8080;">(Blocked)</p>`; optionDiv.classList.add('disabled'); optionDiv.dataset.tier = 'disabled'; }
+            optionDiv.classList.add('disabled');
+            optionDiv.dataset.tier = 'disabled'; // Ensure disabled cards get the disabled tier for styling
+            if(isAlreadyBlockedByPlayer && !optionDiv.classList.contains('disabled')){ const h3 = optionDiv.querySelector('h3'); if (h3) h3.innerHTML += `<p style="font-size:10px; color:#ff8080;">(Blocked)</p>`;}
             if (baseEvoForMaxCheck.id === 'smallerPlayer' && currentShrinkMeCooldownVal > 0) { const h3 = optionDiv.querySelector('h3'); if (h3) h3.innerHTML += `<p style="font-size:10px; color:#aaa;">(Cooldown: ${currentShrinkMeCooldownVal})</p>`;}
         } else {
             optionDiv.onclick = () => {
@@ -738,7 +768,7 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText) { /
                 if (upg.name && upg.description) {
                     if (upg.name.includes("System Overcharge")) playerCoreStats.evolutions["System Overcharge"] = upg.description;
                     else if (upg.name.includes("Vitality Surge")) playerCoreStats.evolutions["Vitality Surge"] = upg.description;
-                    else if (upg.name.includes("Evasive Maneuver") && typeof upg.level === 'number') { // Check for Evasive Maneuver specifically
+                    else if (upg.name.includes("Evasive Maneuver") && typeof upg.level === 'number') {
                         playerCoreStats.evolutions["Evasive Maneuver"] = upg.level;
                     }
                 }
