@@ -121,7 +121,8 @@ export function initializeEvolutionMasterList() {
                 return `${reductionPercent.toFixed(1)}% Total Dmg Reduction`;
             },
             getCardEffectString: function(tier) {
-                return `Reduce Dmg by ${CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS[tier]*100}%`;
+                // <<< MODIFIED HERE >>>
+                return `Reduce Dmg by ${Math.round(CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS[tier]*100)}%`;
             }
         },
         {
