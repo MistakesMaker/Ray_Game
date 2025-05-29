@@ -41,7 +41,7 @@ let localCurrentActiveScreenElement = null;
 let previewCanvasEl = null;
 let previewCtx = null;
 let currentPreviewAimAngle = 0;
-let lastPreviewPlayerDataSnapshot = null; 
+let lastPreviewPlayerDataSnapshot = null;
 let isPreviewAnimating = false;
 let globalPreviewMouseListenerAttached = false;
 
@@ -91,7 +91,7 @@ function playerPreviewAnimationLoop() {
     if (!isPreviewAnimating) return;
     if (!previewCtx || !previewCanvasEl) { isPreviewAnimating = false; return; }
     previewCtx.clearRect(0, 0, previewCanvasEl.width, previewCanvasEl.height);
-    if (lastPreviewPlayerDataSnapshot) { 
+    if (lastPreviewPlayerDataSnapshot) {
         if (playerPreviewPlaceholder) playerPreviewPlaceholder.style.display = 'none';
         Player.drawFromSnapshot(previewCtx, lastPreviewPlayerDataSnapshot, previewCanvasEl.width / 2, previewCanvasEl.height / 2, currentPreviewAimAngle);
     } else {
@@ -100,8 +100,8 @@ function playerPreviewAnimationLoop() {
     requestAnimationFrame(playerPreviewAnimationLoop);
 }
 
-function startOrUpdatePreviewAnimation(snapshotForPreview) { 
-    lastPreviewPlayerDataSnapshot = snapshotForPreview; 
+function startOrUpdatePreviewAnimation(snapshotForPreview) {
+    lastPreviewPlayerDataSnapshot = snapshotForPreview;
     if (snapshotForPreview && !isPreviewAnimating) {
         isPreviewAnimating = true;
         requestAnimationFrame(playerPreviewAnimationLoop);
@@ -284,7 +284,7 @@ export function updateKineticChargeUI(currentCharge, maxCharge, currentMaxPotenc
     if (kineticChargeTextElement) {
         if (currentCharge > 1) {
             const potencyBonusForCurrentCharge = currentMaxPotencyBonus * (currentCharge / maxCharge);
-            kineticChargeTextElement.textContent = `+${(potencyBonusForCurrentCharge * 100).toFixed(0)}% Dmg`;
+            kineticChargeTextElement.textContent = `${(potencyBonusForCurrentCharge * 100).toFixed(0)}% Dmg`;
         } else kineticChargeTextElement.textContent = '';
     }
 }
@@ -300,7 +300,7 @@ export function showScreen(screenElementToShow) {
             statsPanelWrapper.innerHTML = '';
             statsPanelWrapper.appendChild(pausePlayerStatsPanel);
         }
-        startOrUpdatePreviewAnimation(null); 
+        startOrUpdatePreviewAnimation(null);
     } else {
         if (pausePlayerStatsPanel && pausePlayerStatsPanel.parentElement !== document.body) {
              document.body.appendChild(pausePlayerStatsPanel);
@@ -308,8 +308,8 @@ export function showScreen(screenElementToShow) {
         if (screenElementToShow !== importedPauseScreen && screenElementToShow !== importedGameOverScreen) {
             if (pausePlayerStatsPanel) pausePlayerStatsPanel.style.display = 'none';
         }
-        if (isPreviewAnimating && localCurrentActiveScreenElement !== importedDetailedHighScoresScreen) { 
-            isPreviewAnimating = false; 
+        if (isPreviewAnimating && localCurrentActiveScreenElement !== importedDetailedHighScoresScreen) {
+            isPreviewAnimating = false;
         }
     }
 
@@ -383,7 +383,7 @@ function equalizeLootCardHeights() {
 export function populateEvolutionOptionsUI(
     choices, playerInstance, evolutionSelectCallback, rerollCallback,
     toggleBlockModeCallback, currentShrinkMeCooldownVal, toggleFreezeModeCallback, selectFreezeCallback,
-    currentInputState 
+    currentInputState
 ) {
     if (!evolutionOptionsContainer || !playerInstance || !currentInputState) return;
     evolutionOptionsContainer.innerHTML = '';
@@ -414,7 +414,7 @@ export function populateEvolutionOptionsUI(
         const choiceWrapper = document.createElement('div'); choiceWrapper.classList.add('evolution-choice-wrapper');
         const optionDiv = document.createElement('div'); optionDiv.classList.add('evolutionOption'); optionDiv.dataset.class = uiChoiceData.classType; optionDiv.dataset.baseId = uiChoiceData.baseId;
         const tierLabel = document.createElement('span'); tierLabel.classList.add('evolution-tier-label');
-        
+
         let currentEffectText = "";
         if (uiChoiceData.originalEvolution && typeof uiChoiceData.originalEvolution.getEffectString === 'function') {
             currentEffectText = uiChoiceData.originalEvolution.getEffectString(playerInstance);
@@ -424,7 +424,7 @@ export function populateEvolutionOptionsUI(
 
 
         if (currentInputState.shiftPressed) {
-            optionDiv.classList.add('flipped-content'); 
+            optionDiv.classList.add('flipped-content');
             let backText = `<h3>${uiChoiceData.text}</h3>`;
             backText += `<span class="evolution-details" style="color: #lightblue; font-style: italic;">${currentEffectText}</span>`;
             optionDiv.innerHTML = backText;
@@ -441,9 +441,9 @@ export function populateEvolutionOptionsUI(
             if (uiChoiceData.cardEffectString) displayText += `<span class="evolution-details">${uiChoiceData.cardEffectString}</span>`;
             optionDiv.innerHTML = displayText;
         }
-        
-        choiceWrapper.appendChild(tierLabel); 
-       
+
+        choiceWrapper.appendChild(tierLabel);
+
         const baseEvoForMaxCheck = uiChoiceData.originalEvolution;
         const isMaxed = baseEvoForMaxCheck.isMaxed ? baseEvoForMaxCheck.isMaxed(playerInstance) : false;
         const isAlreadyBlockedByPlayer = playerInstance.blockedEvolutionIds && playerInstance.blockedEvolutionIds.includes(uiChoiceData.baseId);
@@ -455,21 +455,21 @@ export function populateEvolutionOptionsUI(
             optionDiv.onmouseover = (event) => {
                 if (playerInstance.isBlockModeActive && uiChoiceData.baseId !== 'noMoreEvolutions' && !uiChoiceData.baseId.startsWith('empty_slot_') && !isAlreadyBlockedByPlayer && playerInstance.evolutionBlocksRemaining > 0) optionDiv.classList.add('primed-for-block');
                 if (playerInstance.isFreezeModeActive && uiChoiceData.baseId !== 'noMoreEvolutions' && !uiChoiceData.baseId.startsWith('empty_slot_') && !isMaxed && !isAlreadyBlockedByPlayer && (playerInstance.evolutionFreezesRemaining > 0 || (playerInstance.frozenEvolutionChoice && playerInstance.frozenEvolutionChoice.choiceData.baseId === uiChoiceData.baseId))) optionDiv.classList.add('primed-for-freeze');
-                
-                let tooltipText = ""; 
+
+                let tooltipText = "";
                 let effectiveTierForTooltip = "core";
                 if (uiChoiceData.originalEvolution.isTiered && uiChoiceData.rolledTier && uiChoiceData.rolledTier !== "none") {
                     effectiveTierForTooltip = uiChoiceData.rolledTier;
                 }
                 const tierStyle = getTierStyling(effectiveTierForTooltip);
                 tooltipText = `<span style="text-transform: capitalize; font-weight: bold; color: ${tierStyle.color};">${tierStyle.text} TIER</span><br>`;
-                
+
                 if (currentInputState.shiftPressed) { // Check currentInputState directly
                     tooltipText += `Current Effect: ${currentEffectText}`;
                 } else {
                     tooltipText += uiChoiceData.detailedDescription;
                 }
-                
+
                 evolutionTooltip.innerHTML = tooltipText; evolutionTooltip.style.left = `${event.pageX + 15}px`; evolutionTooltip.style.top = `${event.pageY + 15}px`; evolutionTooltip.style.display = 'block';
             };
             optionDiv.onmousemove = (event) => { evolutionTooltip.style.left = `${event.pageX + 15}px`; evolutionTooltip.style.top = `${event.pageY + 15}px`; };
@@ -535,7 +535,7 @@ export function displayGameOverScreenContent(currentScoreVal, showNameInput, ach
     importedGameOverScreen.innerHTML = '';
     const title = document.createElement('h2'); title.textContent = "Game Over!"; importedGameOverScreen.appendChild(title);
     const scoreP = document.createElement('p'); scoreP.textContent = `Your final score: ${currentScoreVal}`; importedGameOverScreen.appendChild(scoreP);
-    
+
     if (achievedPlacements && achievedPlacements.length > 0) {
         const placementsTitle = document.createElement('p');
         placementsTitle.style.color = '#0f0';
@@ -555,7 +555,7 @@ export function displayGameOverScreenContent(currentScoreVal, showNameInput, ach
             placementsList.appendChild(li);
         });
         importedGameOverScreen.appendChild(placementsList);
-    } else if (showNameInput) { 
+    } else if (showNameInput) {
         const infoP = document.createElement('p');
         infoP.textContent = "Enter your name to record your run.";
         infoP.style.fontSize = '14px';
@@ -564,13 +564,13 @@ export function displayGameOverScreenContent(currentScoreVal, showNameInput, ach
     }
 
 
-    if (showNameInput) { 
+    if (showNameInput) {
         const nameInput = document.createElement('input'); nameInput.type = 'text'; nameInput.id = 'playerNameInputGameOver'; nameInput.placeholder = "Enter name (max 10)"; nameInput.maxLength = 10; importedGameOverScreen.appendChild(nameInput);
         const submitButton = document.createElement('button'); submitButton.id = 'submitScoreButtonGameOver'; submitButton.textContent = "Submit Score";
         submitButton.onclick = () => { const name = (nameInput.value.trim().substring(0,10)||"ANON").toUpperCase(); onSubmitScoreCallback(name); submitButton.disabled = true; submitButton.textContent = "Submitted!"; };
         importedGameOverScreen.appendChild(submitButton);
     }
-    
+
     const restartButton = document.createElement('button'); restartButton.id = 'restartButtonGOScreen'; restartButton.textContent = "Play Again"; restartButton.onclick = onRestartCallback; importedGameOverScreen.appendChild(restartButton);
     const mainMenuButton = document.createElement('button'); mainMenuButton.id = 'mainMenuButtonGOScreen'; mainMenuButton.textContent = "Main Menu"; mainMenuButton.onclick = onMainMenuCallback; importedGameOverScreen.appendChild(mainMenuButton);
 }
@@ -625,15 +625,15 @@ export function displayDetailedHighScoresScreenUI(allHighScoresObject, onEntryCl
                 let dateString = scoreEntry.timestamp ? ` (${new Date(scoreEntry.timestamp).toLocaleDateString()})` : '';
                 const valueDisplay = isTimeBased ? formatMillisecondsToTime(scoreEntry.value) : scoreEntry.value.toLocaleString();
                 li.textContent = `${index + 1}. ${scoreEntry.name} - ${valueDisplay}${dateString}`;
-                
+
                 const previewData = scoreEntry.stats?.playerDataForPreview || scoreEntry.stats?.playerData || null;
 
-                if (scoreEntry.stats) { 
+                if (scoreEntry.stats) {
                     li.onclick = () => {
                         const currentSelected = detailedScoresList.querySelector('.selected-score');
                         if (currentSelected) currentSelected.classList.remove('selected-score');
                         li.classList.add('selected-score');
-                        
+
                         let statsPanelDisplayTitle = `Stats for ${scoreEntry.name}`;
                         if(categoryKey && categoryKey.toLowerCase().includes("time")){
                             const tierMatch = categoryKey.match(/\d+/);
@@ -642,10 +642,10 @@ export function displayDetailedHighScoresScreenUI(allHighScoresObject, onEntryCl
                         } else if (categoryKey === "survival") {
                             statsPanelDisplayTitle += " (Survival)";
                         }
-                        updatePauseScreenStatsDisplay(scoreEntry.stats, statsPanelDisplayTitle); 
+                        updatePauseScreenStatsDisplay(scoreEntry.stats, statsPanelDisplayTitle);
 
-                        currentPreviewAimAngle = 0; 
-                        startOrUpdatePreviewAnimation(previewData); 
+                        currentPreviewAimAngle = 0;
+                        startOrUpdatePreviewAnimation(previewData);
                         if (pausePlayerStatsPanel) pausePlayerStatsPanel.style.display = 'block';
                     };
                 } else {
@@ -661,7 +661,7 @@ export function displayDetailedHighScoresScreenUI(allHighScoresObject, onEntryCl
         renderScoresForCategory(event.target.value);
         localStorage.setItem('highScoreLastCategory', event.target.value);
     };
-    
+
     const lastSelectedCategory = localStorage.getItem('highScoreLastCategory');
     if (lastSelectedCategory && categories.find(c => c.value === lastSelectedCategory)) {
         highScoreCategorySelect.value = lastSelectedCategory;
@@ -675,7 +675,7 @@ export function displayDetailedHighScoresScreenUI(allHighScoresObject, onEntryCl
         const newBackButton = backButton.cloneNode(true);
         backButton.parentNode.replaceChild(newBackButton, backButton);
         newBackButton.onclick = () => {
-            isPreviewAnimating = false; 
+            isPreviewAnimating = false;
             startOrUpdatePreviewAnimation(null);
             onBackCallback();
         };
@@ -686,23 +686,15 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText) { /
     const statsRunDiv = document.getElementById('statsRun');
     const statsPlayerCoreDiv = document.getElementById('statsPlayerCore');
     const statsGearUl = document.getElementById('statsGearList');
-    const statsAbilitiesCombinedDiv = document.getElementById('statsAbilities'); 
+    const statsAbilitiesCombinedDiv = document.getElementById('statsAbilities');
 
-    // The main title (like "Paused", "Game Over") is handled by the respective screen's H2.
-    // If the #pausePlayerStatsPanel itself needs an internal, static title like "Status Details",
-    // it should be hardcoded in its HTML or set once. The dynamic `panelTitleText` was for this,
-    // but since we removed the element, it's no longer directly used by this function to set that specific title.
-    // However, when called from displayDetailedHighScoresScreenUI, `panelTitleText` will have the high score context.
-    // We'll use it for the statsPanelWrapper's child h4 if it's being displayed there.
-    const panelTitleElement = pausePlayerStatsPanel.querySelector('.stats-header'); // Get the first header inside
-    if(panelTitleElement && panelTitleText) { // Only update if we have a title and text for it
-        // This assumes the first .stats-header is the one we might want to update,
-        // or we could re-add an element with id="statsPanelTitle" inside #pausePlayerStatsPanel
-        // if we want a dedicated title for the panel's content.
-        // For now, we'll update the first one if called with a specific title (like from high scores).
-        // If called from pause/gameover, main.js calls prepareAndShowPauseStats with a title,
-        // which then calls this. Let's make sure it's the right one.
-        // The actual title of the pause screen (e.g. "Paused") is outside this panel.
+    const panelTitleElement = pausePlayerStatsPanel.querySelector('.stats-header');
+    if(panelTitleElement && panelTitleText && pausePlayerStatsPanel.parentElement === statsPanelWrapper) {
+        panelTitleElement.textContent = panelTitleText;
+    } else if (panelTitleElement) {
+        if (pausePlayerStatsPanel.parentElement === document.body) {
+             panelTitleElement.textContent = panelTitleText || "📊 Run Information";
+        }
     }
 
 
@@ -712,7 +704,7 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText) { /
     }
 
     const isOldFormat = statsSnapshot && statsSnapshot.playerData && !statsSnapshot.runStats;
-    
+
     let runStats, playerCoreStats, immunities, gear, abilities, blockedEvolutions, bossTierData;
 
     if (isOldFormat) {
@@ -720,9 +712,9 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText) { /
         runStats = {
             timesHit: oldPlayerData.timesHit || 0,
             totalDamageDealt: oldPlayerData.totalDamageDealt || 0,
-            gameplayTime: statsSnapshot.gameplayTimeData 
+            gameplayTime: statsSnapshot.gameplayTimeData
         };
-        playerCoreStats = { 
+        playerCoreStats = {
             hp: oldPlayerData.hp, maxHp: oldPlayerData.maxHp, finalRadius: oldPlayerData.finalRadius,
             damageTakenMultiplier: oldPlayerData.damageTakenMultiplier !== undefined ? oldPlayerData.damageTakenMultiplier : 1.0,
             rayDamageBonus: oldPlayerData.rayDamageBonus || 0,
@@ -734,19 +726,21 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText) { /
             abilityCritDamageMultiplier: oldPlayerData.abilityCritDamageMultiplier || 1.5,
             temporalEchoChance: oldPlayerData.temporalEchoChance || 0,
             globalCooldownReduction: oldPlayerData.globalCooldownReduction || 0,
-            kineticConversionLevel: oldPlayerData.kineticConversionLevelSnapshot || oldPlayerData.kineticConversionLevel || 0, 
+            kineticConversionLevel: oldPlayerData.kineticConversionLevelSnapshot || oldPlayerData.kineticConversionLevel || 0,
             initialKineticDamageBonus: oldPlayerData.initialKineticDamageBonus || CONSTANTS.KINETIC_INITIAL_DAMAGE_BONUS,
             effectiveKineticAdditionalDamageBonusPerLevel: oldPlayerData.effectiveKineticAdditionalDamageBonusPerLevel || CONSTANTS.DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL,
             baseKineticChargeRate: oldPlayerData.baseKineticChargeRate || CONSTANTS.KINETIC_BASE_CHARGE_RATE,
             effectiveKineticChargeRatePerLevel: oldPlayerData.effectiveKineticChargeRatePerLevel || CONSTANTS.DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL,
-            evolutions: {} 
+            evolutions: {}
         };
         if (oldPlayerData.displayedUpgrades) {
             oldPlayerData.displayedUpgrades.forEach(upg => {
                 if (upg.name && upg.description) {
                     if (upg.name.includes("System Overcharge")) playerCoreStats.evolutions["System Overcharge"] = upg.description;
                     else if (upg.name.includes("Vitality Surge")) playerCoreStats.evolutions["Vitality Surge"] = upg.description;
-                    else if (upg.name.includes("Evasive Maneuver")) playerCoreStats.evolutions["Evasive Maneuver"] = upg.description;
+                    else if (upg.name.includes("Evasive Maneuver") && typeof upg.level === 'number') { // Check for Evasive Maneuver specifically
+                        playerCoreStats.evolutions["Evasive Maneuver"] = upg.level;
+                    }
                 }
             });
         }
@@ -754,33 +748,41 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText) { /
         immunities = oldPlayerData.immuneColorsList || [];
         gear = (oldPlayerData.displayedUpgrades || []).filter(u => u.description && (u.description.toLowerCase().includes("path") || u.name.toLowerCase().includes("injectors") || u.name.toLowerCase().includes("sub-layer") || u.name.toLowerCase().includes("adaptive shield")));
         abilities = [
-            ...(oldPlayerData.formattedActiveAbilities || []), 
+            ...(oldPlayerData.formattedActiveAbilities || []),
             ...(oldPlayerData.formattedMouseAbilities || [])
         ];
         blockedEvolutions = oldPlayerData.blockedEvolutionIds || [];
         bossTierData = statsSnapshot.bossTierData;
 
-    } else if (statsSnapshot && statsSnapshot.runStats && statsSnapshot.playerCoreStats) { 
+    } else if (statsSnapshot && statsSnapshot.runStats && statsSnapshot.playerCoreStats) {
         ({ runStats, playerCoreStats, immunities, gear, abilities, blockedEvolutions, bossTierData } = statsSnapshot);
     } else {
         const noDataMsg = "<p><span style='color: #aaa; font-size:11px;'>Snapshot data incomplete.</span></p>";
-        statsRunDiv.innerHTML = noDataMsg; statsPlayerCoreDiv.innerHTML = noDataMsg; 
+        statsRunDiv.innerHTML = noDataMsg; statsPlayerCoreDiv.innerHTML = noDataMsg;
         statsGearUl.innerHTML = `<li>${noDataMsg.replace(/<p>|<\/p>/g, '')}</li>`;
         statsImmunitiesContainer.innerHTML = `<span>${noDataMsg.replace(/<p>|<\/p>/g, '')}</span>`;
         statsAbilitiesCombinedDiv.innerHTML = noDataMsg;
         statsBossTiersDiv.innerHTML = noDataMsg;
         return;
     }
-    
+
     const bossTypeNamesFromSource = CONSTANTS.standardBossTypeNames ? [...CONSTANTS.standardBossTypeNames, CONSTANTS.nexusWeaverBossName] : ["CHASER", "REFLECTOR", "SINGULARITY", "NEXUS WEAVER"];
     const bossTypeKeysFromSource = CONSTANTS.standardBossTypeKeys ? [...CONSTANTS.standardBossTypeKeys, CONSTANTS.nexusWeaverBossKey] : ["chaser", "reflector", "singularity", "nexusWeaver"];
-    
+
     const formatNum = (val, digits = 1) => (typeof val === 'number' && !isNaN(val) ? val.toFixed(digits) : 'N/A');
     const formatInt = (val) => (typeof val === 'number' && !isNaN(val) ? val.toString() : 'N/A');
     const formatPercent = (val) => (typeof val === 'number' && !isNaN(val) ? (val * 100).toFixed(0) + '%' : '0%');
-    const formatMultiplier = (val) => (typeof val === 'number' && !isNaN(val) ? 'x' + val.toFixed(2) : 'x1.00');
+    const formatBonusPercent = (val, baseValue = 1.0) => {
+        if (typeof val === 'number' && !isNaN(val) && Math.abs(val - baseValue) > 0.001) {
+            return `${((val - baseValue) * 100).toFixed(0)}%`;
+        } else if (typeof val === 'number' && !isNaN(val) && Math.abs(val - baseValue) <= 0.001) {
+            return '0%';
+        }
+        return 'N/A';
+    };
 
-    // --- 📊 Run Information --- 
+
+    // --- 📊 Run Information ---
     let runHTML = '';
     runHTML += `<p><span class="stat-label">Time Played:</span><span class="stat-value">${formatMillisecondsToTime(runStats.gameplayTime)}</span></p>`;
     runHTML += `<p><span class="stat-label">Times Hit:</span><span class="stat-value">${formatInt(runStats.timesHit)}</span></p>`;
@@ -792,26 +794,25 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText) { /
     coreHTML += `<p><span class="stat-label">Max HP:</span><span class="stat-value">${formatInt(playerCoreStats.maxHp)}</span></p>`;
     coreHTML += `<p><span class="stat-label">Player Size:</span><span class="stat-value">${formatNum(playerCoreStats.finalRadius)}</span></p>`;
     coreHTML += `<p><span class="stat-label">Damage Reduction:</span><span class="stat-value">${formatPercent(1 - (playerCoreStats.damageTakenMultiplier !== undefined ? playerCoreStats.damageTakenMultiplier : 1.0))}</span></p>`;
-    coreHTML += `<p><span class="stat-label">Ray Damage Bonus:</span><span class="stat-value">+${formatNum(playerCoreStats.rayDamageBonus || 0)}</span></p>`;
+    coreHTML += `<p><span class="stat-label">Ray Damage Bonus:</span><span class="stat-value">${formatNum(playerCoreStats.rayDamageBonus || 0)}</span></p>`;
     coreHTML += `<p><span class="stat-label">Ray Crit Chance:</span><span class="stat-value">${formatPercent(playerCoreStats.rayCritChance || 0)}</span></p>`;
-    coreHTML += `<p><span class="stat-label">Ray Crit Damage:</span><span class="stat-value">${formatMultiplier(playerCoreStats.rayCritDamageMultiplier || 1.5)}</span></p>`;
+    coreHTML += `<p><span class="stat-label">Ray Crit Damage:</span><span class="stat-value">${formatBonusPercent(playerCoreStats.rayCritDamageMultiplier || 1.5, 1.0)}</span></p>`;
     coreHTML += `<p><span class="stat-label">AOE Explosion Chance:</span><span class="stat-value">${formatPercent(playerCoreStats.chainReactionChance || 0)}</span></p>`;
-    coreHTML += `<p><span class="stat-label">Ability Damage Mult:</span><span class="stat-value">${formatMultiplier(playerCoreStats.abilityDamageMultiplier || 1.0)}</span></p>`;
+    coreHTML += `<p><span class="stat-label">Ability Damage Bonus:</span><span class="stat-value">${formatBonusPercent(playerCoreStats.abilityDamageMultiplier || 1.0, 1.0)}</span></p>`;
     coreHTML += `<p><span class="stat-label">Ability Crit Chance:</span><span class="stat-value">${formatPercent(playerCoreStats.abilityCritChance || 0)}</span></p>`;
-    coreHTML += `<p><span class="stat-label">Ability Crit Damage:</span><span class="stat-value">${formatMultiplier(playerCoreStats.abilityCritDamageMultiplier || 1.5)}</span></p>`;
+    coreHTML += `<p><span class="stat-label">Ability Crit Damage:</span><span class="stat-value">${formatBonusPercent(playerCoreStats.abilityCritDamageMultiplier || 1.5, 1.0)}</span></p>`;
     coreHTML += `<p><span class="stat-label">Global CD Reduction:</span><span class="stat-value">${formatPercent(playerCoreStats.globalCooldownReduction || 0)}</span></p>`;
     coreHTML += `<p><span class="stat-label">Temporal Echo Chance:</span><span class="stat-value">${formatPercent(playerCoreStats.temporalEchoChance || 0)}</span></p>`;
-    
-    if(playerCoreStats.evolutions){ 
+
+    if(playerCoreStats.evolutions){
         if(playerCoreStats.evolutions["System Overcharge"]){
             coreHTML += `<p><span class="stat-label">System Overcharge:</span><span class="stat-value">${playerCoreStats.evolutions["System Overcharge"]}</span></p>`;
         }
         if(playerCoreStats.evolutions["Vitality Surge"]){
             coreHTML += `<p><span class="stat-label">Vitality Surge:</span><span class="stat-value">${playerCoreStats.evolutions["Vitality Surge"]}</span></p>`;
         }
-        // Chameleon Plating removed from here
-        if(playerCoreStats.evolutions["Evasive Maneuver"]){
-            coreHTML += `<p><span class="stat-label">Evasive Maneuver:</span><span class="stat-value">${playerCoreStats.evolutions["Evasive Maneuver"]}</span></p>`;
+        if (typeof playerCoreStats.evolutions["Evasive Maneuver"] === 'number') {
+            coreHTML += `<p><span class="stat-label">Evasive Maneuver:</span><span class="stat-value">Taken x${playerCoreStats.evolutions["Evasive Maneuver"]}</span></p>`;
         }
     }
 
@@ -825,13 +826,13 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText) { /
 
         const maxPotencyBonus = initBonus + (Math.max(0, KCL - 1) * effectiveBonusPerLvl);
         const chargeRate = baseChargeRate + (KCL * effectiveChargePerLvl);
-        coreHTML += `<p><span class="stat-label">Kinetic Conversion:</span><span class="stat-value">Lvl ${KCL}, Dmg +${(maxPotencyBonus * 100).toFixed(0)}%, Rate ${chargeRate.toFixed(2)}/s</span></p>`;
+        coreHTML += `<p><span class="stat-label">Kinetic Conversion:</span><span class="stat-value">Lvl ${KCL}, Dmg ${formatBonusPercent(1 + maxPotencyBonus, 1.0)}, Rate ${chargeRate.toFixed(2)}/s</span></p>`;
     } else {
         coreHTML += `<p><span class="stat-label">Kinetic Conversion:</span><span class="stat-value">Not Acquired</span></p>`;
     }
     statsPlayerCoreDiv.innerHTML = coreHTML;
-    
-    // --- 🛡️ Immunities --- 
+
+    // --- 🛡️ Immunities ---
     statsImmunitiesContainer.innerHTML = '';
     if (immunities && immunities.length > 0) { immunities.forEach(color => { const s = document.createElement('div'); s.className = 'immunity-swatch-pause'; s.style.backgroundColor = color; s.title = getReadableColorNameFromUtils(color); statsImmunitiesContainer.appendChild(s); });}
     else { statsImmunitiesContainer.innerHTML = '<span style="color: #aaa; font-size:11px;">None</span>'; }
@@ -841,17 +842,17 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText) { /
     if (gear && gear.length > 0) {
         gear.forEach(g => { const li = document.createElement('li'); li.innerHTML = `<span class="stat-label">${g.name}</span><span class="stat-value">${g.description || 'Active'}</span>`; statsGearUl.appendChild(li); });
     } else { statsGearUl.innerHTML = '<li><span style="color: #aaa; font-size:11px;">No gear acquired.</span></li>'; }
-    
+
     // --- 💡 Abilities (Combined) ---
     statsAbilitiesCombinedDiv.innerHTML = '';
     if (abilities && abilities.length > 0) {
         abilities.forEach(ab => {
             const p = document.createElement('p');
             let damageText = "";
-            if (ab.damage && ab.damage !== "N/A") {
+            if (ab.damage && ab.damage.trim() !== "") {
                 damageText = ` <span style="color:#ffccaa;">(${ab.damage})</span>`;
             }
-            const descText = ab.desc || ab.description || 'Details N/A';
+            const descText = ab.description || 'Details N/A';
             p.innerHTML = `<span class="stat-label">${ab.name}:</span><span class="stat-value">${descText}${damageText}</span>`;
             statsAbilitiesCombinedDiv.appendChild(p);
         });
@@ -859,35 +860,35 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText) { /
 
     // --- Blocked Evolutions (if any) ---
     const abilitiesHeaderElement = document.getElementById('abilitiesHeader');
-    let existingBlockedHeader = pausePlayerStatsPanel.querySelector('#blockedEvolutionsHeader'); 
+    let existingBlockedHeader = pausePlayerStatsPanel.querySelector('#blockedEvolutionsHeader');
     if (existingBlockedHeader) existingBlockedHeader.remove();
-    let existingBlockedList = pausePlayerStatsPanel.querySelector('#blockedEvolutionsList'); 
+    let existingBlockedList = pausePlayerStatsPanel.querySelector('#blockedEvolutionsList');
     if (existingBlockedList) existingBlockedList.remove();
 
     if (blockedEvolutions && blockedEvolutions.length > 0) {
-        const blockedHeader = document.createElement('h4'); 
-        blockedHeader.classList.add('stats-header'); 
-        blockedHeader.id = 'blockedEvolutionsHeader'; 
+        const blockedHeader = document.createElement('h4');
+        blockedHeader.classList.add('stats-header');
+        blockedHeader.id = 'blockedEvolutionsHeader';
         blockedHeader.textContent = '🚫 Blocked Evolutions';
-        
-        const blockedListUl = document.createElement('ul'); 
-        blockedListUl.id = 'blockedEvolutionsList'; 
-        blockedListUl.classList.add('stats-section'); 
-        blockedListUl.style.listStyleType = 'none'; 
-        blockedListUl.style.padding = '0'; 
+
+        const blockedListUl = document.createElement('ul');
+        blockedListUl.id = 'blockedEvolutionsList';
+        blockedListUl.classList.add('stats-section');
+        blockedListUl.style.listStyleType = 'none';
+        blockedListUl.style.padding = '0';
         blockedListUl.style.margin = '0 0 10px 0';
-        
-        blockedEvolutions.forEach(nameOrObj => { 
-            const li = document.createElement('li'); 
+
+        blockedEvolutions.forEach(nameOrObj => {
+            const li = document.createElement('li');
             const displayName = (typeof nameOrObj === 'object' && nameOrObj.text) ? nameOrObj.text : nameOrObj;
-            li.innerHTML = `<span class="stat-label" style="color: #ff8080;">${displayName}</span><span class="stat-value">(Blocked)</span>`; 
-            blockedListUl.appendChild(li); 
+            li.innerHTML = `<span class="stat-label" style="color: #ff8080;">${displayName}</span><span class="stat-value">(Blocked)</span>`;
+            blockedListUl.appendChild(li);
         });
-        
+
         if (abilitiesHeaderElement && abilitiesHeaderElement.parentNode) {
             abilitiesHeaderElement.parentNode.insertBefore(blockedHeader, abilitiesHeaderElement);
             abilitiesHeaderElement.parentNode.insertBefore(blockedListUl, abilitiesHeaderElement);
-        } else if (statsImmunitiesContainer.parentNode) { 
+        } else if (statsImmunitiesContainer.parentNode) {
             statsImmunitiesContainer.parentNode.appendChild(blockedHeader);
             statsImmunitiesContainer.parentNode.appendChild(blockedListUl);
         }

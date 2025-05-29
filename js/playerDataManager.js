@@ -10,48 +10,10 @@ import { getReadableColorName as getReadableColorNameFromUtils } from './utils.j
 
 function getFormattedAbilitiesForStats(playerInstance, bossLootPoolRef) {
     if (!playerInstance || !bossLootPoolRef) return [];
-    let formattedAbilities = [];
+    let mouseAbilities = [];
+    let numericAbilities = [];
 
-    // Numeric Key Abilities
-    if (playerInstance.activeAbilities) {
-        for (const slotKey in playerInstance.activeAbilities) {
-            const abilityData = playerInstance.activeAbilities[slotKey];
-            if (abilityData && abilityData.id) {
-                const definition = bossLootPoolRef.find(l => l.id === abilityData.id && l.type === 'ability');
-                if (definition) {
-                    let baseCooldown = definition.cooldown;
-                    let currentDamage = "N/A"; // Default, ability might not do damage
-
-                    // Apply Ultimate Configuration penalty for numeric abilities
-                    if (playerInstance.hasUltimateConfigurationHelm) {
-                        baseCooldown *= 1.5;
-                    }
-                     // Apply global percentage reduction
-                    let effectiveCooldown = baseCooldown * (1.0 - (playerInstance.globalCooldownReduction || 0));
-                    effectiveCooldown = Math.max(baseCooldown * 0.1, effectiveCooldown); // Ensure min 10%
-
-                    let desc = `CD: ${(effectiveCooldown / 1000).toFixed(1)}s`;
-                    // if (definition.duration) { // <<< MODIFICATION: Commented out or removed duration
-                    //     desc += `, Dur: ${(definition.duration / 1000).toFixed(1)}s`;
-                    // }
-                    // Add damage if applicable (example for EMP, could be extended)
-                    if (definition.id === "empBurst") currentDamage = "Clears Rays"; // Special case description
-                    // For miniGravityWell, damage comes from launched rays, not direct.
-                    if (definition.id === "teleport") currentDamage = "Immunity"; // Special case description
-
-
-                    formattedAbilities.push({
-                        name: `${definition.name} (Slot ${slotKey})`,
-                        description: desc,
-                        damage: currentDamage, // Store damage/effect
-                        isMouseAbility: false
-                    });
-                }
-            }
-        }
-    }
-
-    // Mouse Abilities
+    // --- Process Mouse Abilities First ---
     if (playerInstance.hasOmegaLaser) {
         let baseCooldown = CONSTANTS.OMEGA_LASER_COOLDOWN;
         let effectiveCooldown = baseCooldown * (1.0 - (playerInstance.globalCooldownReduction || 0));
@@ -60,10 +22,10 @@ function getFormattedAbilitiesForStats(playerInstance, bossLootPoolRef) {
         let damagePerTick = CONSTANTS.OMEGA_LASER_DAMAGE_PER_TICK * (playerInstance.abilityDamageMultiplier || 1.0);
         if (playerInstance.hasUltimateConfigurationHelm) damagePerTick *= 2;
 
-        formattedAbilities.push({
+        mouseAbilities.push({
             name: "Omega Laser (LMB)",
-            description: `CD: ${(effectiveCooldown / 1000).toFixed(1)}s`, // Duration not typically shown for channeled abilities here
-            damage: `${damagePerTick.toFixed(1)}/tick`,
+            description: `CD: ${(effectiveCooldown / 1000).toFixed(1)}s`,
+            damage: `${damagePerTick.toFixed(1)}/tick`, // Damage is key here
             isMouseAbility: true
         });
     }
@@ -72,15 +34,50 @@ function getFormattedAbilitiesForStats(playerInstance, bossLootPoolRef) {
         let effectiveCooldown = baseCooldown * (1.0 - (playerInstance.globalCooldownReduction || 0));
         effectiveCooldown = Math.max(baseCooldown * 0.1, effectiveCooldown);
 
-        formattedAbilities.push({
+        mouseAbilities.push({
             name: "Shield Overcharge (RMB)",
-            // Duration for Shield Overcharge IS relevant as it's a timed buff, so we keep it.
-            description: `CD: ${(effectiveCooldown / 1000).toFixed(1)}s, Dur: ${(CONSTANTS.SHIELD_OVERCHARGE_DURATION / 1000).toFixed(1)}s`,
-            damage: "Invulnerability, Heal: " + CONSTANTS.SHIELD_OVERCHARGE_HEAL_PER_RAY + "/ray",
+            description: `CD: ${(effectiveCooldown / 1000).toFixed(1)}s, Dur: ${(CONSTANTS.SHIELD_OVERCHARGE_DURATION / 1000).toFixed(1)}s`, // Duration is important for this buff
+            damage: `Heal: ${CONSTANTS.SHIELD_OVERCHARGE_HEAL_PER_RAY}/ray`, // Keep Heal, remove (Invulnerability)
             isMouseAbility: true
         });
     }
-    return formattedAbilities;
+
+    // --- Process Numeric Key Abilities ---
+    if (playerInstance.activeAbilities) {
+        const slotOrder = ['1', '2', '3']; // Ensure consistent order
+        for (const slotKey of slotOrder) {
+            const abilityData = playerInstance.activeAbilities[slotKey];
+            if (abilityData && abilityData.id) {
+                const definition = bossLootPoolRef.find(l => l.id === abilityData.id && l.type === 'ability');
+                if (definition) {
+                    let baseCooldown = definition.cooldown;
+                    let currentEffectDescription = ""; // Changed from currentDamage
+
+                    if (playerInstance.hasUltimateConfigurationHelm) {
+                        baseCooldown *= 1.5;
+                    }
+                    let effectiveCooldown = baseCooldown * (1.0 - (playerInstance.globalCooldownReduction || 0));
+                    effectiveCooldown = Math.max(baseCooldown * 0.1, effectiveCooldown);
+
+                    let desc = `CD: ${(effectiveCooldown / 1000).toFixed(1)}s`;
+
+                    // Specific effect descriptions, removing what's not needed
+                    if (definition.id === "empBurst") currentEffectDescription = ""; // No extra text
+                    else if (definition.id === "teleport") currentEffectDescription = ""; // No extra text, duration removed
+                    else if (definition.id === "miniGravityWell") currentEffectDescription = ""; // No extra text, duration removed
+
+                    numericAbilities.push({
+                        name: `${definition.name} (Slot ${slotKey})`,
+                        description: desc,
+                        damage: currentEffectDescription, // Use this for the concise effect note if any
+                        isMouseAbility: false
+                    });
+                }
+            }
+        }
+    }
+    // Combine in the desired order: LMB, RMB, 1, 2, 3
+    return [...mouseAbilities, ...numericAbilities];
 }
 
 
@@ -191,11 +188,15 @@ export function createFinalStatsSnapshot(playerInstance, bossTiers, bossLootPool
     };
 
     masterEvolutionListWithFunctions.forEach(evo => {
-        if (evo.level > 0 ||
+        if (evo.id === 'smallerPlayer') { // <<< MODIFICATION: Handle smallerPlayer (Evasive Maneuver) differently
+            if (evo.level > 0) {
+                playerCoreStats.evolutions[evo.text] = evo.level; // Store the level (times taken)
+            }
+        } else if (evo.level > 0 ||
             (evo.id === 'systemOvercharge' && playerInstance.evolutionIntervalModifier < 1.0) ||
             (evo.id === 'colorImmunity')) {
             if (typeof evo.getEffectString === 'function') {
-                if (evo.id === 'colorImmunity' || evo.id === 'systemOvercharge' || evo.id === 'smallerPlayer' || evo.id === 'vitalitySurge' || evo.id === 'kineticConversion') {
+                if (evo.id === 'colorImmunity' || evo.id === 'systemOvercharge' || evo.id === 'vitalitySurge' || evo.id === 'kineticConversion') {
                      playerCoreStats.evolutions[evo.text] = evo.getEffectString(playerInstance);
                 }
             }
