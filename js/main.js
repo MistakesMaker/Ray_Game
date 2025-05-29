@@ -455,16 +455,23 @@ function endGameInternal() {
             uiPausePlayerStatsPanel.style.display = 'block';
         }
     }
-    const hs = getHighScores();
-    const survivalScores = hs.survival || [];
-    const lowTopSurvival = survivalScores.length < CONSTANTS.MAX_ENTRIES_PER_CATEGORY ? 0 : (survivalScores[survivalScores.length-1]?.value || 0);
-    const isNewSurvivalHS = GameState.getScore() > 0 && (GameState.getScore() > lowTopSurvival || survivalScores.length < CONSTANTS.MAX_ENTRIES_PER_CATEGORY);
 
-    UIManager.displayGameOverScreenContent( GameState.getScore(), isNewSurvivalHS,
+    // <<< MODIFIED LOGIC FOR HIGH SCORE SUBMISSION >>>
+    const canSubmitScore = GameState.getScore() > 0; // Player can submit if score is greater than 0
+
+    UIManager.displayGameOverScreenContent( GameState.getScore(), canSubmitScore, // Pass true if they *can* submit
         (name) => { 
-            currentPlayerNameForHighScores = name || "CHAMPION"; 
-            addHighScore("survival", currentPlayerNameForHighScores, GameState.getScore(), finalStatsSnapshot, currentRunId); 
-            // <<< Update any "PENDING" tier records from THIS run with the new name
+            currentPlayerNameForHighScores = name || "CHAMPION";
+            
+            // Check if eligible for survival high score
+            const hs = getHighScores();
+            const survivalScores = hs.survival || [];
+            const lowTopSurvival = survivalScores.length < CONSTANTS.MAX_ENTRIES_PER_CATEGORY ? 0 : (survivalScores[survivalScores.length-1]?.value || 0);
+            if (GameState.getScore() > 0 && (GameState.getScore() > lowTopSurvival || survivalScores.length < CONSTANTS.MAX_ENTRIES_PER_CATEGORY)) {
+                 addHighScore("survival", currentPlayerNameForHighScores, GameState.getScore(), finalStatsSnapshot, currentRunId); 
+            }
+            
+            // Update any "PENDING" tier records from THIS run with the new name
             if (typeof updatePendingTierRecordNames === 'function') {
                 updatePendingTierRecordNames(currentRunId, currentPlayerNameForHighScores);
             }
