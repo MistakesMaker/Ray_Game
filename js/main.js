@@ -7,7 +7,7 @@ import * as UIManager from './uiManager.js';
 import { getHighScores, addHighScore, updatePendingTierRecordNames } from './highScoreManager.js';
 import { initGameLoop, startGameLoop, stopGameLoop } from './gameLoop.js';
 import * as EvolutionManager from './evolutionManager.js';
-import * as LootManager from './lootManager.js'; // Already imported, good.
+import * as LootManager from './lootManager.js';
 import { createFinalStatsSnapshot } from './playerDataManager.js';
 import {
     initializeGameLogic as importedInitializeGameLogic,
@@ -168,6 +168,8 @@ function evolutionCycleConcludedCallback(uiSelectedChoice) {
 }
 
 function lootSelectionConcludedCallback(chosenUpgrade, playerInstance, dependencies) {
+    // console.log("[MainJS LootSelect CBK] Start. Chosen Upgrade:", chosenUpgrade ? chosenUpgrade.name : "None", "Player Aegis Flag:", playerInstance ? playerInstance.hasAegisPathHelm : "N/A Player");
+
     if (!playerInstance) {
         GameState.setGamePausedForLootChoice(false);
         orchestrateScreenChange(null);
@@ -178,33 +180,49 @@ function lootSelectionConcludedCallback(chosenUpgrade, playerInstance, dependenc
     GameState.setPostPopupImmunityTimer(CONSTANTS.POST_POPUP_IMMUNITY_DURATION * 0.75);
 
     orchestrateScreenChange(null);
+    // console.log("[MainJS LootSelect CBK] After orchestrateScreenChange(null). Player Aegis Flag:", playerInstance.hasAegisPathHelm);
+
     UIManager.updateActiveBuffIndicator(playerInstance, GameState.getPostPopupImmunityTimer(), GameState.getPostDamageImmunityTimer());
     UIManager.updateAbilityCooldownUI(playerInstance);
 
     const currentBossManager = gameLogicGetBossManagerFunc ? gameLogicGetBossManagerFunc() : null;
     if (GameState.isEvolutionPendingAfterBoss()) {
-        const currentPlayer = gameLogicGetPlayerFunc();
-        const currentEvoThreshold = lastEvolutionScore + (CONSTANTS.EVOLUTION_SCORE_INTERVAL * (currentPlayer ? currentPlayer.evolutionIntervalModifier : 1.0));
-        if (currentPlayer && GameState.getScore() >= currentEvoThreshold) {
+        // console.log("[MainJS LootSelect CBK] Evolution is pending after boss.");
+        const currentPlayerForEvo = gameLogicGetPlayerFunc();
+        const currentEvoThreshold = lastEvolutionScore + (CONSTANTS.EVOLUTION_SCORE_INTERVAL * (currentPlayerForEvo ? currentPlayerForEvo.evolutionIntervalModifier : 1.0));
+        if (currentPlayerForEvo && GameState.getScore() >= currentEvoThreshold) {
+            // console.log("[MainJS LootSelect CBK] Triggering evolution. Player Aegis Flag before evo trigger:", currentPlayerForEvo.hasAegisPathHelm);
             triggerEvolutionInternal(true);
         } else {
             GameState.setEvolutionPendingAfterBoss(false);
+            // console.log("[MainJS LootSelect CBK] Evolution not triggered, pending flag cleared.");
         }
     } else {
         if (currentBossManager && currentBossManager.isBossInQueue() && !currentBossManager.isBossWarningActiveProp() && !GameState.isAnyPauseActive()) {
+            // console.log("[MainJS LootSelect CBK] Processing boss spawn queue.");
             currentBossManager.processBossSpawnQueue(getGameContextForBossManager(LootManager));
         }
     }
+    // console.log("[MainJS LootSelect CBK] End. Player Aegis Flag:", playerInstance.hasAegisPathHelm);
 }
 
 function pathSelectionConcludedCallback(chosenPathBuff, playerInstance, dependencies) {
-    if (!playerInstance) { return; }
+    // console.log("[MainJS PathSelect CBK] Start. Chosen Path:", chosenPathBuff ? chosenPathBuff.name : "None", "Player Aegis Flag:", playerInstance ? playerInstance.hasAegisPathHelm : "N/A Player");
+
+    if (!playerInstance) {
+        // console.error("[MainJS PathSelect CBK] No player instance!");
+        GameState.setGamePausedForLootChoice(false);
+        orchestrateScreenChange(null);
+        return;
+    }
 
     const activeBuffs = gameLogicGetActiveBuffsFunc ? gameLogicGetActiveBuffsFunc() : [];
     if (chosenPathBuff && dependencies && activeBuffs) {
         activeBuffs.push({ text: `${chosenPathBuff.name} Chosen!`, timer: CONSTANTS.BUFF_NOTIFICATION_DURATION });
     }
+    // console.log("[MainJS PathSelect CBK] Player Aegis Flag AFTER activeBuffs (should be set by LootManager):", playerInstance.hasAegisPathHelm);
     lootSelectionConcludedCallback(chosenPathBuff, playerInstance, dependencies);
+    // console.log("[MainJS PathSelect CBK] End. Player Aegis Flag:", playerInstance.hasAegisPathHelm);
 }
 
 
@@ -247,7 +265,6 @@ function triggerEvolutionInternal(isScoreBased = true) {
 function redrawEvolutionOptionsInternal() {
     const currentPlayer = gameLogicGetPlayerFunc ? gameLogicGetPlayerFunc() : null;
     if (currentPlayer && GameState.isGamePausedForEvolution()) {
-        // Pass all necessary dependencies, including inputState
         EvolutionManager.redrawEvolutionOptionsWithShiftState(currentPlayer);
     }
 }
@@ -360,6 +377,14 @@ function updateShootIntervalAndGameState() {
 }
 
 function orchestrateScreenChange(screenToShow) {
+    // const playerInstance = gameLogicGetPlayerFunc ? gameLogicGetPlayerFunc() : null;
+    // console.log(
+    //     "[MainJS Orchestrate] Changing to screen:", screenToShow ? screenToShow.id : "Game Screen",
+    //     ". Current Player Aegis Flag:", playerInstance ? playerInstance.hasAegisPathHelm : "N/A Player",
+    //     "Game Running:", GameState.isGameRunning(),
+    //     "Game Over:", GameState.isGameOver(),
+    //     "Any Pause Active:", GameState.isAnyPauseActive()
+    // );
     currentActiveScreenMain = screenToShow;
     let shouldStopCoreGameLoop = false;
 
@@ -370,12 +395,19 @@ function orchestrateScreenChange(screenToShow) {
     else if (screenToShow === startScreen || screenToShow === settingsScreen || screenToShow === gameOverScreen || screenToShow === detailedHighScoresScreen) {
         shouldStopCoreGameLoop = true;
     } else if (screenToShow === null) { // Game screen
+        // console.log("[MainJS Orchestrate] Unpausing popups for Game Screen.");
         GameState.setGamePausedForEvolution(false); GameState.setGamePausedForFreeUpgrade(false);
         GameState.setGamePausedForLootChoice(false);
     }
 
-    if (shouldStopCoreGameLoop && GameState.isGameRunning() && !GameState.isGameOver()) stopGameLoop();
-    else if (!shouldStopCoreGameLoop && GameState.isGameRunning() && !GameState.isGameOver() && gameLogicUpdateFunc && gameLogicDrawFunc) startGameLoop(gameLogicUpdateFunc, gameLogicDrawFunc);
+    if (shouldStopCoreGameLoop && GameState.isGameRunning() && !GameState.isGameOver()) {
+        // console.log("[MainJS Orchestrate] Stopping game loop.");
+        stopGameLoop();
+    }
+    else if (!shouldStopCoreGameLoop && GameState.isGameRunning() && !GameState.isGameOver() && gameLogicUpdateFunc && gameLogicDrawFunc) {
+        // console.log("[MainJS Orchestrate] Ensuring game loop is running for game screen/popups.");
+        startGameLoop(gameLogicUpdateFunc, gameLogicDrawFunc);
+    }
 
     UIManager.showScreen(screenToShow);
     applyMusicPlayStateWrapper();
@@ -383,6 +415,7 @@ function orchestrateScreenChange(screenToShow) {
 
 
 function initGame() {
+    // console.log("[MainJS] initGame called. Resetting core game state.");
     GameState.resetCoreGameState();
     EvolutionManager.initializeEvolutionMasterList();
     EvolutionManager.resetEvolutionLevels();
@@ -403,9 +436,10 @@ function initGame() {
         handleFullHealthHeartPickup: handleFullHealthHeartPickupInternal,
     };
 
-    if (initializeGameLogicFunc) initializeGameLogicFunc(gameCanvasElement, inputState, mainCallbacksForLogic, CONSTANTS.PLAYER_SPEED_BASE);
-    else { console.error("FATAL: gameLogic.js's initializeGameLogicFunc is not available!"); return; }
-    if (resetGameLogicStateFunc) resetGameLogicStateFunc();
+    if (initializeGameLogicFunc) {
+        // console.log("[MainJS] Calling initializeGameLogicFunc.");
+        initializeGameLogicFunc(gameCanvasElement, inputState, mainCallbacksForLogic, CONSTANTS.PLAYER_SPEED_BASE);
+    } else { console.error("FATAL: gameLogic.js's initializeGameLogicFunc is not available!"); return; }
 
 
     GameState.setGameRunning(true);
@@ -417,6 +451,7 @@ function initGame() {
 
     const currentPlayer = gameLogicGetPlayerFunc();
     if (currentPlayer) {
+        // console.log("[MainJS initGame] Player instance exists after init. Aegis Flag:", currentPlayer.hasAegisPathHelm);
         UIManager.updateHealthDisplay(currentPlayer.hp, currentPlayer.maxHp);
         UIManager.updateBuffIndicator(currentPlayer.immuneColorsList);
         UIManager.updateKineticChargeUI(currentPlayer.kineticCharge, currentPlayer.kineticChargeConsumption,
@@ -451,7 +486,6 @@ function endGameInternal() {
     if (currentPlayer && currentPlayer.isFiringOmegaLaser) stopSound(omegaLaserSound);
 
     const currentBossManager = gameLogicGetBossManagerFunc ? gameLogicGetBossManagerFunc() : null;
-    // Pass LootManager to createFinalStatsSnapshot
     const finalStatsSnapshot = createFinalStatsSnapshot(currentPlayer, currentBossManager ? currentBossManager.bossTiers : {}, LootManager.getBossLootPoolReference(), LootManager);
 
 
@@ -538,32 +572,28 @@ function endGameInternal() {
 }
 
 function togglePauseMenu() {
-    // Condition to check if any popup or uninterruptible state is active
     if (GameState.isGameOver() || GameState.getIsCountingDownToResume() || GameState.isGamePausedForEvolution() || GameState.isGamePausedForFreeUpgrade() || GameState.isGamePausedForLootChoice()) {
         return;
     }
 
     const currentPlayer = gameLogicGetPlayerFunc();
-    if (!currentPlayer && !GameState.isGamePausedByEsc()) { // Only log if trying to pause without player
-        console.warn("togglePauseMenu: No player instance found, cannot pause.");
+    if (!currentPlayer && !GameState.isGamePausedByEsc()) {
+        // console.warn("togglePauseMenu: No player instance found, cannot pause.");
         return;
     }
 
 
-    if (!GameState.isGamePausedByEsc()) { // If not currently paused by ESC, then pause the game
-        // Robustly clear any other potential pop-up states before pausing with ESC
-        // This is a safeguard, though orchestrateScreenChange(null) should handle these.
+    if (!GameState.isGamePausedByEsc()) {
         GameState.setGamePausedForEvolution(false);
         GameState.setGamePausedForFreeUpgrade(false);
         GameState.setGamePausedForLootChoice(false);
-        // GameState.setIsCountingDownToResume(false); // This should already be false if we passed the initial check
 
-        if(currentPlayer) { // These modes are only relevant if there's a player
+        if(currentPlayer) {
              currentPlayer.isBlockModeActive = false;
              currentPlayer.isFreezeModeActive = false;
         }
         prepareAndShowPauseStats("Paused");
-        orchestrateScreenChange(pauseScreen); // This will set GameState.setGamePausedByEsc(true);
+        orchestrateScreenChange(pauseScreen);
         if(uiPausePlayerStatsPanel) {
             if (uiPausePlayerStatsPanel.parentElement !== document.body && UIManager.getCurrentActiveScreen() !== detailedHighScoresScreen) {
                 document.body.appendChild(uiPausePlayerStatsPanel);
@@ -574,7 +604,7 @@ function togglePauseMenu() {
                 uiPausePlayerStatsPanel.style.display = 'block';
             }
         }
-    } else { // If already paused by ESC, then resume the game
+    } else {
         if(uiPausePlayerStatsPanel) uiPausePlayerStatsPanel.style.display = 'none';
         startResumeCountdownInternal();
     }
@@ -583,7 +613,7 @@ function togglePauseMenu() {
 function startResumeCountdownInternal() {
     if(uiPausePlayerStatsPanel) uiPausePlayerStatsPanel.style.display = 'none';
     const currentPlayer = gameLogicGetPlayerFunc();
-    GameState.setGamePausedByEsc(true); GameState.setIsCountingDownToResume(true); // isGamePausedByEsc remains true during countdown
+    GameState.setGamePausedByEsc(true); GameState.setIsCountingDownToResume(true);
     orchestrateScreenChange(countdownOverlay);
     let countVal = 3;
     if(currentPlayer) { currentPlayer.isBlockModeActive = false; currentPlayer.isFreezeModeActive = false;}
@@ -593,7 +623,7 @@ function startResumeCountdownInternal() {
         countVal--; if (countdownOverlay) countdownOverlay.textContent = countVal > 0 ? countVal.toString() : '';
         if (countVal <= 0) {
             clearInterval(GameState.getResumeCountdownTimerId()); GameState.setResumeCountdownTimerId(null);
-            GameState.setIsCountingDownToResume(false); GameState.setGamePausedByEsc(false); // Fully unpause here
+            GameState.setIsCountingDownToResume(false); GameState.setGamePausedByEsc(false);
             orchestrateScreenChange(null);
         }
     }, 1000));
@@ -602,10 +632,10 @@ function startResumeCountdownInternal() {
 
 function prepareAndShowPauseStats(contextualTitle) {
     const currentPlayer = gameLogicGetPlayerFunc();
+    // console.log("[MainJS prepareAndShowPauseStats] Player Aegis Flag:", currentPlayer ? currentPlayer.hasAegisPathHelm : "N/A Player");
     const currentBossManager = gameLogicGetBossManagerFunc ? gameLogicGetBossManagerFunc() : null;
-    // Pass LootManager to createFinalStatsSnapshot
     const statsSnapshot = createFinalStatsSnapshot(currentPlayer, currentBossManager ? currentBossManager.bossTiers : {}, LootManager.getBossLootPoolReference(), LootManager);
-    UIManager.updatePauseScreenStatsDisplay(statsSnapshot, contextualTitle); // Pass the contextual title
+    UIManager.updatePauseScreenStatsDisplay(statsSnapshot, contextualTitle);
 }
 
 function showDetailedHighScores() {
@@ -639,13 +669,17 @@ function applyMusicPlayStateWrapper() {
 }
 
 function showStartScreenWithUpdatesInternal() {
+    // console.log("[MainJS] showStartScreenWithUpdatesInternal called.");
     GameState.setGameRunning(false); GameState.setGameOver(false); GameState.setGamePausedByEsc(false); GameState.setIsCountingDownToResume(false);
     GameState.setGamePausedForEvolution(false); GameState.setGamePausedForFreeUpgrade(false); GameState.setGamePausedForLootChoice(false);
     GameState.setEvolutionPendingAfterBoss(false); GameState.setFirstBossDefeatedThisRun(false);
     stopGameLoop();
     const currentPlayer = gameLogicGetPlayerFunc();
     if (currentPlayer && currentPlayer.isFiringOmegaLaser) stopSound(omegaLaserSound);
-    if (resetGameLogicStateFunc) resetGameLogicStateFunc();
+    if (resetGameLogicStateFunc) {
+        // console.log("[MainJS] Calling resetGameLogicStateFunc from showStartScreen.");
+        resetGameLogicStateFunc();
+    }
     if (uiPausePlayerStatsPanel) {
         if (uiPausePlayerStatsPanel.parentElement !== document.body) document.body.appendChild(uiPausePlayerStatsPanel);
         uiPausePlayerStatsPanel.style.display = 'none';
@@ -725,27 +759,38 @@ const gameContextForEventListeners = {
         handleEvolutionReRoll: () => {
             const cp = gameLogicGetPlayerFunc();
             if (cp && EvolutionManager && GameState.isGamePausedForEvolution()) {
-                EvolutionManager.handleEvolutionReRoll(cp); // Dependencies are now stored in EvoManager
+                EvolutionManager.handleEvolutionReRoll(cp);
             }
         },
         toggleBlockMode: () => {
             const cp = gameLogicGetPlayerFunc();
              if (cp && EvolutionManager && GameState.isGamePausedForEvolution()) {
-                EvolutionManager.toggleBlockMode(cp); // Dependencies are now stored in EvoManager
+                EvolutionManager.toggleBlockMode(cp);
             }
         },
         toggleFreezeMode: () => {
             const cp = gameLogicGetPlayerFunc();
             if (cp && EvolutionManager && GameState.isGamePausedForEvolution()) {
-                EvolutionManager.toggleFreezeMode(cp); // Dependencies are now stored in EvoManager
+                EvolutionManager.toggleFreezeMode(cp);
             }
         },
         redrawEvolutionOptions: redrawEvolutionOptionsInternal,
         onPlayerBossCollision: (bossThatHit) => {
             const cp = gameLogicGetPlayerFunc();
             if (cp && !cp.isShieldOvercharging && (!cp.teleporting || cp.teleportEffectTimer <= 0) && GameState.getPostDamageImmunityTimer() <= 0) {
-                const dmgDealt = cp.takeDamage(bossThatHit.tier * 5, { postPopupImmunityTimer: GameState.getPostPopupImmunityTimer(), postDamageImmunityTimer: GameState.getPostDamageImmunityTimer(), score: GameState.getScore(), updateHealthDisplayCallback:UIManager.updateHealthDisplay, endGameCallback:endGameInternal, updateScoreCallback: (amt) => { GameState.incrementScore(amt); UIManager.updateScoreDisplay(GameState.getScore()); checkForNewColorUnlock(); }, checkForNewColorCallback: checkForNewColorUnlock, activeBuffNotificationsArray: gameLogicGetActiveBuffsFunc ? gameLogicGetActiveBuffsFunc() : [] }, { screenShakeParams: gameLogicGetScreenShakeParamsFunc ? gameLogicGetScreenShakeParamsFunc() : {} });
-                if (dmgDealt > 0) GameState.setPostDamageImmunityTimer(CONSTANTS.POST_DAMAGE_IMMUNITY_DURATION);
+                let damageAmount = bossThatHit.tier * 5;
+                if (cp.hasAegisPathHelm) {
+                     damageAmount = 0;
+                }
+
+                if (damageAmount > 0) {
+                    const dmgDealt = cp.takeDamage(
+                        damageAmount,
+                        { postPopupImmunityTimer: GameState.getPostPopupImmunityTimer(), postDamageImmunityTimer: GameState.getPostDamageImmunityTimer(), score: GameState.getScore(), updateHealthDisplayCallback:UIManager.updateHealthDisplay, endGameCallback:endGameInternal, updateScoreCallback: (amt) => { GameState.incrementScore(amt); UIManager.updateScoreDisplay(GameState.getScore()); checkForNewColorUnlock(); }, checkForNewColorCallback: checkForNewColorUnlock, activeBuffNotificationsArray: gameLogicGetActiveBuffsFunc ? gameLogicGetActiveBuffsFunc() : [] },
+                        { screenShakeParams: gameLogicGetScreenShakeParamsFunc ? gameLogicGetScreenShakeParamsFunc() : {} }
+                    );
+                    if (dmgDealt > 0) GameState.setPostDamageImmunityTimer(CONSTANTS.POST_DAMAGE_IMMUNITY_DURATION);
+                }
             }
         },
         onPlayerMinionCollision: (minionThatHit) => {
@@ -788,7 +833,6 @@ const gameContextForEventListeners = {
         markNexusWeaverTierTimeRecordedThisRun: GameState.recordNexusWeaverTierTimeThisRun,
         getGameplayTimeElapsed: GameState.getGameplayTimeElapsed,
         createStatsSnapshotForBossKill: (playerInst, currentOverallBossTiers) => {
-            // Pass LootManager to createFinalStatsSnapshot
             return createFinalStatsSnapshot(playerInst, currentOverallBossTiers, LootManager.getBossLootPoolReference(), LootManager);
         },
         getSpecificHighScores: (category) => {

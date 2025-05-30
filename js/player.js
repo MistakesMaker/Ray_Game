@@ -11,21 +11,22 @@ import {
     POST_DAMAGE_IMMUNITY_DURATION,
     PLAYER_BOUNCE_FORCE_FROM_GRAVITY_BALL,
     RAY_SPAWN_GRACE_PERIOD,
-    PERFECT_HARMONY_NO_DAMAGE_DURATION_THRESHOLD,
-    PERFECT_HARMONY_RAY_DAMAGE_BONUS,
-    PERFECT_HARMONY_SPEED_BONUS,
-    PERFECT_HARMONY_COOLDOWN_REDUCTION,
     BERSERKERS_ECHO_DAMAGE_PER_10_HP,
     BERSERKERS_ECHO_SPEED_PER_10_HP,
     DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL,
     DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL,
     KINETIC_INITIAL_DAMAGE_BONUS,
-    MAX_EVOLUTION_REROLLS,
-    MAX_EVOLUTION_BLOCKS,
-    MAX_EVOLUTION_FREEZES_PER_RUN,
+    MAX_EVOLUTION_REROLLS, // <<< ENSURE THIS IS USED
+    MAX_EVOLUTION_BLOCKS,  // <<< ENSURE THIS IS USED
+    MAX_EVOLUTION_FREEZES_PER_RUN, // <<< ENSURE THIS IS USED
     RAY_RADIUS,
     RAY_SPAWN_FORWARD_OFFSET,
-    SCATTER_SHOT_ANGLE_OFFSET
+    SCATTER_SHOT_ANGLE_OFFSET,
+    AEGIS_PATH_BASE_COLLISION_DAMAGE,
+    AEGIS_PATH_MAX_HP_SCALING_FACTOR,
+    AEGIS_PATH_RADIUS_SCALING_FACTOR,
+    AEGIS_PATH_BOSS_KNOCKBACK_FORCE,
+    AEGIS_PATH_PLAYER_SELF_KNOCKBACK_FACTOR
 } from './constants.js';
 import * as GameState from './gameState.js';
 import { checkCollision, hexToRgb, lightenColor, isLineSegmentIntersectingCircle, getPooledRay } from './utils.js';
@@ -33,7 +34,8 @@ import {
     playSound, stopSound,
     playerHitSound, shieldOverchargeSound, omegaLaserSound, teleportSound, empBurstSound,
     playerWellDeploySound, playerWellDetonateSound,
-    shootSound
+    shootSound,
+    bossHitSound as audioBossHitSound
 } from './audio.js';
 import { PlayerGravityWell } from './ray.js';
 
@@ -65,7 +67,7 @@ export class Player {
         this.temporalEchoChance = 0.0;
         this.temporalEchoFixedReduction = 2000;
 
-        this.globalCooldownReduction = 0.0; // <<< NEW: For Streamlined Systems
+        this.globalCooldownReduction = 0.0;
 
         this.rayCritChance = 0.0;
         this.rayCritDamageMultiplier = 1.5;
@@ -90,11 +92,9 @@ export class Player {
         this.hpRegenBonusFromEvolution = 0;
         this.acquiredBossUpgrades = [];
 
-        this.hasPerfectHarmonyHelm = false;
         this.hasBerserkersEchoHelm = false;
         this.hasUltimateConfigurationHelm = false;
-
-        this.isHarmonized = false; 
+        this.hasAegisPathHelm = false;
 
         this.activeAbilities = {
             '1': null,
@@ -111,6 +111,7 @@ export class Player {
         this.naniteAnimTimer = Math.random() * 5000;
         this.momentumAnimTimer = Math.random() * 5000;
         this.ablativeAnimTimer = Math.random() * 5000;
+        this.aegisAnimTimer = Math.random() * 5000;
         this.timesHit = 0;
         this.totalDamageDealt = 0;
 
@@ -136,11 +137,10 @@ export class Player {
         this.originalPlayerSpeed = initialPlayerSpeed;
         this.currentSpeed = initialPlayerSpeed;
 
-        this.evolutionReRollsRemaining = 0;
+        this.evolutionReRollsRemaining = MAX_EVOLUTION_REROLLS; // <<< CORRECT INITIALIZATION
         this.blockedEvolutionIds = [];
-        this.evolutionBlocksRemaining = 0;
-
-        this.evolutionFreezesRemaining = 0;
+        this.evolutionBlocksRemaining = MAX_EVOLUTION_BLOCKS;   // <<< CORRECT INITIALIZATION
+        this.evolutionFreezesRemaining = MAX_EVOLUTION_FREEZES_PER_RUN; // <<< CORRECT INITIALIZATION
         this.frozenEvolutionChoice = null;
         this.isFreezeModeActive = false;
         this.hasUsedFreezeForCurrentOffers = false;
@@ -173,7 +173,7 @@ export class Player {
         this.hpPickupBonus = 0;
         this.abilityDamageMultiplier = 1.0;
         this.temporalEchoChance = 0.0;
-        this.globalCooldownReduction = 0.0; 
+        this.globalCooldownReduction = 0.0;
         this.rayCritChance = 0.0;
         this.rayCritDamageMultiplier = 1.5;
         this.abilityCritChance = 0.0;
@@ -187,10 +187,9 @@ export class Player {
         this.hpRegenTimer = 0;
         this.hpRegenBonusFromEvolution = 0;
         this.acquiredBossUpgrades = [];
-        this.hasPerfectHarmonyHelm = false;
         this.hasBerserkersEchoHelm = false;
         this.hasUltimateConfigurationHelm = false;
-        this.isHarmonized = false;
+        this.hasAegisPathHelm = false;
         this.activeAbilities = { '1': null, '2': null, '3': null };
         this.visualModifiers = {};
         this.bleedOnHit = false;
@@ -210,10 +209,11 @@ export class Player {
         this.omegaLaserTimer = 0;
         this.omegaLaserCooldownTimer = 0;
         this.currentSpeed = this.originalPlayerSpeed;
-        this.evolutionReRollsRemaining = MAX_EVOLUTION_REROLLS;
+
+        this.evolutionReRollsRemaining = MAX_EVOLUTION_REROLLS; // <<< CORRECT INITIALIZATION
         this.blockedEvolutionIds = [];
-        this.evolutionBlocksRemaining = MAX_EVOLUTION_BLOCKS;
-        this.evolutionFreezesRemaining = MAX_EVOLUTION_FREEZES_PER_RUN;
+        this.evolutionBlocksRemaining = MAX_EVOLUTION_BLOCKS;   // <<< CORRECT INITIALIZATION
+        this.evolutionFreezesRemaining = MAX_EVOLUTION_FREEZES_PER_RUN; // <<< CORRECT INITIALIZATION
         this.frozenEvolutionChoice = null;
         this.isFreezeModeActive = false;
         this.hasUsedFreezeForCurrentOffers = false;
@@ -246,9 +246,10 @@ export class Player {
                 postDamageImmunityTimer: postDamageTimerFromCtx = 0
               } = gameContext;
         const now = Date.now();
-        this.naniteAnimTimer = this.naniteAnimTimer || now; 
+        this.naniteAnimTimer = this.naniteAnimTimer || now;
         this.momentumAnimTimer = this.momentumAnimTimer || now;
         this.ablativeAnimTimer = this.ablativeAnimTimer || now;
+        this.aegisAnimTimer = this.aegisAnimTimer || now;
 
 
         this.drawHpBar(ctx);
@@ -257,88 +258,79 @@ export class Player {
         ctx.translate(this.x, this.y);
 
         ctx.save();
-        let helmGlowRadius = 0;
-        let helmGlowColor = "transparent";
 
-        if (this.hasPerfectHarmonyHelm) {
-            ctx.fillStyle = "rgba(255, 255, 200, 0.6)";
-            ctx.strokeStyle = "gold";
-            ctx.lineWidth = 2;
+        if (this.hasAegisPathHelm) {
+            ctx.fillStyle = "rgba(180, 180, 200, 0.7)";
+            ctx.strokeStyle = "rgba(220, 220, 240, 0.9)";
+            ctx.lineWidth = 2.5;
+            const visorWidth = this.radius * 1.2;
             ctx.beginPath();
-            ctx.arc(0, -this.radius * 0.85, this.radius * 0.6, 0, Math.PI * 2, false);
-            if (!this.isHarmonized) {
-                ctx.globalAlpha = 0.3 + Math.abs(Math.sin(now / 300)) * 0.3;
-                ctx.fill();
-                ctx.globalAlpha = 1.0;
-            } else { 
-                 ctx.fill(); 
-            }
+            ctx.moveTo(-visorWidth / 2, -this.radius * 0.3);
+            ctx.lineTo(visorWidth / 2, -this.radius * 0.3);
+            ctx.lineTo(visorWidth * 0.3, this.radius * 0.4);
+            ctx.lineTo(-visorWidth * 0.3, this.radius * 0.4);
+            ctx.closePath();
+            ctx.fill();
             ctx.stroke();
 
+            const numSpikes = 5;
+            const spikeAnimSpeed = 0.002;
+            const baseSpikeLength = this.radius * 0.2;
+            const animSpikeLength = this.radius * 0.15 * Math.sin(this.aegisAnimTimer * spikeAnimSpeed);
 
-            if (this.isHarmonized) {
-                helmGlowRadius = 15 + Math.sin(now / 200) * 5;
-                helmGlowColor = "rgba(255, 255, 100, 0.7)";
-                ctx.shadowBlur = helmGlowRadius;
-                ctx.shadowColor = helmGlowColor;
-                ctx.lineWidth = 2.5;
-                ctx.strokeStyle = "rgba(255, 255, 180, 1)";
+            ctx.strokeStyle = "rgba(200, 220, 255, 0.6)";
+            ctx.lineWidth = 1.5;
+            for (let i = 0; i < numSpikes; i++) {
+                const angle = (i / numSpikes) * Math.PI * 2 + (this.aegisAnimTimer * spikeAnimSpeed * 0.5);
+                const startX = Math.cos(angle) * (this.radius * 0.9);
+                const startY = Math.sin(angle) * (this.radius * 0.9);
+                const endX = Math.cos(angle) * (this.radius + baseSpikeLength + animSpikeLength);
+                const endY = Math.sin(angle) * (this.radius + baseSpikeLength + animSpikeLength);
                 ctx.beginPath();
-                ctx.arc(0, -this.radius * 0.85, this.radius * 0.65, 0, Math.PI * 2, false);
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(endX, endY);
                 ctx.stroke();
-                ctx.shadowBlur = 0;
-                ctx.shadowColor = "transparent";
             }
-
         } else if (this.hasBerserkersEchoHelm) {
             ctx.fillStyle = "rgb(120, 20, 20)";
             ctx.strokeStyle = "rgb(50, 0, 0)";
             ctx.lineWidth = 1.5;
-
             const currentHp = typeof this.hp === 'number' ? this.hp : PLAYER_MAX_HP;
             const currentMaxHp = typeof this.maxHp === 'number' ? this.maxHp : PLAYER_MAX_HP;
             const missingHpFactor = currentMaxHp > 0 ? Math.max(0, (currentMaxHp - currentHp) / currentMaxHp) : 0;
-
             if (missingHpFactor > 0.05) {
-                helmGlowRadius = 5 + missingHpFactor * 20;
+                const helmGlowRadius = 5 + missingHpFactor * 20;
                 const glowIntensity = 0.3 + missingHpFactor * 0.6;
-                helmGlowColor = `rgba(255, 0, 0, ${glowIntensity})`;
+                const helmGlowColor = `rgba(255, 0, 0, ${glowIntensity})`;
                 ctx.shadowBlur = helmGlowRadius;
                 ctx.shadowColor = helmGlowColor;
             }
-
             const hornBaseOffsetY = -this.radius * 0.5;
             const hornSideOffsetX = this.radius * 0.45;
             const hornTipOffsetY = -this.radius * 1.1;
             const hornTipSideOffsetX = this.radius * 0.7;
-
             ctx.beginPath();
             ctx.moveTo(-hornSideOffsetX, hornBaseOffsetY);
             ctx.quadraticCurveTo(-hornTipSideOffsetX * 0.8, hornTipOffsetY * 0.9, -hornTipSideOffsetX, hornTipOffsetY);
             ctx.quadraticCurveTo(-hornTipSideOffsetX * 0.6, hornTipOffsetY * 1.1, -hornSideOffsetX + this.radius * 0.15, hornBaseOffsetY + this.radius * 0.1);
             ctx.closePath();
             ctx.fill(); ctx.stroke();
-
             ctx.beginPath();
             ctx.moveTo(hornSideOffsetX, hornBaseOffsetY);
             ctx.quadraticCurveTo(hornTipSideOffsetX * 0.8, hornTipOffsetY * 0.9, hornTipSideOffsetX, hornTipOffsetY);
             ctx.quadraticCurveTo(hornTipSideOffsetX * 0.6, hornTipOffsetY * 1.1, hornSideOffsetX - this.radius * 0.15, hornBaseOffsetY + this.radius * 0.1);
             ctx.closePath();
             ctx.fill(); ctx.stroke();
-
             ctx.shadowBlur = 0;
             ctx.shadowColor = "transparent";
-
         } else if (this.hasUltimateConfigurationHelm) {
             ctx.fillStyle = "rgba(80, 0, 120, 0.85)";
             ctx.strokeStyle = "rgba(180, 120, 255, 0.9)";
             ctx.lineWidth = 2;
-
-            helmGlowRadius = 8 + Math.sin(now / 350) * 3;
-            helmGlowColor = "rgba(150, 100, 220, 0.4)";
+            const helmGlowRadius = 8 + Math.sin(now / 350) * 3;
+            const helmGlowColor = "rgba(150, 100, 220, 0.4)";
             ctx.shadowBlur = helmGlowRadius;
             ctx.shadowColor = helmGlowColor;
-
             ctx.beginPath();
             ctx.moveTo(0, -this.radius * 1.8);
             ctx.lineTo(-this.radius * 0.8, -this.radius * 0.5);
@@ -346,10 +338,8 @@ export class Player {
             ctx.closePath();
             ctx.fill();
             ctx.stroke();
-
             ctx.shadowBlur = 0;
             ctx.shadowColor = "transparent";
-
             ctx.fillStyle = "yellow";
             ctx.beginPath();
             ctx.arc(0, -this.radius * 1.5, this.radius * 0.15, 0, Math.PI * 2);
@@ -442,7 +432,7 @@ export class Player {
             const nG=3; const oR=this.radius+9; const gS=1/600; ctx.fillStyle='rgba(255,50,50,0.95)'; ctx.strokeStyle='rgba(255,100,100,0.5)'; ctx.lineWidth=1; for(let i=0;i<nG;i++){const a=(this.naniteAnimTimer*gS+(i*Math.PI*2/nG))%(Math.PI*2); const gx=Math.cos(a)*oR; const gy=Math.sin(a)*oR; const gSize=3.5; ctx.save();ctx.translate(gx,gy);ctx.rotate(a+Math.PI/2); ctx.beginPath();ctx.moveTo(0,-gSize*0.6);ctx.lineTo(-gSize*0.5,gSize*0.4);ctx.lineTo(gSize*0.5,gSize*0.4);ctx.closePath();ctx.fill(); const pA=a-gS*50;const pX=Math.cos(pA)*oR;const pY=Math.sin(pA)*oR; ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(pX-gx,pY-gy);ctx.stroke(); ctx.restore();}}
 
         if (this.isFiringOmegaLaser) {
-            ctx.save(); ctx.rotate(this.omegaLaserAngle); 
+            ctx.save(); ctx.rotate(this.omegaLaserAngle);
             ctx.beginPath(); ctx.moveTo(this.radius, -this.omegaLaserWidth / 2);
             ctx.lineTo(this.radius + this.omegaLaserRange, -this.omegaLaserWidth / 2);
             ctx.lineTo(this.radius + this.omegaLaserRange, this.omegaLaserWidth / 2);
@@ -478,20 +468,16 @@ export class Player {
             ctx.restore();
         }
 
-        ctx.restore();
+        ctx.restore(); // Final restore for player translation
     }
 
     static drawFromSnapshot(ctx, snapshotPlayerData, centerX, centerY, aimAngle = 0) {
         if (!ctx || !snapshotPlayerData) return;
 
         const now = Date.now();
-        const PREVIEW_MAX_RADIUS = 100; 
+        const PREVIEW_MAX_RADIUS = 100;
 
-        // Use snapshotPlayerData directly if it's the old flat format, 
-        // or snapshotPlayerData.playerDataForPreview if it's the new structured one.
-        // For drawing, we mostly care about visual properties.
         const data = snapshotPlayerData.finalRadius !== undefined ? snapshotPlayerData : (snapshotPlayerData.playerDataForPreview || snapshotPlayerData.playerData || {});
-
 
         const actualRadius = data.finalRadius || PLAYER_BASE_RADIUS;
         let displayScale = 1;
@@ -503,74 +489,78 @@ export class Player {
 
         const immuneColorsList = data.immuneColorsList || [];
         const visualModifiers = data.visualModifiers || {};
-        
-        let inferredHelmType = data.helmType || null; 
-        // No need to infer from displayedUpgrades for old format here, as it complicates drawing.
-        // If helmType isn't directly in the snapshot, it won't be drawn.
-        
+
+        let inferredHelmType = data.helmType || null;
+        if (!inferredHelmType && data.displayedUpgrades) {
+            if (data.displayedUpgrades.some(u => u.id === 'juggernautPath' || u.name === 'Path of the Juggernaut' || u.id === 'aegisPath' || u.name === "Aegis Path")) {
+                 inferredHelmType = 'aegisPath';
+            }
+        }
+
+
         const ablativeAnimTimer = data.ablativeAnimTimer !== undefined ? data.ablativeAnimTimer : now;
         const momentumAnimTimer = data.momentumAnimTimer !== undefined ? data.momentumAnimTimer : now;
         const naniteAnimTimer = data.naniteAnimTimer !== undefined ? data.naniteAnimTimer : now;
+        const aegisAnimTimer = data.aegisAnimTimer !== undefined ? data.aegisAnimTimer : (data.naniteAnimTimer || now);
 
 
         ctx.save();
         ctx.translate(centerX, centerY);
 
         ctx.save(); 
-        let helmGlowRadius = 0;
-        let helmGlowColor = "transparent";
 
-        if (inferredHelmType === "perfectHarmony") {
-            ctx.fillStyle = "rgba(255, 255, 200, 0.6)";
-            ctx.strokeStyle = "gold"; ctx.lineWidth = 2 * displayScale;
-            ctx.beginPath(); ctx.arc(0, -radius * 0.85, radius * 0.6, 0, Math.PI * 2, false);
-            const isHarmonizedSnapshot = false; // Old snapshots won't have this live state
-            if (!isHarmonizedSnapshot) { 
-                ctx.globalAlpha = 0.3 + Math.abs(Math.sin(now / 300)) * 0.3;
-                ctx.fill();
-                ctx.globalAlpha = 1.0;
-            } else {
-                 ctx.fill(); 
+        if (inferredHelmType === "aegisPath") {
+            ctx.fillStyle = "rgba(180, 180, 200, 0.7)";
+            ctx.strokeStyle = "rgba(220, 220, 240, 0.9)";
+            ctx.lineWidth = 2.5 * displayScale;
+            const visorWidth = radius * 1.2;
+            ctx.beginPath();
+            ctx.moveTo(-visorWidth / 2, -radius * 0.3); ctx.lineTo(visorWidth / 2, -radius * 0.3);
+            ctx.lineTo(visorWidth * 0.3, radius * 0.4); ctx.lineTo(-visorWidth * 0.3, radius * 0.4);
+            ctx.closePath(); ctx.fill(); ctx.stroke();
+
+            const numSpikes = 5; const spikeAnimSpeed = 0.002;
+            const baseSpikeLength = radius * 0.2;
+            const animSpikeLength = radius * 0.15 * Math.sin(aegisAnimTimer * spikeAnimSpeed);
+            ctx.strokeStyle = "rgba(200, 220, 255, 0.6)"; ctx.lineWidth = 1.5 * displayScale;
+            for (let i = 0; i < numSpikes; i++) {
+                const angle = (i / numSpikes) * Math.PI * 2 + (aegisAnimTimer * spikeAnimSpeed * 0.5);
+                const startX = Math.cos(angle) * (radius * 0.9); const startY = Math.sin(angle) * (radius * 0.9);
+                const endX = Math.cos(angle) * (radius + baseSpikeLength + animSpikeLength);
+                const endY = Math.sin(angle) * (radius + baseSpikeLength + animSpikeLength);
+                ctx.beginPath(); ctx.moveTo(startX, startY); ctx.lineTo(endX, endY); ctx.stroke();
             }
-            ctx.stroke();
         } else if (inferredHelmType === "berserkersEcho") {
             ctx.fillStyle = "rgb(120, 20, 20)"; ctx.strokeStyle = "rgb(50, 0, 0)"; ctx.lineWidth = 1.5 * displayScale;
-            
-            const currentHpSnapshot = typeof data.hp === 'number' ? data.hp : PLAYER_MAX_HP; 
-            const maxHpSnapshot = typeof data.maxHp === 'number' ? data.maxHp : PLAYER_MAX_HP; 
+            const currentHpSnapshot = typeof data.hp === 'number' ? data.hp : PLAYER_MAX_HP;
+            const maxHpSnapshot = typeof data.maxHp === 'number' ? data.maxHp : PLAYER_MAX_HP;
             const missingHpFactorSnapshot = maxHpSnapshot > 0 ? Math.max(0, (maxHpSnapshot - currentHpSnapshot) / maxHpSnapshot) : 0;
-
             if (missingHpFactorSnapshot > 0.05) {
-                helmGlowRadius = (5 + missingHpFactorSnapshot * 20) * displayScale;
+                const helmGlowRadius_ = (5 + missingHpFactorSnapshot * 20) * displayScale;
                 const glowIntensity = 0.3 + missingHpFactorSnapshot * 0.6;
-                helmGlowColor = `rgba(255, 0, 0, ${glowIntensity})`;
-                ctx.shadowBlur = helmGlowRadius; ctx.shadowColor = helmGlowColor;
+                const helmGlowColor_ = `rgba(255, 0, 0, ${glowIntensity})`;
+                ctx.shadowBlur = helmGlowRadius_; ctx.shadowColor = helmGlowColor_;
             }
-
             const hornBaseOffsetY = -radius * 0.5; const hornSideOffsetX = radius * 0.45;
             const hornTipOffsetY = -radius * 1.1; const hornTipSideOffsetX = radius * 0.7;
-            
-            ctx.beginPath(); 
+            ctx.beginPath();
             ctx.moveTo(-hornSideOffsetX, hornBaseOffsetY);
             ctx.quadraticCurveTo(-hornTipSideOffsetX*0.8, hornTipOffsetY*0.9, -hornTipSideOffsetX, hornTipOffsetY);
             ctx.quadraticCurveTo(-hornTipSideOffsetX*0.6, hornTipOffsetY*1.1, -hornSideOffsetX + radius*0.15, hornBaseOffsetY + radius*0.1);
-            ctx.closePath(); 
+            ctx.closePath();
             ctx.fill(); ctx.stroke();
-            
-            ctx.beginPath(); 
+            ctx.beginPath();
             ctx.moveTo(hornSideOffsetX, hornBaseOffsetY);
             ctx.quadraticCurveTo(hornTipSideOffsetX*0.8, hornTipOffsetY*0.9, hornTipSideOffsetX, hornTipOffsetY);
             ctx.quadraticCurveTo(hornTipSideOffsetX*0.6, hornTipOffsetY*1.1, hornSideOffsetX - radius*0.15, hornBaseOffsetY + radius*0.1);
-            ctx.closePath(); 
+            ctx.closePath();
             ctx.fill(); ctx.stroke();
-            
             ctx.shadowBlur = 0; ctx.shadowColor = "transparent";
-
         } else if (inferredHelmType === "ultimateConfiguration") {
             ctx.fillStyle = "rgba(80, 0, 120, 0.85)"; ctx.strokeStyle = "rgba(180, 120, 255, 0.9)"; ctx.lineWidth = 2 * displayScale;
-            helmGlowRadius = (8 + Math.sin(now / 350) * 3) * displayScale;
-            helmGlowColor = "rgba(150, 100, 220, 0.4)";
-            ctx.shadowBlur = helmGlowRadius; ctx.shadowColor = helmGlowColor;
+            const helmGlowRadius_ = (8 + Math.sin(now / 350) * 3) * displayScale;
+            const helmGlowColor_ = "rgba(150, 100, 220, 0.4)";
+            ctx.shadowBlur = helmGlowRadius_; ctx.shadowColor = helmGlowColor_;
             ctx.beginPath(); ctx.moveTo(0, -radius * 1.8);
             ctx.lineTo(-radius * 0.8, -radius * 0.5);
             ctx.quadraticCurveTo(0, -radius * 0.1, radius * 0.8, -radius * 0.5);
@@ -626,9 +616,9 @@ export class Player {
         }
         ctx.restore();
 
-        ctx.restore();
+        ctx.restore(); // final translate restore
     }
-    // ... (rest of Player class remains the same) ...
+
     update(gameContext) {
         const { dt, keys, mouseX, mouseY, canvasWidth, canvasHeight, targets, activeBosses,
                 currentGrowthFactor,
@@ -637,11 +627,13 @@ export class Player {
                 isAnyPauseActiveCallback, decoysArray, bossDefeatEffectsArray, allRays,
                 screenShakeParams, activeBuffNotificationsArray, score,
                 evolutionChoices,
-                ui, CONSTANTS: gameConstants
+                ui, CONSTANTS: gameConstants,
+                endGameCallback, updateScoreCallback
               } = gameContext;
 
 
         this.timeSinceLastHit += dt;
+        this.aegisAnimTimer += dt;
 
         if (this.teleporting && this.teleportEffectTimer > 0) {
             this.teleportEffectTimer -= dt;
@@ -650,26 +642,13 @@ export class Player {
             }
         }
 
-        if (this.hasPerfectHarmonyHelm) {
-            if (this.timeSinceLastHit >= PERFECT_HARMONY_NO_DAMAGE_DURATION_THRESHOLD) {
-                if (!this.isHarmonized) {
-                    this.isHarmonized = true;
-                    if(activeBuffNotificationsArray) activeBuffNotificationsArray.push({ text: `Perfect Harmony Active!`, timer: 2000});
-                }
-            }
-        }
-
         let numericAbilityUIUpdateNeeded = false;
         for (const slot in this.activeAbilities) {
              if (this.activeAbilities[slot]) {
-                let effectiveCooldownMultiplier = 1.0 - this.globalCooldownReduction; // Start with global
-                if (this.isHarmonized && this.hasPerfectHarmonyHelm) {
-                    effectiveCooldownMultiplier *= (1.0 - PERFECT_HARMONY_COOLDOWN_REDUCTION);
-                }
+                let effectiveCooldownMultiplier = 1.0 - this.globalCooldownReduction;
                 if (this.hasUltimateConfigurationHelm) {
-                    effectiveCooldownMultiplier *= 1.5; // This is a penalty, so it increases needed time
+                    effectiveCooldownMultiplier *= 1.5;
                 }
-                // Ensure multiplier doesn't go to zero or negative, 0.1 means 90% reduction max from stacking beneficial effects
                 effectiveCooldownMultiplier = Math.max(0.1, effectiveCooldownMultiplier);
 
 
@@ -691,19 +670,14 @@ export class Player {
 
         let mouseAbilityUIUpdateNeeded = false;
         const updateMouseAbility = (abilityStateProp, abilityTimerProp, abilityCooldownTimerProp, abilityCooldownConst) => {
-            let effectiveCooldownMultiplier = 1.0 - this.globalCooldownReduction; // Start with global
-            if (this.isHarmonized && this.hasPerfectHarmonyHelm) {
-                effectiveCooldownMultiplier *= (1.0 - PERFECT_HARMONY_COOLDOWN_REDUCTION);
-            }
-             // Mouse abilities are not affected by Ultimate Configuration penalty
+            let effectiveCooldownMultiplier = 1.0 - this.globalCooldownReduction;
             effectiveCooldownMultiplier = Math.max(0.1, effectiveCooldownMultiplier);
-
 
             if (this[abilityStateProp]) {
                 this[abilityTimerProp] -= dt;
                 mouseAbilityUIUpdateNeeded = true;
                 if (this[abilityTimerProp] <= 0) {
-                    return true; // Indicates ability duration ended
+                    return true;
                 }
             } else if (this[abilityCooldownTimerProp] > 0) {
                 this[abilityCooldownTimerProp] -= dt / effectiveCooldownMultiplier;
@@ -716,10 +690,8 @@ export class Player {
         if (this.hasShieldOvercharge) {
             if(updateMouseAbility('isShieldOvercharging', 'shieldOverchargeTimer', 'shieldOverchargeCooldownTimer', this.shieldOverchargeCooldown)){
                 this.isShieldOvercharging = false;
-                this.shieldOverchargeCooldownTimer = this.shieldOverchargeCooldown * (1.0 - this.globalCooldownReduction); // Apply global reduction to base
-                 if (this.isHarmonized && this.hasPerfectHarmonyHelm) { this.shieldOverchargeCooldownTimer *= (1.0 - PERFECT_HARMONY_COOLDOWN_REDUCTION); }
-                 this.shieldOverchargeCooldownTimer = Math.max(this.shieldOverchargeCooldown * 0.1, this.shieldOverchargeCooldownTimer);
-
+                let cd = this.shieldOverchargeCooldown * (1.0 - this.globalCooldownReduction);
+                this.shieldOverchargeCooldownTimer = Math.max(this.shieldOverchargeCooldown * 0.1, cd);
             }
         }
 
@@ -733,24 +705,20 @@ export class Player {
                 mouseAbilityUIUpdateNeeded = true;
 
                 if (this.omegaLaserCurrentTickTimer <= 0) {
-                    const laserDamageContext = { updateScoreCallback: gameContext.updateScoreCallback };
+                    const laserDamageContext = { updateScoreCallback: updateScoreCallback };
                     this.dealOmegaLaserDamage(targets, activeBosses, laserDamageContext);
                     this.omegaLaserCurrentTickTimer = OMEGA_LASER_TICK_INTERVAL;
                 }
                 if (this.omegaLaserTimer <= 0) {
                     this.isFiringOmegaLaser = false;
                     stopSound(omegaLaserSound);
-                    this.omegaLaserCooldownTimer = this.omegaLaserCooldown * (1.0 - this.globalCooldownReduction); // Apply global reduction to base
-                    if (this.isHarmonized && this.hasPerfectHarmonyHelm) { this.omegaLaserCooldownTimer *= (1.0 - PERFECT_HARMONY_COOLDOWN_REDUCTION); }
-                    this.omegaLaserCooldownTimer = Math.max(this.omegaLaserCooldown * 0.1, this.omegaLaserCooldownTimer);
+                    let cd = this.omegaLaserCooldown * (1.0 - this.globalCooldownReduction);
+                    this.omegaLaserCooldownTimer = Math.max(this.omegaLaserCooldown * 0.1, cd);
                     this.currentOmegaLaserKineticBoost = 1.0;
                 }
             } else {
                  if (this.omegaLaserCooldownTimer > 0) {
                     let effectiveCooldownMultiplier = 1.0 - this.globalCooldownReduction;
-                    if (this.isHarmonized && this.hasPerfectHarmonyHelm) {
-                        effectiveCooldownMultiplier *= (1.0 - PERFECT_HARMONY_COOLDOWN_REDUCTION);
-                    }
                     effectiveCooldownMultiplier = Math.max(0.1, effectiveCooldownMultiplier);
                     this.omegaLaserCooldownTimer -= dt / effectiveCooldownMultiplier;
 
@@ -790,9 +758,6 @@ export class Player {
                 if (tenPercentIncrements > 0) {
                     speedMultiplier *= (1 + (tenPercentIncrements * BERSERKERS_ECHO_SPEED_PER_10_HP));
                 }
-            }
-            if (this.isHarmonized && this.hasPerfectHarmonyHelm) {
-                speedMultiplier *= (1 + PERFECT_HARMONY_SPEED_BONUS);
             }
             actualCurrentSpeed *= speedMultiplier;
         }
@@ -839,10 +804,25 @@ export class Player {
         }
         if (activeBosses && activeBosses.length > 0) {
             if (!(this.teleporting && this.teleportEffectTimer > 0)) {
-                for (const boss of activeBosses) { if (checkCollision({ x: nX, y: this.y, radius: this.radius }, boss)) { nX = this.x; break; } }
-                for (const boss of activeBosses) { if (checkCollision({ x: this.x, y: nY, radius: this.radius }, boss)) { nY = this.y; break; } }
+                for (const boss of activeBosses) {
+                    if (checkCollision({ x: nX, y: this.y, radius: this.radius }, boss)) {
+                        if (this.hasAegisPathHelm) {
+                            this.handleAegisCollisionWithBoss(boss, gameContext);
+                        }
+                        nX = this.x; break;
+                    }
+                }
+                for (const boss of activeBosses) {
+                    if (checkCollision({ x: this.x, y: nY, radius: this.radius }, boss)) {
+                         if (this.hasAegisPathHelm) {
+                            this.handleAegisCollisionWithBoss(boss, gameContext);
+                        }
+                        nY = this.y; break;
+                    }
+                }
             }
         }
+
 
         this.x = nX; this.y = nY;
 
@@ -859,9 +839,9 @@ export class Player {
         this.y = Math.max(this.radius, Math.min(this.y, canvasHeight - this.radius));
 
         if (isAnyPauseActiveCallback && !isAnyPauseActiveCallback()) {
-            if (!this.isFiringOmegaLaser) { 
+            if (!this.isFiringOmegaLaser) {
                 this.aimAngle = Math.atan2(mouseY - this.y, mouseX - this.x);
-            } 
+            }
         }
 
 
@@ -932,7 +912,68 @@ export class Player {
         }
     }
 
+    handleAegisCollisionWithBoss(boss, gameContext) {
+        if (!this.hasAegisPathHelm || !boss || boss.health <= 0) return;
+
+        if (boss.lastHitByAegisTimer && (Date.now() - boss.lastHitByAegisTimer < 200) ) {
+            return;
+        }
+        // Aegis effect should trigger regardless of player's own temporary immunity from popups or recent hits.
+        // The immunity for the player taking damage is handled in takeDamage().
+
+        let collisionDamage = AEGIS_PATH_BASE_COLLISION_DAMAGE;
+        collisionDamage += (this.maxHp * AEGIS_PATH_MAX_HP_SCALING_FACTOR);
+        collisionDamage += (this.radius * AEGIS_PATH_RADIUS_SCALING_FACTOR);
+        collisionDamage = Math.round(collisionDamage);
+
+        if (typeof boss.takeDamage === 'function') {
+            const damageApplied = boss.takeDamage(collisionDamage, null, this, { isAegisCollision: true });
+            if (damageApplied) {
+                playSound(audioBossHitSound);
+                this.totalDamageDealt += collisionDamage;
+                boss.lastHitByAegisTimer = Date.now();
+                 if (gameContext.screenShakeParams) {
+                    gameContext.screenShakeParams.isScreenShaking = true;
+                    gameContext.screenShakeParams.screenShakeTimer = 200;
+                    gameContext.screenShakeParams.currentShakeMagnitude = 4;
+                    gameContext.screenShakeParams.currentShakeType = 'playerHit';
+                 }
+            }
+        }
+
+        if (typeof boss.x !== 'undefined' && typeof boss.y !== 'undefined') {
+            const angleToBoss = Math.atan2(boss.y - this.y, boss.x - this.x);
+            const knockbackForce = AEGIS_PATH_BOSS_KNOCKBACK_FORCE;
+            if (typeof boss.recoilVelX === 'number' && typeof boss.recoilVelY === 'number') {
+                boss.recoilVelX += Math.cos(angleToBoss) * knockbackForce;
+                boss.recoilVelY += Math.sin(angleToBoss) * knockbackForce;
+                if (typeof boss.playerCollisionStunTimer === 'number' && typeof boss.PLAYER_COLLISION_STUN_DURATION === 'number') {
+                    boss.playerCollisionStunTimer = Math.max(boss.playerCollisionStunTimer, boss.PLAYER_COLLISION_STUN_DURATION * 0.3);
+                    if(typeof boss.speed === 'number') boss.speed = 0;
+                }
+            } else {
+                boss.x += Math.cos(angleToBoss) * knockbackForce * 0.1;
+                boss.y += Math.sin(angleToBoss) * knockbackForce * 0.1;
+            }
+        }
+
+        const angleFromBoss = Math.atan2(this.y - boss.y, this.x - boss.x);
+        this.velX += Math.cos(angleFromBoss) * AEGIS_PATH_BOSS_KNOCKBACK_FORCE * AEGIS_PATH_PLAYER_SELF_KNOCKBACK_FACTOR;
+        this.velY += Math.sin(angleFromBoss) * AEGIS_PATH_BOSS_KNOCKBACK_FORCE * AEGIS_PATH_PLAYER_SELF_KNOCKBACK_FACTOR;
+    }
+
+
     takeDamage(hittingRayOrAmount, gameContext, damageContext) {
+        if (this.hasAegisPathHelm &&
+            typeof hittingRayOrAmount === 'object' &&
+            hittingRayOrAmount !== null &&
+            hittingRayOrAmount.constructor && hittingRayOrAmount.constructor.name !== 'Ray' &&
+            typeof hittingRayOrAmount.tier === 'number' &&
+            typeof hittingRayOrAmount.dx === 'undefined')
+        {
+            return 0;
+        }
+
         const postPopupTimerFromCtx = gameContext.postPopupImmunityTimer || 0;
         const postDamageTimerFromCtx = gameContext.postDamageImmunityTimer || 0;
 
@@ -965,13 +1006,7 @@ export class Player {
             return 0;
         }
 
-
-        if (this.isHarmonized && this.hasPerfectHarmonyHelm) {
-            this.isHarmonized = false;
-            if(gameContext.activeBuffNotificationsArray) gameContext.activeBuffNotificationsArray.push({ text: `Harmony Lost!`, timer: 1500});
-        }
         this.timeSinceLastHit = 0;
-
         this.timesHit++;
 
         let damageToTake;
@@ -1095,15 +1130,13 @@ export class Player {
         if (!ability) return;
 
         let abilityUsedSuccessfully = false;
-        
-        // Calculate effective base cooldown duration for THIS ability
+
         let baseCooldownForThisAbility = ability.cooldownDuration;
         if (this.hasUltimateConfigurationHelm) {
             baseCooldownForThisAbility *= 1.5;
         }
-        // This is the cooldown that will be SET after use, affected by global reduction
         let effectiveCooldownToSet = baseCooldownForThisAbility * (1.0 - this.globalCooldownReduction);
-        effectiveCooldownToSet = Math.max(baseCooldownForThisAbility * 0.1, effectiveCooldownToSet); // Ensure min 10% of original base
+        effectiveCooldownToSet = Math.max(baseCooldownForThisAbility * 0.1, effectiveCooldownToSet);
 
 
         if (ability.id === 'miniGravityWell') {
@@ -1117,8 +1150,7 @@ export class Player {
                 this.deployMiniGravityWell(ability.duration, abilityContext.decoysArray, abilityContext.mouseX, abilityContext.mouseY);
                 if (this.activeMiniWell) {
                     abilityUsedSuccessfully = true;
-                     // Cooldown is set when deploying, not when detonating existing.
-                    ability.cooldownTimer = effectiveCooldownToSet; 
+                    ability.cooldownTimer = effectiveCooldownToSet;
                     ability.justBecameReady = false;
                 }
             }
@@ -1239,9 +1271,6 @@ export class Player {
         if (this.hasUltimateConfigurationHelm) {
             damagePerTickForCalc *= 2;
         }
-        if (this.isHarmonized && this.hasPerfectHarmonyHelm) {
-            damagePerTickForCalc *= (1 + PERFECT_HARMONY_RAY_DAMAGE_BONUS);
-        }
         damagePerTickForCalc *= this.currentOmegaLaserKineticBoost;
 
         if (this.abilityCritChance > 0 && Math.random() < this.abilityCritChance) {
@@ -1267,7 +1296,7 @@ export class Player {
             activeBossesArray.forEach(boss => {
                 if (boss && boss.health > 0 && isLineSegmentIntersectingCircle(beamStartX, beamStartY, beamEndX, beamEndY, boss.x, boss.y, boss.radius + this.omegaLaserWidth / 2)) {
                     if (typeof boss.takeDamage === 'function') {
-                        boss.takeDamage(finalDamagePerTick, null, this, {}); 
+                        boss.takeDamage(finalDamagePerTick, null, this, {});
                     }
                     this.totalDamageDealt += finalDamagePerTick;
                 }

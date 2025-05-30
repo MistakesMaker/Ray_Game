@@ -1,6 +1,6 @@
 // js/chaserBoss.js
 import { BossNPC } from './bossBase.js';
-import { PLAYER_BOUNCE_FORCE_FROM_BOSS } from './constants.js'; // Ensure this is exported
+import { PLAYER_BOUNCE_FORCE_FROM_BOSS } from './constants.js';
 import { checkCollision } from './utils.js';
 
 export class ChaserBoss extends BossNPC {
@@ -8,14 +8,13 @@ export class ChaserBoss extends BossNPC {
         super(x, y, tier, 25, 0.3, 20 + tier * 1.0, '#E50000');
         this.baseSpeed = 0.9 + tier * 0.07;
         this.speed = this.baseSpeed;
-        this.PLAYER_COLLISION_STUN_DURATION = 400;
+        this.PLAYER_COLLISION_STUN_DURATION = 400; // Stun duration when Chaser itself is affected by collision
         this.recoilVelX = 0;
         this.recoilVelY = 0;
-        // playerCollisionStunTimer is inherited from BossNPC
+        // playerCollisionStunTimer is inherited from BossNPC for this stun
     }
 
     draw(ctx) {
-        // ... (draw logic remains the same)
         if (!ctx) return;
         let effectiveColor = this.color;
         if (this.hitFlashTimer > 0 && Math.floor(this.hitFlashTimer / 50) % 2 === 0) {
@@ -47,13 +46,10 @@ export class ChaserBoss extends BossNPC {
         super.draw(ctx); // Draw health bar
     }
 
-    // Corrected signature: (playerInstance, gameContext)
     update(playerInstance, gameContext) {
-        // Destructure dt from gameContext for super.update and local use
         const { dt, canvasWidth, canvasHeight, postDamageImmunityTimer, isPlayerShieldOvercharging } = gameContext;
 
-        super.update(dt, playerInstance); // Pass dt and playerInstance to base class
-
+        super.update(dt, playerInstance);
         if (this.health <= 0) return;
 
         const normalizedDtFactor = dt / (1000 / 60) || 1;
@@ -79,34 +75,60 @@ export class ChaserBoss extends BossNPC {
         this.y = Math.max(this.radius, Math.min(canvasHeight - this.radius, this.y));
 
         if (checkCollision(this, playerInstance)) {
-            const playerCanTakeDamage = (postDamageImmunityTimer === undefined || postDamageImmunityTimer <= 0) && // Check if undefined before use
-                                        !(playerInstance.teleporting && playerInstance.teleportEffectTimer > 0) &&
-                                        !isPlayerShieldOvercharging;
+            const playerIsTeleporting = (playerInstance.teleporting && playerInstance.teleportEffectTimer > 0);
+            const playerIsShieldOverchargingCurrently = isPlayerShieldOvercharging; // from gameContext
+            const playerDamageImmune = (postDamageImmunityTimer !== undefined && postDamageImmunityTimer > 0);
 
-            if (playerCanTakeDamage) {
-                const collisionAnglePlayer = Math.atan2(playerInstance.y - this.y, playerInstance.x - this.x);
-                playerInstance.velX = Math.cos(collisionAnglePlayer) * PLAYER_BOUNCE_FORCE_FROM_BOSS;
-                playerInstance.velY = Math.sin(collisionAnglePlayer) * PLAYER_BOUNCE_FORCE_FROM_BOSS;
+            // Player can interact (either take damage or apply Aegis effect) if not generally immune/phasing
+            const canPlayerInteract = !playerIsTeleporting && !playerIsShieldOverchargingCurrently;
 
-                const dist = Math.sqrt((this.x - playerInstance.x) ** 2 + (this.y - playerInstance.y) ** 2);
-                const overlap = (this.radius + playerInstance.radius) - dist;
-                if (overlap > 0) {
-                    const pushAngleBoss = Math.atan2(this.y - playerInstance.y, this.x - playerInstance.x);
-                    const pushAmount = overlap * 1.3;
-                    this.x += Math.cos(pushAngleBoss) * pushAmount;
-                    this.y += Math.sin(pushAngleBoss) * pushAmount;
+            if (canPlayerInteract) {
+                if (playerInstance.hasAegisPathHelm) {
+                    // Aegis Path handles its own damage and knockback effects in player.js
+                    // Chaser boss should still signal collision for the main game loop / player to react.
+                    // The player's handleAegisCollisionWithBoss will apply knockback to this Chaser.
+                    // Chaser boss itself does not initiate its strong bounce here.
+                    if (gameContext && gameContext.playerCollidedWithBoss !== undefined) {
+                        gameContext.playerCollidedWithBoss = this; // Signal collision
+                    }
+                    // Aegis path makes player immune to this collision, so no player.takeDamage() here.
+                    // The Chaser will take damage from player.handleAegisCollisionWithBoss()
+                    // and also receive knockback from there.
+                    // We might want a *very* minor recoil for the Chaser here, or let Aegis handle it all.
+                    // For now, let Aegis handle all knockback effects on the boss.
+                    // If the Chaser still feels too "sticky", a tiny self-push could be added here.
 
-                    const knockbackForceBoss = PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.6;
-                    this.recoilVelX = Math.cos(pushAngleBoss) * knockbackForceBoss;
-                    this.recoilVelY = Math.sin(pushAngleBoss) * knockbackForceBoss;
-                    this.playerCollisionStunTimer = this.PLAYER_COLLISION_STUN_DURATION;
-                    this.speed = 0;
+                } else {
+                    // Normal collision: Player does NOT have Aegis Path
+                    if (!playerDamageImmune) { // Player only takes damage if not under general post-hit immunity
+                        // Standard Chaser "crazy bounce" logic
+                        const collisionAnglePlayer = Math.atan2(playerInstance.y - this.y, playerInstance.x - this.x);
+                        playerInstance.velX = Math.cos(collisionAnglePlayer) * PLAYER_BOUNCE_FORCE_FROM_BOSS;
+                        playerInstance.velY = Math.sin(collisionAnglePlayer) * PLAYER_BOUNCE_FORCE_FROM_BOSS;
 
-                    this.x = Math.max(this.radius, Math.min(canvasWidth - this.radius, this.x));
-                    this.y = Math.max(this.radius, Math.min(canvasHeight - this.radius, this.y));
+                        const dist = Math.sqrt((this.x - playerInstance.x) ** 2 + (this.y - playerInstance.y) ** 2);
+                        const overlap = (this.radius + playerInstance.radius) - dist;
+                        if (overlap > 0) {
+                            const pushAngleBoss = Math.atan2(this.y - playerInstance.y, this.x - playerInstance.x);
+                            const pushAmount = overlap * 1.3; // Stronger push for chaser
+                            this.x += Math.cos(pushAngleBoss) * pushAmount;
+                            this.y += Math.sin(pushAngleBoss) * pushAmount;
+
+                            const knockbackForceBoss = PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.6; // Chaser also recoils
+                            this.recoilVelX = Math.cos(pushAngleBoss) * knockbackForceBoss;
+                            this.recoilVelY = Math.sin(pushAngleBoss) * knockbackForceBoss;
+                            this.playerCollisionStunTimer = this.PLAYER_COLLISION_STUN_DURATION; // Chaser gets stunned briefly
+                            this.speed = 0;
+
+                            this.x = Math.max(this.radius, Math.min(canvasWidth - this.radius, this.x));
+                            this.y = Math.max(this.radius, Math.min(canvasHeight - this.radius, this.y));
+                        }
+                        // Signal to main.js/gameLogic that player collision occurred for damage processing
+                        if (gameContext && gameContext.playerCollidedWithBoss !== undefined) {
+                            gameContext.playerCollidedWithBoss = this;
+                        }
+                    }
                 }
-                 // Signal to main.js that player collision occurred for damage processing
-                if (gameContext) gameContext.playerCollidedWithBoss = this;
             }
         }
     }

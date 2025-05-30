@@ -257,10 +257,10 @@ export const ABILITY_CRIT_DAMAGE_TIER_BONUS = { common: 0.10, rare: 0.15, epic: 
 
 
 // ---- Unique Path Buff Constants ----
-export const PERFECT_HARMONY_NO_DAMAGE_DURATION_THRESHOLD = 5000;
-export const PERFECT_HARMONY_RAY_DAMAGE_BONUS = 0.20;
-export const PERFECT_HARMONY_SPEED_BONUS = 0.15;
-export const PERFECT_HARMONY_COOLDOWN_REDUCTION = 0.20;
+export const PERFECT_HARMONY_NO_DAMAGE_DURATION_THRESHOLD = 5000; // Was Path of Harmony
+// export const PERFECT_HARMONY_RAY_DAMAGE_BONUS = 0.20; // No longer used
+// export const PERFECT_HARMONY_SPEED_BONUS = 0.15; // No longer used
+// export const PERFECT_HARMONY_COOLDOWN_REDUCTION = 0.20; // No longer used
 
 export const BERSERKERS_ECHO_DAMAGE_PER_10_HP = 0.09;
 export const BERSERKERS_ECHO_SPEED_PER_10_HP = 0.03;
@@ -268,6 +268,13 @@ export const BERSERKERS_ECHO_SPEED_PER_10_HP = 0.03;
 // Kinetic Conversion - Base values (player object holds these)
 export const KINETIC_INITIAL_DAMAGE_BONUS = 0.30;
 export const KINETIC_BASE_CHARGE_RATE = 1.0;
+
+// ---- NEW: Aegis Path (Juggernaut) Constants ----
+export const AEGIS_PATH_BASE_COLLISION_DAMAGE = 50; // Flat damage per collision
+export const AEGIS_PATH_MAX_HP_SCALING_FACTOR = 0.13; // Damage = base + (maxHP * factor)
+export const AEGIS_PATH_RADIUS_SCALING_FACTOR = 1; // Damage += (radius * factor)
+export const AEGIS_PATH_BOSS_KNOCKBACK_FORCE = 30; // Base knockback force on boss
+export const AEGIS_PATH_PLAYER_SELF_KNOCKBACK_FACTOR = 0.3; // Player gets knocked back a bit too
 // ---- END Unique Path Buff Constants ----
 
 // Mouse Abilities Constants
