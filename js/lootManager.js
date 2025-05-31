@@ -43,17 +43,14 @@ export function initializeLootPools(playerInstance, updateBuffIndicatorCallback)
                 }
             }
         },
-        // Numeric abilities remain in the general pool if desired, or could also become path-specific if needed.
-        // For now, keeping them general as per original structure.
         { id: 'empBurst',        type: 'ability', slot: '1', name: 'EMP Burst',        description: 'Activate [1]: Destroy ALL non-boss rays on screen.', cooldown: 25000, radius: CONSTANTS.canvas?.width || 800, apply: ()=>{} },
         { id: 'miniGravityWell', type: 'ability', slot: '2', name: 'Mini Gravity Well',description: 'Activate [2]: Deploy a well that pulls rays. Activate again to launch them.', cooldown: 25000, duration: 7000, apply: ()=>{} },
         { id: 'teleport',        type: 'ability', slot: '3', name: 'Teleport',         description: 'Activate [3]: Instantly move to cursor. Brief immunity on arrival.', cooldown: 20000, duration: CONSTANTS.TELEPORT_IMMUNITY_DURATION, apply: ()=>{} },
-        // Omega Laser and Shield Overcharge are removed from general pool, now tied to Mage path.
     ];
 
     firstBossPathChoices = [
         {
-            id: 'aegisPath', // Tank Path
+            id: 'aegisPath', 
             type: 'path_buff',
             name: 'Aegis Path',
             description: `Become a living battering ram. Colliding with bosses damages them and knocks them back. Grants Aegis Helm. LMB: Hold to charge, release to dash. RMB: AoE Seismic Slam.`,
@@ -61,7 +58,7 @@ export function initializeLootPools(playerInstance, updateBuffIndicatorCallback)
             grants_RMB: 'seismicSlam'
         },
         {
-            id: 'berserkersEcho', // Fury Path
+            id: 'berserkersEcho', 
             type: 'path_buff',
             name: 'Path of Fury',
             description: `Per 10% missing Max HP: +${CONSTANTS.BERSERKERS_ECHO_DAMAGE_PER_10_HP*100}% normal ray damage & +${CONSTANTS.BERSERKERS_ECHO_SPEED_PER_10_HP*100}% speed. Grants Berserker's Helm. LMB: Activate Bloodpact for ray lifesteal. RMB: Savage Howl to fear enemies and boost attack speed.`,
@@ -69,12 +66,12 @@ export function initializeLootPools(playerInstance, updateBuffIndicatorCallback)
             grants_RMB: 'savageHowl'
         },
         {
-            id: 'ultimateConfiguration', // Mage Path
+            id: 'ultimateConfiguration', 
             type: 'path_buff',
             name: 'Path of Power',
-            description: `Omega Laser Dmg x2, Mini-Well Launched Rays +100% Dmg. Numbered Ability Cooldowns +50%. Grants Wizard's Hat. LMB: Omega Laser. RMB: Shield Overcharge.`,
-            grants_LMB: 'omegaLaser', // Existing ability ID
-            grants_RMB: 'shieldOvercharge' // Existing ability ID
+            description: `Damaging effects of all abilities deal 2x damage. Kinetic Conversion charges with movement (no decay) & scales over time. Grants Wizard's Hat. LMB: Omega Laser. RMB: Shield Overcharge.`,
+            grants_LMB: 'omegaLaser', 
+            grants_RMB: 'shieldOvercharge' 
         }
     ];
 }
@@ -171,7 +168,7 @@ function confirmLootSelection(chosenUpgrade, playerInstance) {
                     justBecameReady: true
                 };
             }
-        } else if (chosenUpgrade.type !== 'ability') { // Gear, etc.
+        } else if (chosenUpgrade.type !== 'ability') { 
              playerInstance.acquiredBossUpgrades.push(chosenUpgrade.id);
         }
      }
@@ -185,7 +182,6 @@ function confirmPathSelection(chosenPathBuff, playerInstance) {
         return;
     }
 
-    // Reset all path-specific flags and mouse ability flags first
     playerInstance.currentPath = null;
     playerInstance.hasAegisPathHelm = false;
     playerInstance.hasBerserkersEchoHelm = false;
@@ -198,7 +194,14 @@ function confirmPathSelection(chosenPathBuff, playerInstance) {
     playerInstance.hasBloodpact = false;
     playerInstance.hasSavageHowl = false;
 
-    // Apply chosen path
+    // Reset Kinetic Conversion before setting for Mage
+    playerInstance.kineticConversionLevel = 0;
+    playerInstance.baseKineticChargeRate = 0;
+    playerInstance.initialKineticDamageBonus = 0;
+    playerInstance.magePathTimeElapsed = 0;
+    playerInstance.kineticConversionScaleTimer = 0;
+
+
     if (chosenPathBuff.id === 'aegisPath') {
         playerInstance.currentPath = 'aegis';
         playerInstance.hasAegisPathHelm = true;
@@ -214,6 +217,13 @@ function confirmPathSelection(chosenPathBuff, playerInstance) {
         playerInstance.hasUltimateConfigurationHelm = true;
         if (chosenPathBuff.grants_LMB === 'omegaLaser') playerInstance.hasOmegaLaser = true;
         if (chosenPathBuff.grants_RMB === 'shieldOvercharge') playerInstance.hasShieldOvercharge = true;
+        
+        playerInstance.kineticConversionLevel = 1; 
+        playerInstance.baseKineticChargeRate = CONSTANTS.KINETIC_BASE_CHARGE_RATE;
+        playerInstance.initialKineticDamageBonus = CONSTANTS.KINETIC_INITIAL_DAMAGE_BONUS;
+        playerInstance.magePathTimeElapsed = 0; // Start timer for scaling
+        playerInstance.kineticConversionScaleTimer = 0; // Start timer for scaling interval
+        
     } else {
         console.error("[LootManager] Unknown path ID chosen during confirmation:", chosenPathBuff.id);
     }

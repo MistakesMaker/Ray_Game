@@ -4,7 +4,7 @@ import * as GameState from './gameState.js';
 import { getReadableColorName as getReadableColorNameFromUtils } from './utils.js';
 
 let evolutionChoicesMasterList = [];
-let _currentlyDisplayedEvolutionOffers = []; // To store the full data of currently shown cards
+let _currentlyDisplayedEvolutionOffers = []; 
 let _isBlockModeActiveManager = false;
 
 let _dependencies = {
@@ -16,7 +16,7 @@ let _dependencies = {
     audioUpgradeSound: null,
     updateLastEvolutionScore: null,
     triggerBossSpawnCheck: null,
-    inputState: null // For Shift key
+    inputState: null 
 };
 
 
@@ -29,7 +29,6 @@ function rollTier() {
     return 'common';
 }
 
-// Helper to generate a single new offer, avoiding existing ones and blocked ones
 function generateSingleNewOffer(playerInstance, existingOfferBaseIds, additionalExclusionId = null) {
     const exclusionList = [...playerInstance.blockedEvolutionIds, ...existingOfferBaseIds];
     if (additionalExclusionId && !exclusionList.includes(additionalExclusionId)) {
@@ -42,7 +41,7 @@ function generateSingleNewOffer(playerInstance, existingOfferBaseIds, additional
     });
 
     if (availableChoices.length > 0) {
-        const baseEvo = availableChoices[Math.floor(Math.random() * availableChoices.length)]; // Pick one randomly
+        const baseEvo = availableChoices[Math.floor(Math.random() * availableChoices.length)]; 
         let rolledTierIfApplicable = baseEvo.isTiered ? rollTier() : 'common';
         const tierSpecificData = baseEvo.isTiered ? baseEvo.tiers[rolledTierIfApplicable] : baseEvo;
 
@@ -61,7 +60,6 @@ function generateSingleNewOffer(playerInstance, existingOfferBaseIds, additional
             originalEvolution: baseEvo
         };
     }
-    // Fallback if no valid new offer can be generated
     return {
         baseId: `empty_slot_replacement`, classType: 'ability', text:"No More Options", rolledTier: null,
         detailedDescription: "No further upgrades available for this slot.", applyEffect: ()=>{},
@@ -98,7 +96,7 @@ export function initializeEvolutionMasterList() {
                 return"No new colors left!";
             },
             getEffectString: function(playerInstance) { return `Currently Immune to ${playerInstance?playerInstance.immuneColorsList.length:0} colors`; },
-            getCardEffectString: function(tier, playerInstance) { // This is the "front of card" text
+            getCardEffectString: function(tier, playerInstance) { 
                  return `Gain immunity to a new random color.`;
             }
         },
@@ -244,40 +242,14 @@ export function initializeEvolutionMasterList() {
             getEffectString: function(p) { return `Current Ray Crit Damage: x${(p && p.rayCritDamageMultiplier !== undefined ? p.rayCritDamageMultiplier:1.5).toFixed(2)}`; },
             getCardEffectString: function(tier) { return `+${(CONSTANTS.RAY_CRIT_DAMAGE_TIER_BONUS[tier]*100).toFixed(0)}% Ray Crit Damage`;}
         },
-        {
-            id: 'kineticConversion', classType: 'ability', text: "Kinetic Conversion", level: 0, maxLevel: 999,
-            isTiered: true,
-            isMaxed: function(p) { return false; },
-            tiers: {
-                common:    { description: "Increases Kinetic Conversion level. Standard per-level scaling for charge rate and damage potential.", apply: function(p) { p.kineticConversionLevel++; p.effectiveKineticChargeRatePerLevel = Math.max(p.effectiveKineticChargeRatePerLevel, CONSTANTS.DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.common.rateBonus); p.effectiveKineticAdditionalDamageBonusPerLevel = Math.max(p.effectiveKineticAdditionalDamageBonusPerLevel, CONSTANTS.DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.common.dmgBonus); }},
-                rare:      { description: "Increases Kinetic Conversion level. Slightly enhances its per-level scaling.", apply: function(p) { p.kineticConversionLevel++; p.effectiveKineticChargeRatePerLevel = Math.max(p.effectiveKineticChargeRatePerLevel, CONSTANTS.DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.rare.rateBonus); p.effectiveKineticAdditionalDamageBonusPerLevel = Math.max(p.effectiveKineticAdditionalDamageBonusPerLevel, CONSTANTS.DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.rare.dmgBonus); }},
-                epic:      { description: "Increases Kinetic Conversion level. Moderately enhances its per-level scaling.", apply: function(p) { p.kineticConversionLevel++; p.effectiveKineticChargeRatePerLevel = Math.max(p.effectiveKineticChargeRatePerLevel, CONSTANTS.DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.epic.rateBonus); p.effectiveKineticAdditionalDamageBonusPerLevel = Math.max(p.effectiveKineticAdditionalDamageBonusPerLevel, CONSTANTS.DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.epic.dmgBonus); }},
-                legendary: { description: "Increases Kinetic Conversion level. Greatly enhances its per-level scaling.", apply: function(p) { p.kineticConversionLevel++; p.effectiveKineticChargeRatePerLevel = Math.max(p.effectiveKineticChargeRatePerLevel, CONSTANTS.DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.legendary.rateBonus); p.effectiveKineticAdditionalDamageBonusPerLevel = Math.max(p.effectiveKineticAdditionalDamageBonusPerLevel, CONSTANTS.DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL + CONSTANTS.KINETIC_CONVERSION_TIER_SCALING.legendary.dmgBonus); }}
-            },
-            getEffectString: function(playerInstance) {
-                if (!playerInstance) return "Lvl 0: Max Dmg +0%, Rate 0/s";
-                const KCL = playerInstance.kineticConversionLevel || 0;
-                if (KCL === 0) {
-                    return "Not Acquired";
-                }
-                const maxPotencyBonus = playerInstance.initialKineticDamageBonus + (Math.max(0, KCL - 1) * playerInstance.effectiveKineticAdditionalDamageBonusPerLevel);
-                const chargeRate = playerInstance.baseKineticChargeRate + (KCL * playerInstance.effectiveKineticChargeRatePerLevel);
-                return `Lvl ${KCL}: Dmg +${(maxPotencyBonus * 100).toFixed(0)}%, Rate ${chargeRate.toFixed(2)}/s`;
-            },
-            getCardEffectString: function(tier, playerInstance) {
-                 const KCL = playerInstance ? (playerInstance.kineticConversionLevel || 0) + 1 : 1;
-                 const rateBonusPercent = (CONSTANTS.KINETIC_CONVERSION_TIER_SCALING[tier]?.rateBonus || 0);
-                 const dmgBonusPercent = (CONSTANTS.KINETIC_CONVERSION_TIER_SCALING[tier]?.dmgBonus || 0);
-
-                 const nextEffRatePerLvl = CONSTANTS.DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL + rateBonusPercent;
-                 const nextEffDmgPerLvl = CONSTANTS.DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL + dmgBonusPercent;
-
-                 const nextMaxPotency = CONSTANTS.KINETIC_INITIAL_DAMAGE_BONUS + (Math.max(0, KCL - 1) * nextEffDmgPerLvl);
-                 const nextChargeRate = (playerInstance ? playerInstance.baseKineticChargeRate : CONSTANTS.KINETIC_BASE_CHARGE_RATE) + (KCL * nextEffRatePerLvl);
-
-                 return `To Lvl ${KCL}: Max Dmg +${(nextMaxPotency * 100).toFixed(0)}%, Rate ${nextChargeRate.toFixed(2)}/s`;
-            }
-        },
+        // { // <<< KINETIC CONVERSION REMOVED FROM HERE
+        //     id: 'kineticConversion', classType: 'ability', text: "Kinetic Conversion", level: 0, maxLevel: 999,
+        //     isTiered: true,
+        //     isMaxed: function(p) { return false; },
+        //     tiers: { ... },
+        //     getEffectString: function(playerInstance) { ... },
+        //     getCardEffectString: function(tier, playerInstance) { ... }
+        // },
         {
             id: 'temporalEcho', classType: 'ability', text: "Temporal Echo", level: 0, maxLevel: 999,
             detailedDescription: function(playerInstance) {
@@ -429,11 +401,9 @@ export function generateEvolutionOffers(playerInstance) {
                     offeredBaseIds.push(reconstructedHeldOffer.baseId);
                     filledIndices[targetIndex] = true;
                 } else {
-                     console.warn("EvolutionManager: Held choice had invalid originalIndex:", targetIndex, "Clearing hold.");
                      playerInstance.frozenEvolutionChoice = null;
                 }
             } else {
-                 console.warn("EvolutionManager: Held choice", originalMasterEvo.id, "became invalid. Clearing hold.");
                  playerInstance.frozenEvolutionChoice = null;
             }
         } else {
@@ -547,7 +517,6 @@ export function presentEvolutionUI(playerInstance, dependencies) {
 
 export function redrawEvolutionOptionsWithShiftState(playerInstance) {
     if (!playerInstance || !_dependencies.UIManager || !_dependencies.inputState) {
-        console.warn("Cannot redraw evolution options: missing player or dependencies.");
         return;
     }
      _dependencies.UIManager.populateEvolutionOptionsUI(
@@ -733,12 +702,10 @@ function handleBlockActionOnCard(baseIdToBlock, playerInstance) {
     const blockedCardIndex = _currentlyDisplayedEvolutionOffers.findIndex(offer => offer.baseId === baseIdToBlock);
 
     if (blockedCardIndex !== -1) {
-        // Get IDs of other offers to exclude them from the single new roll
         const otherOfferIds = _currentlyDisplayedEvolutionOffers
             .filter((_, idx) => idx !== blockedCardIndex)
             .map(offer => offer.baseId);
 
-        // Generate just one new offer for the blocked slot
         const newSingleOffer = generateSingleNewOffer(playerInstance, otherOfferIds, baseIdToBlock);
         _currentlyDisplayedEvolutionOffers[blockedCardIndex] = newSingleOffer;
     }

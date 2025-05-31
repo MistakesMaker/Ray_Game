@@ -13,9 +13,7 @@ import {
     RAY_SPAWN_GRACE_PERIOD,
     BERSERKERS_ECHO_DAMAGE_PER_10_HP,
     BERSERKERS_ECHO_SPEED_PER_10_HP,
-    DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL,
-    DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL,
-    KINETIC_INITIAL_DAMAGE_BONUS,
+    KINETIC_INITIAL_DAMAGE_BONUS, KINETIC_BASE_CHARGE_RATE, 
     MAX_EVOLUTION_REROLLS, 
     MAX_EVOLUTION_BLOCKS,  
     MAX_EVOLUTION_FREEZES_PER_RUN, 
@@ -28,7 +26,6 @@ import {
     AEGIS_PATH_BOSS_KNOCKBACK_FORCE,
     AEGIS_PATH_PLAYER_SELF_KNOCKBACK_FACTOR,
 
-    // New Path Ability Constants
     AEGIS_CHARGE_MAX_CHARGE_TIME, AEGIS_CHARGE_MIN_DAMAGE, AEGIS_CHARGE_MAX_DAMAGE_SCALE_PER_SECOND_CHARGED,
     AEGIS_CHARGE_AOE_RADIUS, AEGIS_CHARGE_DR_DURING_DASH, AEGIS_CHARGE_COOLDOWN, AEGIS_CHARGE_DASH_SPEED_FACTOR,
     SEISMIC_SLAM_DAMAGE_BASE, SEISMIC_SLAM_DAMAGE_MAXHP_SCALE, SEISMIC_SLAM_DAMAGE_RADIUS_SCALE,
@@ -48,7 +45,8 @@ import {
     playerWellDeploySound, playerWellDetonateSound,
     shootSound,
     bossHitSound as audioBossHitSound,
-    savageHowlSound 
+    savageHowlSound,
+    upgradeSound as audioUpgradeSound // For Kinetic Power Amplified notification
 } from './audio.js';
 import { PlayerGravityWell } from './ray.js';
 
@@ -76,7 +74,7 @@ export class Player {
         this.damageTakenMultiplier = 1.0;
 
         this.hpPickupBonus = 0;
-        this.abilityDamageMultiplier = 1.0;
+        this.abilityDamageMultiplier = 1.0; 
         this.temporalEchoChance = 0.0;
         this.temporalEchoFixedReduction = 2000;
 
@@ -87,15 +85,16 @@ export class Player {
         this.abilityCritChance = 0.0;
         this.abilityCritDamageMultiplier = 1.5;
 
+        // Kinetic Conversion (Mage specific)
         this.kineticCharge = 0;
-        this.baseKineticChargeRate = 1.0;
-        this.effectiveKineticChargeRatePerLevel = DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL;
-        this.kineticDecayRate = 2.0;
-        this.kineticChargeSpeedThresholdFactor = 0.70;
-        this.kineticConversionLevel = 0;
-        this.initialKineticDamageBonus = KINETIC_INITIAL_DAMAGE_BONUS;
-        this.effectiveKineticAdditionalDamageBonusPerLevel = DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL;
-        this.kineticChargeConsumption = 100;
+        this.baseKineticChargeRate = 0; 
+        this.kineticConversionLevel = 0; 
+        this.initialKineticDamageBonus = 0; 
+        this.kineticChargeConsumption = 100; 
+        this.magePathTimeElapsed = 0; // <<< NEW: Timer for Mage path duration
+        this.kineticConversionScaleTimer = 0; // <<< NEW: Timer for scaling interval
+        this.kineticConversionScaleInterval = 60000; // <<< NEW: 1 minute
+        this.kineticConversionScalingFactor = 1.1; // <<< NEW: 1.1x multiplier
 
         this.currentOmegaLaserKineticBoost = 1.0;
         this.currentGravityWellKineticBoost = 1.0;
@@ -105,10 +104,9 @@ export class Player {
         this.hpRegenBonusFromEvolution = 0;
         this.acquiredBossUpgrades = [];
 
-        // Path related flags
         this.currentPath = null; 
         this.hasBerserkersEchoHelm = false;
-        this.hasUltimateConfigurationHelm = false;
+        this.hasUltimateConfigurationHelm = false; 
         this.hasAegisPathHelm = false;
 
         this.activeAbilities = {
@@ -132,7 +130,6 @@ export class Player {
         this.originalPlayerSpeed = initialPlayerSpeed;
         this.currentSpeed = initialPlayerSpeed;
 
-        // ---- MAGE Path Abilities ----
         this.hasOmegaLaser = false; 
         this.isFiringOmegaLaser = false;
         this.omegaLaserTimer = 0;
@@ -153,7 +150,6 @@ export class Player {
         this.shieldOverchargeCooldownTimer = 0;
         this.shieldOverchargeCooldown = SHIELD_OVERCHARGE_COOLDOWN;
 
-        // ---- AEGIS Path (Tank) Abilities ----
         this.hasAegisCharge = false;
         this.isChargingAegisCharge = false;
         this.aegisChargeCurrentChargeTime = 0;
@@ -162,12 +158,11 @@ export class Player {
         this.aegisChargeDashTargetX = 0;
         this.aegisChargeDashTargetY = 0;
         this.aegisChargeDashTimer = 0; 
-        this.currentChargeRotation = 0; // <<< NEW for Aegis Charge spin
+        this.currentChargeRotation = 0; 
 
         this.hasSeismicSlam = false;
         this.seismicSlamCooldownTimer = 0;
 
-        // ---- BERSERKER Path (Fury) Abilities ----
         this.hasBloodpact = false;
         this.isBloodpactActive = false;
         this.bloodpactTimer = 0;
@@ -177,7 +172,6 @@ export class Player {
         this.savageHowlCooldownTimer = 0;
         this.isSavageHowlAttackSpeedBuffActive = false;
         this.savageHowlAttackSpeedBuffTimer = 0;
-
 
         this.evolutionReRollsRemaining = MAX_EVOLUTION_REROLLS; 
         this.blockedEvolutionIds = [];
@@ -213,18 +207,21 @@ export class Player {
         this.ownRaySpeedMultiplier = 1.0;
         this.damageTakenMultiplier = 1.0;
         this.hpPickupBonus = 0;
-        this.abilityDamageMultiplier = 1.0;
+        this.abilityDamageMultiplier = 1.0; 
         this.temporalEchoChance = 0.0;
         this.globalCooldownReduction = 0.0;
         this.rayCritChance = 0.0;
         this.rayCritDamageMultiplier = 1.5;
         this.abilityCritChance = 0.0;
         this.abilityCritDamageMultiplier = 1.5;
+        
         this.kineticCharge = 0;
-        this.baseKineticChargeRate = 1.0;
-        this.effectiveKineticChargeRatePerLevel = DEFAULT_KINETIC_CHARGE_RATE_PER_LEVEL;
-        this.kineticConversionLevel = 0;
-        this.effectiveKineticAdditionalDamageBonusPerLevel = DEFAULT_KINETIC_ADDITIONAL_DAMAGE_BONUS_PER_LEVEL;
+        this.baseKineticChargeRate = 0; 
+        this.kineticConversionLevel = 0; 
+        this.initialKineticDamageBonus = 0; 
+        this.magePathTimeElapsed = 0;      // <<< RESET
+        this.kineticConversionScaleTimer = 0; // <<< RESET
+
         this.timeSinceLastHit = Number.MAX_SAFE_INTEGER;
         this.hpRegenTimer = 0;
         this.hpRegenBonusFromEvolution = 0;
@@ -247,20 +244,16 @@ export class Player {
         this.totalDamageDealt = 0;
         this.currentSpeed = this.originalPlayerSpeed;
 
-        // Reset Mage abilities
         this.hasOmegaLaser = false; this.isFiringOmegaLaser = false; this.omegaLaserTimer = 0; this.omegaLaserCooldownTimer = 0;
         this.hasShieldOvercharge = false; this.isShieldOvercharging = false; this.shieldOverchargeTimer = 0; this.shieldOverchargeCooldownTimer = 0;
         
-        // Reset Aegis abilities
         this.hasAegisCharge = false; this.isChargingAegisCharge = false; this.aegisChargeCurrentChargeTime = 0; this.aegisChargeCooldownTimer = 0;
         this.isAegisChargingDash = false; this.aegisChargeDashTimer = 0;
-        this.currentChargeRotation = 0; // <<< RESET Aegis Charge spin
+        this.currentChargeRotation = 0; 
         this.hasSeismicSlam = false; this.seismicSlamCooldownTimer = 0;
 
-        // Reset Berserker abilities
         this.hasBloodpact = false; this.isBloodpactActive = false; this.bloodpactTimer = 0; this.bloodpactCooldownTimer = 0;
         this.hasSavageHowl = false; this.savageHowlCooldownTimer = 0; this.isSavageHowlAttackSpeedBuffActive = false; this.savageHowlAttackSpeedBuffTimer = 0;
-
 
         this.evolutionReRollsRemaining = MAX_EVOLUTION_REROLLS; 
         this.blockedEvolutionIds = [];
@@ -309,15 +302,12 @@ export class Player {
         ctx.save();
         ctx.translate(this.x, this.y);
 
-        // Apply Aegis Charge rotation if active
         if (this.currentPath === 'aegis' && this.isChargingAegisCharge && this.currentChargeRotation !== 0) {
             ctx.rotate(this.currentChargeRotation);
         }
 
-        ctx.save(); // Inner save for helm drawing, so it doesn't affect main body rotation if helm is static
+        ctx.save(); 
         if (this.currentPath === 'aegis' && this.isChargingAegisCharge && this.currentChargeRotation !== 0) {
-            // No rotation for helm if player body is already rotating, or rotate helm oppositely
-            // ctx.rotate(-this.currentChargeRotation); // To keep helm static relative to screen
         }
 
 
@@ -385,7 +375,7 @@ export class Player {
             ctx.fill(); ctx.stroke();
             ctx.shadowBlur = 0;
             ctx.shadowColor = "transparent";
-        } else if (this.hasUltimateConfigurationHelm) {
+        } else if (this.hasUltimateConfigurationHelm) { 
             ctx.fillStyle = "rgba(80, 0, 120, 0.85)";
             ctx.strokeStyle = "rgba(180, 120, 255, 0.9)";
             ctx.lineWidth = 2;
@@ -407,7 +397,7 @@ export class Player {
             ctx.arc(0, -this.radius * 1.5, this.radius * 0.15, 0, Math.PI * 2);
             ctx.fill();
         }
-        ctx.restore(); // Restore from helm's potential rotation
+        ctx.restore(); 
 
         if (this.teleporting && this.teleportEffectTimer > 0) {
             const effectProgress = 1 - (this.teleportEffectTimer / TELEPORT_IMMUNITY_DURATION);
@@ -518,16 +508,11 @@ export class Player {
             ctx.strokeStyle = `rgba(255, 100, 100, ${laserIntensity})`; ctx.lineWidth = 2; ctx.stroke();
             ctx.restore();
         } else if (this.isChargingAegisCharge && this.currentPath === 'aegis') {
-            const chargeProgress = this.aegisChargeCurrentChargeTime / AEGIS_CHARGE_MAX_CHARGE_TIME;
-            ctx.beginPath();
-            ctx.arc(0, 0, this.radius + 2 + chargeProgress * 8, 0, Math.PI * 2 * chargeProgress);
-            ctx.strokeStyle = `rgba(255, 200, 100, ${0.3 + chargeProgress * 0.5})`;
-            ctx.lineWidth = 2 + chargeProgress * 4;
-            ctx.stroke();
+            // Aim indicator is not drawn during charge, body is spinning
         }
          else { 
              ctx.save(); 
-             if (!(this.currentPath === 'aegis' && this.isChargingAegisCharge)) { // Only rotate aim indicator if not charging Aegis
+             if (!(this.currentPath === 'aegis' && this.isChargingAegisCharge)) { 
                 ctx.rotate(this.aimAngle);
              }
              if (this.visualModifiers.momentumInjectors) {
@@ -555,7 +540,7 @@ export class Player {
             ctx.restore();
         }
 
-        ctx.restore(); // Final restore for player translation
+        ctx.restore(); 
     }
 
     static drawFromSnapshot(ctx, snapshotPlayerData, centerX, centerY, aimAngle = 0) {
@@ -703,7 +688,7 @@ export class Player {
         }
         ctx.restore();
 
-        ctx.restore(); // final translate restore
+        ctx.restore(); 
     }
 
     update(gameContext) {
@@ -728,33 +713,28 @@ export class Player {
                 this.teleporting = false; this.teleportEffectTimer = 0;
             }
         }
-        // Handle Aegis Charge spin
+        
         if (this.currentPath === 'aegis' && this.isChargingAegisCharge) {
             const chargeProgress = Math.min(1, this.aegisChargeCurrentChargeTime / AEGIS_CHARGE_MAX_CHARGE_TIME);
-            const maxSpinSpeed = Math.PI / 15; // Radians per frame at max charge
-            this.currentChargeRotation += chargeProgress * maxSpinSpeed * (dt / (1000 / 60)); // Scale by dt
+            const maxSpinSpeed = Math.PI / 15; 
+            const currentSpinSpeed = chargeProgress * maxSpinSpeed;
+            this.currentChargeRotation += currentSpinSpeed * (dt / (1000/60)); 
             this.currentChargeRotation %= (Math.PI * 2);
         } else if (this.currentPath === 'aegis' && !this.isChargingAegisCharge && !this.isAegisChargingDash) {
-            // Optional: gradually slow down rotation or snap back
              if (this.currentChargeRotation !== 0) {
-                this.currentChargeRotation *= 0.9; // Slow down
+                this.currentChargeRotation *= 0.9; 
                 if (Math.abs(this.currentChargeRotation) < 0.01) this.currentChargeRotation = 0;
             }
         } else if (this.currentPath !== 'aegis' && this.currentChargeRotation !== 0) {
-            this.currentChargeRotation = 0; // Ensure it's reset if path changes or not Aegis
+            this.currentChargeRotation = 0; 
         }
 
 
-        // Update numeric abilities
         let numericAbilityUIUpdateNeeded = false;
         for (const slot in this.activeAbilities) {
              if (this.activeAbilities[slot]) {
                 let effectiveCooldownMultiplier = 1.0 - this.globalCooldownReduction;
-                 if (this.currentPath === 'mage') { 
-                    effectiveCooldownMultiplier /= 1.5; 
-                }
                 effectiveCooldownMultiplier = Math.max(0.1, effectiveCooldownMultiplier);
-
 
                 if (this.activeAbilities[slot].cooldownTimer > 0) {
                     this.activeAbilities[slot].cooldownTimer -= dt / effectiveCooldownMultiplier;
@@ -808,12 +788,26 @@ export class Player {
                 } else if (this.omegaLaserCooldownTimer > 0) { let ecm = Math.max(0.1, 1.0 - this.globalCooldownReduction); this.omegaLaserCooldownTimer -= dt/ecm; mouseAbilityUIUpdateNeeded = true; if(this.omegaLaserCooldownTimer < 0) this.omegaLaserCooldownTimer=0;}
             }
             if (this.hasShieldOvercharge) updateGenericMouseAbility('isShieldOvercharging', 'shieldOverchargeTimer', 'shieldOverchargeCooldownTimer', gameConstants.SHIELD_OVERCHARGE_COOLDOWN, gameConstants.SHIELD_OVERCHARGE_DURATION);
+            
+            // Mage Kinetic Conversion Scaling
+            if (this.kineticConversionLevel > 0) { // Only if Mage path has been chosen
+                this.magePathTimeElapsed += dt;
+                this.kineticConversionScaleTimer += dt;
+                if (this.kineticConversionScaleTimer >= this.kineticConversionScaleInterval) {
+                    this.initialKineticDamageBonus *= this.kineticConversionScalingFactor;
+                    this.baseKineticChargeRate *= this.kineticConversionScalingFactor;
+                    this.kineticConversionScaleTimer -= this.kineticConversionScaleInterval; // More precise timing
+                    if(activeBuffNotificationsArray) activeBuffNotificationsArray.push({ text: `Kinetic Power Amplified!`, timer: BUFF_NOTIFICATION_DURATION });
+                    playSound(audioUpgradeSound); // Re-use upgrade sound
+                }
+            }
+
         } else if (this.currentPath === 'aegis') {
             if (this.hasAegisCharge) {
                 if(this.isChargingAegisCharge) {
                      this.aegisChargeCurrentChargeTime += dt;
                      if (this.aegisChargeCurrentChargeTime > AEGIS_CHARGE_MAX_CHARGE_TIME) {
-                        this.aegisChargeCurrentChargeTime = AEGIS_CHARGE_MAX_CHARGE_TIME; // Cap charge time
+                        this.aegisChargeCurrentChargeTime = AEGIS_CHARGE_MAX_CHARGE_TIME; 
                      }
                 }
                 if(this.isAegisChargingDash) {
@@ -825,7 +819,7 @@ export class Player {
                     this.x += dxDash * (dt / (1000/60)); this.y += dyDash * (dt / (1000/60));
                     if (Math.hypot(this.x - this.aegisChargeDashTargetX, this.y - this.aegisChargeDashTargetY) < dashSpeed * 0.5 || this.aegisChargeDashTimer <= 0) { 
                         this.isAegisChargingDash = false; this.aegisChargeDashTimer = 0;
-                        this.currentChargeRotation = 0; // Stop spinning after dash
+                        this.currentChargeRotation = 0; 
                         this.dealAegisChargeImpactDamage(activeBosses, targets, {updateScoreCallback}); 
                         let cd = gameConstants.AEGIS_CHARGE_COOLDOWN * (1.0 - this.globalCooldownReduction); this.aegisChargeCooldownTimer = Math.max(gameConstants.AEGIS_CHARGE_COOLDOWN * 0.1, cd);
                     }
@@ -890,14 +884,17 @@ export class Player {
             }
         }
 
-        let currentTotalKineticChargeRate = this.baseKineticChargeRate;
-        if (this.kineticConversionLevel > 0) currentTotalKineticChargeRate += this.kineticConversionLevel * this.effectiveKineticChargeRatePerLevel;
-        if (playerIsActuallyMoving) this.kineticCharge = Math.min(100, this.kineticCharge + currentTotalKineticChargeRate * (dt / 1000));
-        else this.kineticCharge = Math.max(0, this.kineticCharge - this.kineticDecayRate * (dt / 1000));
+        if (this.kineticConversionLevel > 0) { // True for Mage path
+            if (playerIsActuallyMoving) {
+                this.kineticCharge = Math.min(100, this.kineticCharge + this.baseKineticChargeRate * (dt / 1000));
+            }
+            // No decay based on new requirement
+        }
+
 
         if (ui && ui.updateKineticChargeUI) {
             let maxPotencyAtFullCharge = 0;
-            if (this.kineticConversionLevel > 0) maxPotencyAtFullCharge = this.initialKineticDamageBonus + (Math.max(0, this.kineticConversionLevel - 1) * this.effectiveKineticAdditionalDamageBonusPerLevel);
+            if (this.kineticConversionLevel > 0) maxPotencyAtFullCharge = this.initialKineticDamageBonus; 
             ui.updateKineticChargeUI(this.kineticCharge, this.kineticChargeConsumption, maxPotencyAtFullCharge, this.kineticConversionLevel > 0);
         }
 
@@ -989,9 +986,9 @@ export class Player {
 
                         if (this.kineticConversionLevel > 0 && this.kineticCharge >= this.kineticChargeConsumption) {
                             const damageMultiplier = this.consumeKineticChargeForDamageBoost();
-                            ray.momentumDamageBonusValue = (ray.momentumDamageBonusValue || 0) + (damageMultiplier - 1);
+                            ray.momentumDamageBonusValue = (ray.momentumDamageBonusValue || 0) + (damageMultiplier - 1); 
                              if (ui && ui.updateKineticChargeUI) {
-                                let maxPotencyAtFullCharge = this.initialKineticDamageBonus + (Math.max(0, this.kineticConversionLevel - 1) * this.effectiveKineticAdditionalDamageBonusPerLevel);
+                                let maxPotencyAtFullCharge = this.initialKineticDamageBonus; 
                                 ui.updateKineticChargeUI(this.kineticCharge, this.kineticChargeConsumption, maxPotencyAtFullCharge, this.kineticConversionLevel > 0);
                             }
                         }
@@ -1028,9 +1025,9 @@ export class Player {
 
         if (typeof boss.takeDamage === 'function') {
             const damageApplied = boss.takeDamage(collisionDamage, null, this, { isAegisCollision: true });
-            if (damageApplied) {
+            if (damageApplied > 0) { 
                 playSound(audioBossHitSound); 
-                this.totalDamageDealt += collisionDamage;
+                this.totalDamageDealt += damageApplied; 
                 boss.lastHitByAegisTimer = Date.now();
                  if (gameContext.screenShakeParams) {
                     gameContext.screenShakeParams.isScreenShaking = true;
@@ -1147,14 +1144,15 @@ export class Player {
     }
 
     consumeKineticChargeForDamageBoost() {
-        if (this.kineticCharge <= 0 || this.kineticConversionLevel <= 0) return 1.0;
+        if (this.kineticCharge <= 0 || this.kineticConversionLevel <= 0) return 1.0; 
         let chargeToConsume = Math.min(this.kineticCharge, this.kineticChargeConsumption);
         let effectScale = chargeToConsume / this.kineticChargeConsumption;
-        let maxPossiblePotencyBonus;
-        if (this.kineticConversionLevel === 1) maxPossiblePotencyBonus = this.initialKineticDamageBonus;
-        else maxPossiblePotencyBonus = this.initialKineticDamageBonus + ((this.kineticConversionLevel - 1) * this.effectiveKineticAdditionalDamageBonusPerLevel);
+        
+        let maxPossiblePotencyBonus = this.initialKineticDamageBonus; 
+
         let currentPotencyBonus = effectScale * maxPossiblePotencyBonus;
         let finalDamageMultiplier = 1.0 + currentPotencyBonus;
+
         this.kineticCharge -= chargeToConsume;
         return finalDamageMultiplier;
     }
@@ -1190,7 +1188,7 @@ export class Player {
 
 
     activateAbility(slot, abilityContext) { 
-        const { isAnyPauseActiveCallback, updateAbilityCooldownCallback } = abilityContext;
+        const { isAnyPauseActiveCallback, updateAbilityCooldownCallback, activeBosses } = abilityContext; // Added activeBosses
         if (isAnyPauseActiveCallback && isAnyPauseActiveCallback()) return;
 
         const slotStr = String(slot);
@@ -1199,8 +1197,7 @@ export class Player {
 
         let abilityUsedSuccessfully = false;
         let baseCooldownForThisAbility = ability.cooldownDuration;
-        if (this.currentPath === 'mage') baseCooldownForThisAbility *= 1.5;
-
+        
         let effectiveCooldownToSet = baseCooldownForThisAbility * (1.0 - this.globalCooldownReduction);
         effectiveCooldownToSet = Math.max(baseCooldownForThisAbility * 0.1, effectiveCooldownToSet);
 
@@ -1217,7 +1214,22 @@ export class Player {
         } else if (ability.cooldownTimer <= 0) {
             switch (ability.id) {
                 case 'teleport': this.doTeleport(abilityContext.bossDefeatEffectsArray, abilityContext.mouseX, abilityContext.mouseY, abilityContext.canvasWidth, abilityContext.canvasHeight); ability.cooldownTimer = effectiveCooldownToSet; abilityUsedSuccessfully = true; break;
-                case 'empBurst': this.triggerEmpBurst(abilityContext.bossDefeatEffectsArray, abilityContext.allRays, abilityContext.screenShakeParams, abilityContext.canvasWidth, abilityContext.canvasHeight); ability.cooldownTimer = effectiveCooldownToSet; abilityUsedSuccessfully = true; break;
+                case 'empBurst': 
+                    this.triggerEmpBurst(abilityContext.bossDefeatEffectsArray, abilityContext.allRays, abilityContext.screenShakeParams, abilityContext.canvasWidth, abilityContext.canvasHeight); 
+                    if (this.currentPath === 'mage' && activeBosses) { // Ensure activeBosses is available
+                        let empDamage = 50 * (this.abilityDamageMultiplier || 1.0); 
+                         if (this.abilityCritChance > 0 && Math.random() < this.abilityCritChance) empDamage *= this.abilityCritDamageMultiplier;
+                        empDamage *= 2; 
+
+                        activeBosses.forEach(boss => { // Iterate through activeBosses from abilityContext
+                            if (boss.takeDamage) {
+                                const dmgDone = boss.takeDamage(Math.round(empDamage), null, this, { isAbility: true, abilityType: 'empBurst' });
+                                if(dmgDone > 0) this.totalDamageDealt += dmgDone;
+                            }
+                        });
+                    }
+                    ability.cooldownTimer = effectiveCooldownToSet; abilityUsedSuccessfully = true; 
+                    break;
             }
              if(abilityUsedSuccessfully) ability.justBecameReady = false;
         }
@@ -1228,7 +1240,7 @@ export class Player {
 
     deployMiniGravityWell(duration, decoysArray, mouseX, mouseY) {
         if (this.activeMiniWell && this.activeMiniWell.isActive) return;
-        this.currentGravityWellKineticBoost = 1.0;
+        this.currentGravityWellKineticBoost = 1.0; 
         this.activeMiniWell = new PlayerGravityWell(mouseX, mouseY, duration);
         if (decoysArray) decoysArray.push(this.activeMiniWell);
         playSound(playerWellDeploySound);
@@ -1256,7 +1268,6 @@ export class Player {
         playSound(empBurstSound);
     }
 
-    // --- MOUSE ABILITY ACTIVATION ---
     activateLMB(abilityContext, isRelease = false) { 
         if (this.currentPath === 'mage') this.activateOmegaLaser_LMB_Mage(abilityContext);
         else if (this.currentPath === 'aegis') this.activateAegisCharge_LMB_Aegis(abilityContext, isRelease);
@@ -1268,7 +1279,6 @@ export class Player {
         else if (this.currentPath === 'berserker') this.activateSavageHowl_RMB_Berserker(abilityContext);
     }
 
-    // --- MAGE PATH MOUSE ABILITIES ---
     activateOmegaLaser_LMB_Mage(abilityContext) {
         if (this.hasOmegaLaser && !this.isFiringOmegaLaser && this.omegaLaserCooldownTimer <= 0) {
             this.isFiringOmegaLaser = true; this.omegaLaserTimer = this.omegaLaserDuration; this.omegaLaserCurrentTickTimer = 0;
@@ -1289,7 +1299,6 @@ export class Player {
         }
     }
 
-    // --- AEGIS PATH MOUSE ABILITIES ---
     activateAegisCharge_LMB_Aegis(abilityContext, isRelease = false) { 
         if (!this.hasAegisCharge) return;
 
@@ -1297,7 +1306,6 @@ export class Player {
             if (this.aegisChargeCooldownTimer <= 0 && !this.isChargingAegisCharge && !this.isAegisChargingDash) {
                 this.isChargingAegisCharge = true;
                 this.aegisChargeCurrentChargeTime = 0;
-                // playSound(aegisChargeSound_charge); 
             }
         } else { 
             if (this.isChargingAegisCharge) {
@@ -1308,8 +1316,6 @@ export class Player {
                 const dist = Math.hypot(this.aegisChargeDashTargetX - this.x, this.aegisChargeDashTargetY - this.y);
                 const dashSpeed = this.originalPlayerSpeed * AEGIS_CHARGE_DASH_SPEED_FACTOR;
                 this.aegisChargeDashTimer = (dist / dashSpeed) * (1000/60) * 2; 
-                
-                // playSound(aegisChargeSound_release); 
                 this.procTemporalEcho('aegisCharge_LMB_Aegis', abilityContext);
             }
         }
@@ -1317,11 +1323,10 @@ export class Player {
     }
     activateSeismicSlam_RMB_Aegis(abilityContext) {
         if (this.hasSeismicSlam && this.seismicSlamCooldownTimer <= 0) {
-            // playSound(seismicSlamSound);
-            if(abilityContext.activeBuffNotificationsArray) abilityContext.activeBuffNotificationsArray.push({ text: `Seismic Slam!`, timer: BUFF_NOTIFICATION_DURATION });
+            if(abilityContext.activeBuffNotificationsArray) abilityContext.activeBuffNotificationsArray.push({ text: `Seismic Slam!`, timer: BUFF_NOTIFICATION_DURATION }); 
             
             let damage = SEISMIC_SLAM_DAMAGE_BASE + (this.maxHp * SEISMIC_SLAM_DAMAGE_MAXHP_SCALE) + (this.radius * SEISMIC_SLAM_DAMAGE_RADIUS_SCALE);
-            damage = Math.round(damage * (this.abilityDamageMultiplier || 1.0));
+            damage = Math.round(damage * (this.abilityDamageMultiplier || 1.0)); 
              if (this.abilityCritChance > 0 && Math.random() < this.abilityCritChance) damage *= this.abilityCritDamageMultiplier;
 
             const slamEffectX = this.x;
@@ -1330,7 +1335,10 @@ export class Player {
             if (abilityContext.activeBosses) {
                 abilityContext.activeBosses.forEach(boss => {
                     if (Math.hypot(slamEffectX - boss.x, slamEffectY - boss.y) < SEISMIC_SLAM_AOE_RADIUS + boss.radius) {
-                        if (boss.takeDamage) boss.takeDamage(damage, null, this);
+                        if (boss.takeDamage) {
+                            const dmgDone = boss.takeDamage(damage, null, this, {isAbility: true, abilityType: 'seismicSlam'});
+                            if(dmgDone > 0) this.totalDamageDealt += dmgDone;
+                        }
                         if (boss.recoilVelX !== undefined) {
                             const angleToBoss = Math.atan2(boss.y - slamEffectY, boss.x - slamEffectX);
                             boss.recoilVelX += Math.cos(angleToBoss) * SEISMIC_SLAM_BOSS_KNOCKBACK_MINOR;
@@ -1355,7 +1363,6 @@ export class Player {
                 abilityContext.screenShakeParams.currentShakeType = 'bonus'; 
             }
 
-
             let cd = SEISMIC_SLAM_COOLDOWN * (1.0 - this.globalCooldownReduction);
             this.seismicSlamCooldownTimer = Math.max(SEISMIC_SLAM_COOLDOWN * 0.1, cd);
             this.procTemporalEcho('seismicSlam_RMB_Aegis', abilityContext);
@@ -1363,12 +1370,10 @@ export class Player {
         }
     }
 
-    // --- BERSERKER PATH MOUSE ABILITIES ---
     activateBloodpact_LMB_Berserker(abilityContext) {
         if (this.hasBloodpact && !this.isBloodpactActive && this.bloodpactCooldownTimer <= 0) {
             this.isBloodpactActive = true;
             this.bloodpactTimer = BLOODPACT_DURATION;
-            // playSound(bloodpactSound); 
             if(abilityContext.activeBuffNotificationsArray) abilityContext.activeBuffNotificationsArray.push({ text: `Bloodpact Active! Lifesteal!`, timer: BLOODPACT_DURATION });
             
             let cd = BLOODPACT_COOLDOWN * (1.0 - this.globalCooldownReduction);
@@ -1429,8 +1434,8 @@ export class Player {
         const beamEndY = this.y + Math.sin(this.omegaLaserAngle) * (this.radius + this.omegaLaserRange);
 
         let damagePerTickForCalc = this.omegaLaserDamagePerTick;
-        if (typeof this.abilityDamageMultiplier === 'number') damagePerTickForCalc *= this.abilityDamageMultiplier;
-        if (this.currentPath === 'mage' && this.hasUltimateConfigurationHelm) damagePerTickForCalc *= 2;
+        damagePerTickForCalc *= (this.abilityDamageMultiplier || 1.0); 
+        if (this.currentPath === 'mage') damagePerTickForCalc *= 2; 
         damagePerTickForCalc *= this.currentOmegaLaserKineticBoost;
         if (this.abilityCritChance > 0 && Math.random() < this.abilityCritChance) damagePerTickForCalc *= this.abilityCritDamageMultiplier;
         const finalDamagePerTick = Math.round(Math.max(1, damagePerTickForCalc));
@@ -1439,7 +1444,7 @@ export class Player {
             for (let i = targetsArray.length - 1; i >= 0; i--) {
                 const target = targetsArray[i];
                 if (target && isLineSegmentIntersectingCircle(beamStartX, beamStartY, beamEndX, beamEndY, target.x, target.y, target.radius + this.omegaLaserWidth / 2)) {
-                    targetsArray.splice(i, 1); this.totalDamageDealt += 10;
+                    targetsArray.splice(i, 1); this.totalDamageDealt += 10; 
                     if (laserDamageContext && laserDamageContext.updateScoreCallback) laserDamageContext.updateScoreCallback(10);
                 }
             }
@@ -1447,8 +1452,10 @@ export class Player {
         if (activeBossesArray) {
             activeBossesArray.forEach(boss => {
                 if (boss && boss.health > 0 && isLineSegmentIntersectingCircle(beamStartX, beamStartY, beamEndX, beamEndY, boss.x, boss.y, boss.radius + this.omegaLaserWidth / 2)) {
-                    if (typeof boss.takeDamage === 'function') boss.takeDamage(finalDamagePerTick, null, this, {});
-                    this.totalDamageDealt += finalDamagePerTick;
+                    if (typeof boss.takeDamage === 'function') {
+                        const dmgDone = boss.takeDamage(finalDamagePerTick, null, this, {isAbility: true, abilityType: 'omegaLaser'});
+                        if(dmgDone > 0) this.totalDamageDealt += dmgDone;
+                    }
                 }
             });
         }
@@ -1458,6 +1465,7 @@ export class Player {
         const chargeLevel = Math.min(1, this.aegisChargeCurrentChargeTime / AEGIS_CHARGE_MAX_CHARGE_TIME);
         const damageScaleFromCharge = chargeLevel * AEGIS_CHARGE_MAX_DAMAGE_SCALE_PER_SECOND_CHARGED * (AEGIS_CHARGE_MAX_CHARGE_TIME / 1000);
         let baseDamage = AEGIS_CHARGE_MIN_DAMAGE * (1 + damageScaleFromCharge);
+        
         baseDamage = Math.round(baseDamage * (this.abilityDamageMultiplier || 1.0));
         if (this.abilityCritChance > 0 && Math.random() < this.abilityCritChance) baseDamage *= this.abilityCritDamageMultiplier;
 
@@ -1465,8 +1473,8 @@ export class Player {
             activeBossesArray.forEach(boss => {
                 if (Math.hypot(this.x - boss.x, this.y - boss.y) < AEGIS_CHARGE_AOE_RADIUS + boss.radius) {
                     if (boss.takeDamage) {
-                        const dmgDone = boss.takeDamage(baseDamage, null, this);
-                        if (dmgDone) this.totalDamageDealt += baseDamage;
+                        const dmgDone = boss.takeDamage(baseDamage, null, this, {isAbility: true, abilityType: 'aegisCharge'});
+                        if (dmgDone > 0) this.totalDamageDealt += dmgDone;
                     }
                 }
             });
