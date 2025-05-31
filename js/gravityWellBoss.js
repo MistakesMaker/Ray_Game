@@ -1,8 +1,5 @@
 // js/gravityWellBoss.js
-// ... (imports remain the same) ...
 import { BossNPC } from './bossBase.js';
-// Ray import not strictly needed here unless new Ray() is used, which it isn't.
-// import { Ray } from './ray.js';
 import { getPooledRay, checkCollision } from './utils.js';
 import {
     GRAVITY_RAY_PROJECTILE_COLOR, GRAVITY_RAY_SPAWN_ANIM_DURATION,
@@ -37,7 +34,9 @@ export class GravityWellBoss extends BossNPC {
     draw(ctx) {
         if (!ctx) return;
         let effectiveColor = this.color;
-        if (this.hitFlashTimer > 0 && Math.floor(this.hitFlashTimer / 50) % 2 === 0) {
+        if (this.isFeared) {
+            effectiveColor = 'rgba(255, 0, 255, 0.6)'; // Magenta when feared
+        } else if (this.hitFlashTimer > 0 && Math.floor(this.hitFlashTimer / 50) % 2 === 0) {
             effectiveColor = '#FFFFFF';
         } else if (this.bleedTimer > 0 && Math.floor(this.bleedTimer / 100) % 2 === 0) {
             effectiveColor = '#10605A';
@@ -56,7 +55,7 @@ export class GravityWellBoss extends BossNPC {
         ctx.stroke();
         ctx.restore();
 
-        super.draw(ctx); // Draws health bar
+        super.draw(ctx); 
 
         if (this.activeDetonationEffect) {
             const effect = this.activeDetonationEffect;
@@ -74,13 +73,29 @@ export class GravityWellBoss extends BossNPC {
     update(playerInstance, gameContext) {
         const { dt, allRays, canvasWidth, canvasHeight, postDamageImmunityTimer, isPlayerShieldOvercharging, getPooledRay } = gameContext;
 
-        super.update(dt, playerInstance); // Base update for bleed, hitstun etc.
-        if (this.health <= 0) return;
+        super.update(dt, playerInstance, canvasWidth, canvasHeight); // Pass canvas dimensions
+        if (this.health <= 0) {
+            if (this.gravityRay && this.gravityRay.isActive) {
+                if(stopSound && gravityWellChargeSound) stopSound(gravityWellChargeSound);
+                this.gravityRay.isActive = false; // Deactivate its well if boss dies
+            }
+            this.gravityRay = null;
+            return;
+        }
 
         const normalizedDtFactor = (dt / (1000 / 60)) || 1;
         const angleToPlayer = Math.atan2(playerInstance.y - this.y, playerInstance.x - this.x);
 
-        if (this.playerCollisionStunTimer > 0) {
+        if (this.isFeared) {
+            // Base class handles fear movement.
+            // Stop initiating new spawns if feared.
+            if (this.isInitiatingSpawn) {
+                this.isInitiatingSpawn = false;
+                this.initiationTimer = 0;
+                if(stopSound && gravityWellChargeSound) stopSound(gravityWellChargeSound); // Stop charge sound if it started
+            }
+            // Existing gravityRay will continue its lifecycle independently.
+        } else if (this.playerCollisionStunTimer > 0) {
             this.playerCollisionStunTimer -= dt;
             this.x += this.recoilVelX * normalizedDtFactor;
             this.y += this.recoilVelY * normalizedDtFactor;
@@ -91,7 +106,7 @@ export class GravityWellBoss extends BossNPC {
             if (this.playerCollisionStunTimer <= 0) {
                 this.speed = this.baseSpeed;
             }
-        } else if (this.hitStunTimer <= 0) { // Not stunned by ray or player collision
+        } else if (this.hitStunTimer <= 0) { 
             if (this.isInitiatingSpawn) {
                 this.x -= Math.cos(this.intendedSpawnAngle) * this.speed * 0.2 * normalizedDtFactor;
                 this.y -= Math.sin(this.intendedSpawnAngle) * this.speed * 0.2 * normalizedDtFactor;
@@ -99,12 +114,16 @@ export class GravityWellBoss extends BossNPC {
                 this.x += Math.cos(angleToPlayer) * this.speed * normalizedDtFactor;
                 this.y += Math.sin(angleToPlayer) * this.speed * normalizedDtFactor;
             }
-        } // If hitStunTimer > 0, minimal movement is handled by super.update or implicitly if speed is reduced
+        } 
 
-        this.x = Math.max(this.radius, Math.min(canvasWidth - this.radius, this.x));
-        this.y = Math.max(this.radius, Math.min(canvasHeight - this.radius, this.y));
+        // Boundary check handled by super.update if feared, otherwise here.
+        if (!this.isFeared) {
+            this.x = Math.max(this.radius, Math.min(canvasWidth - this.radius, this.x));
+            this.y = Math.max(this.radius, Math.min(canvasHeight - this.radius, this.y));
+        }
 
-        if (this.isInitiatingSpawn) {
+
+        if (this.isInitiatingSpawn && !this.isFeared) { // Don't progress spawn if feared
             this.initiationTimer -= dt;
             if (this.initiationTimer <= 0) {
                 this.isInitiatingSpawn = false;
@@ -118,21 +137,20 @@ export class GravityWellBoss extends BossNPC {
                     gravRayInstance.reset(
                         actualSpawnX, actualSpawnY, GRAVITY_RAY_PROJECTILE_COLOR,
                         Math.cos(this.intendedSpawnAngle), Math.sin(this.intendedSpawnAngle),
-                        0.3, /* playerInstance (null for boss rays) */ null, 7000, 
+                        0.3, null, 7000, 
                         true, false, gravRayFinalRadius, true
                     );
 
                     gravRayInstance.gravityWellTarget = this;
                     gravRayInstance.gravityRadius = gravRayFinalRadius * 4 + 100 + this.tier * 40;
                     gravRayInstance.gravityStrength = 0.15 + this.tier * 0.02;
-                    gravRayInstance.corruptionRadius = gravRayFinalRadius; // Assuming this is the radius of the gravity ball itself
+                    gravRayInstance.corruptionRadius = gravRayFinalRadius; 
                     gravRayInstance.absorbedRays = [];
                     this.gravityRay = gravRayInstance;
                     allRays.push(gravRayInstance);
-                    // playSound for gravityWellChargeSound is handled in ray.js when isForming becomes false
                 }
             }
-        } else { // Not initiating spawn
+        } else if (!this.isFeared) { 
             this.shootCooldownTimer -= dt;
             if (this.shootCooldownTimer <= 0 && !this.gravityRay && this.hitStunTimer <= 0 && !this.isInitiatingSpawn && this.playerCollisionStunTimer <= 0) {
                 this.shootCooldownTimer = this.shootCooldown;
@@ -143,7 +161,6 @@ export class GravityWellBoss extends BossNPC {
         }
 
         if (this.gravityRay && this.gravityRay.isActive && !this.gravityRay.isForming && allRays) {
-            // Gravity well logic for pulling other rays (from hiottu.html)
             this.gravityRay.absorbedRays = this.gravityRay.absorbedRays.filter(r => r && r.isActive);
             const isNearDetonation = this.gravityRay.lifeTimer < 2000;
 
@@ -242,7 +259,7 @@ export class GravityWellBoss extends BossNPC {
              const playerCanTakeDamage = (postDamageImmunityTimer === undefined || postDamageImmunityTimer <= 0) &&
                                         !(playerInstance.teleporting && playerInstance.teleportEffectTimer > 0) &&
                                         !isPlayerShieldOvercharging;
-            if (playerCanTakeDamage && this.playerCollisionStunTimer <=0) {
+            if (playerCanTakeDamage && this.playerCollisionStunTimer <=0 && !this.isFeared) { // Don't collide if feared
                  if(gameContext) gameContext.playerCollidedWithBoss = this;
                 const dist = Math.sqrt((this.x - playerInstance.x) ** 2 + (this.y - playerInstance.y) ** 2);
                 const overlap = (this.radius + playerInstance.radius) - dist;
@@ -286,9 +303,9 @@ export class GravityWellBoss extends BossNPC {
 
         absorbedForDetonation.forEach(absorbedRay => {
             if (absorbedRay && absorbedRay.isActive) {
-                absorbedRay.isCorruptedByGravityWell = false; // No longer corrupted
-                absorbedRay.color = SCATTERED_ABSORBED_RAY_COLOR; // New color
-                absorbedRay.isBossProjectile = true; // Now a boss projectile
+                absorbedRay.isCorruptedByGravityWell = false; 
+                absorbedRay.color = SCATTERED_ABSORBED_RAY_COLOR; 
+                absorbedRay.isBossProjectile = true; 
                 const scatterAngle = Math.random() * Math.PI * 2;
                 absorbedRay.dx = Math.cos(scatterAngle);
                 absorbedRay.dy = Math.sin(scatterAngle);
@@ -296,10 +313,10 @@ export class GravityWellBoss extends BossNPC {
                 absorbedRay.lifeTimer = GRAVITY_WELL_SCATTER_RAY_LIFETIME * 0.8;
                 absorbedRay.maxLifetime = absorbedRay.lifeTimer;
                 absorbedRay.wallBounceCount = 0;
-                absorbedRay.spawnGraceTimer = 100; // Brief grace after scatter
+                absorbedRay.spawnGraceTimer = 100; 
                 countOfActuallyScatteredOriginals++;
             } else if (absorbedRay) {
-                absorbedRay.isActive = false; // Ensure non-active rays are marked
+                absorbedRay.isActive = false; 
             }
         });
         gravityRayInstance.absorbedRays = [];
@@ -314,25 +331,21 @@ export class GravityWellBoss extends BossNPC {
                     gravityRayInstance.x, gravityRayInstance.y,
                     BOSS_PROJECTILE_COLOR_DEFAULT,
                     Math.cos(angle), Math.sin(angle),
-                    speedMult, null, GRAVITY_WELL_SCATTER_RAY_LIFETIME, // playerInstance is null
+                    speedMult, null, GRAVITY_WELL_SCATTER_RAY_LIFETIME, 
                     true,  false, RAY_RADIUS, false
                 );
                 allRays.push(newRay);
             }
         }
-
-        // Visual effect for detonation
-        if (bossDefeatEffectsArray) { // Changed from this.activeDetonationEffect
-             // Ensure this is added to the main game's array for effects
+        if (bossDefeatEffectsArray) { 
             bossDefeatEffectsArray.push({
                 x: gravityRayInstance.x, y: gravityRayInstance.y,
                 maxRadius: GRAVITY_RAY_EXPLOSION_BASE_RADIUS + (countOfActuallyScatteredOriginals * GRAVITY_RAY_EXPLOSION_RADIUS_PER_RAY),
                 timer: GRAVITY_RAY_EXPLOSION_DURATION, duration: GRAVITY_RAY_EXPLOSION_DURATION,
-                radius: 0, initialRadius: 0, // For expanding effect
-                color: GRAVITY_RAY_DETONATION_EXPLOSION_COLOR // Already has 'opacity' placeholder
+                radius: 0, initialRadius: 0, 
+                color: GRAVITY_RAY_DETONATION_EXPLOSION_COLOR 
             });
         }
-
 
         if (this.gravityRay === gravityRayInstance) this.gravityRay = null;
         gravityRayInstance.isActive = false;

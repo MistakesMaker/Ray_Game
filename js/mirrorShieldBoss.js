@@ -3,16 +3,16 @@ import { BossNPC } from './bossBase.js';
 import { PLAYER_BOUNCE_FORCE_FROM_BOSS, BASE_RAY_SPEED, REFLECTED_RAY_SPEED_MULTIPLIER, REFLECTED_RAY_COLOR, REFLECTED_RAY_LIFETIME_AFTER_REFLECTION } from './constants.js';
 import { checkCollision } from './utils.js';
 
-export class MirrorShieldBoss extends BossNPC { // <<< MAKE SURE 'export' IS HERE
+export class MirrorShieldBoss extends BossNPC { 
     constructor(x, y, tier) {
         super(x, y, tier, 40, 0.35, 45 + tier * 2.5, '#6A5ACD');
         this.shieldAngle = Math.random() * Math.PI * 2;
-        this.shieldWidthAngle = Math.PI;
+        this.shieldWidthAngle = Math.PI; // Shield covers half the boss
         this.rotationSpeed = 0.008 + tier * 0.0015;
         this.hitBodyFlash = false;
         this.baseSpeed = 0.35 + tier * 0.025;
         this.speed = this.baseSpeed;
-        this.hitStunSlowFactor = 0.05;
+        this.hitStunSlowFactor = 0.05; // Very slow when body is hit
         this.driftAngle = Math.random() * Math.PI * 2;
         this.driftAngleChangeTimer = 0;
         this.driftAngleChangeInterval = 2500 + Math.random() * 1500;
@@ -28,7 +28,10 @@ export class MirrorShieldBoss extends BossNPC { // <<< MAKE SURE 'export' IS HER
         let bodyEffectiveColor = this.color;
         let shieldEffectiveColor = 'rgba(180, 180, 255, 0.7)';
 
-        if (this.hitBodyFlash) {
+        if (this.isFeared) {
+            bodyEffectiveColor = 'rgba(255, 0, 255, 0.6)'; // Magenta when feared
+            shieldEffectiveColor = 'rgba(255, 100, 255, 0.4)';
+        } else if (this.hitBodyFlash) {
             bodyEffectiveColor = `rgba(255, 165, 0, ${0.6 + 0.4 * Math.sin(this.hitFlashTimer * 0.15)})`;
         } else if (this.hitFlashTimer > 0 && !this.hitBodyFlash) { 
             shieldEffectiveColor = `rgba(220, 220, 255, ${0.6 + 0.4 * Math.sin(this.hitFlashTimer * 0.15)})`;
@@ -38,7 +41,7 @@ export class MirrorShieldBoss extends BossNPC { // <<< MAKE SURE 'export' IS HER
         if (this.bleedTimer > 0 && Math.floor(this.bleedTimer / 100) % 2 === 0) {
             bodyEffectiveColor = '#483D8B';
         }
-        if (this.playerCollisionStunTimer > 0) {
+        if (this.playerCollisionStunTimer > 0 && !this.isFeared) { // Don't show stun color if feared
             bodyEffectiveColor = `rgba(100, 100, 200, 0.8)`; 
         }
 
@@ -46,35 +49,40 @@ export class MirrorShieldBoss extends BossNPC { // <<< MAKE SURE 'export' IS HER
         ctx.save();
         ctx.translate(this.x, this.y);
 
+        // Draw body
         ctx.beginPath();
         ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
         ctx.fillStyle = bodyEffectiveColor;
         ctx.fill();
 
+        // Draw shield
         ctx.beginPath();
         ctx.moveTo(0, 0);
         ctx.arc(0, 0, this.radius + 3, this.shieldAngle - this.shieldWidthAngle / 2, this.shieldAngle + this.shieldWidthAngle / 2);
         ctx.closePath();
-        ctx.fillStyle = shieldEffectiveColor.replace('0.7)', '0.2)');
+        ctx.fillStyle = shieldEffectiveColor.replace('0.7)', '0.2)'); // More transparent fill for shield area
         ctx.fill();
         ctx.lineWidth = 6;
         ctx.strokeStyle = shieldEffectiveColor;
         ctx.stroke();
 
         ctx.restore();
-        super.draw(ctx);
+        super.draw(ctx); // Health bar and base fear visual
         this.hitBodyFlash = false; 
     }
 
     update(playerInstance, gameContext) {
         const { dt, canvasWidth, canvasHeight, postDamageImmunityTimer, isPlayerShieldOvercharging } = gameContext;
 
-        super.update(dt, playerInstance); 
+        super.update(dt, playerInstance, canvasWidth, canvasHeight); // Pass canvas dimensions
         if (this.health <= 0) return;
 
         const normalizedDtFactor = (dt / (1000 / 60)) || 1;
 
-        if (this.playerCollisionStunTimer > 0) {
+        // If feared, base class update handles movement. Skip normal MirrorShield logic.
+        if (this.isFeared) {
+            // Specific reactions to fear for MirrorShield can go here if needed
+        } else if (this.playerCollisionStunTimer > 0) {
             this.playerCollisionStunTimer -= dt;
             this.x += this.recoilVelX * normalizedDtFactor;
             this.y += this.recoilVelY * normalizedDtFactor;
@@ -87,6 +95,7 @@ export class MirrorShieldBoss extends BossNPC { // <<< MAKE SURE 'export' IS HER
                 this.speed = this.baseSpeed; 
             }
         } else if (this.hitStunTimer <= 0) { 
+            // Normal AI: Rotate shield towards player and drift
             const angleToPlayer = Math.atan2(playerInstance.y - this.y, playerInstance.x - this.x);
             let diff = angleToPlayer - this.shieldAngle;
             while (diff < -Math.PI) diff += Math.PI * 2;
@@ -102,12 +111,17 @@ export class MirrorShieldBoss extends BossNPC { // <<< MAKE SURE 'export' IS HER
             this.x += Math.cos(this.driftAngle) * this.speed * normalizedDtFactor;
             this.y += Math.sin(this.driftAngle) * this.speed * normalizedDtFactor;
         } else { 
-            this.x += Math.cos(this.driftAngle) * this.speed * 0.1 * normalizedDtFactor; 
+            // Minimal movement when hitStunned (body hit)
+            this.x += Math.cos(this.driftAngle) * this.speed * 0.1 * normalizedDtFactor; // Very slow drift
             this.y += Math.sin(this.driftAngle) * this.speed * 0.1 * normalizedDtFactor;
         }
 
-        this.x = Math.max(this.radius, Math.min(canvasWidth - this.radius, this.x));
-        this.y = Math.max(this.radius, Math.min(canvasHeight - this.radius, this.y));
+        // Boundary check is now handled in super.update if feared, otherwise here
+        if (!this.isFeared) {
+            this.x = Math.max(this.radius, Math.min(canvasWidth - this.radius, this.x));
+            this.y = Math.max(this.radius, Math.min(canvasHeight - this.radius, this.y));
+        }
+
 
         if (checkCollision(this, playerInstance)) {
             const playerIsTeleporting = (playerInstance.teleporting && playerInstance.teleportEffectTimer > 0);
@@ -118,7 +132,7 @@ export class MirrorShieldBoss extends BossNPC { // <<< MAKE SURE 'export' IS HER
                                         !playerIsTeleporting &&
                                         !playerIsCurrentlyShieldOvercharging;
             
-            if (playerCanTakeDamage && this.playerCollisionStunTimer <= 0) {
+            if (playerCanTakeDamage && this.playerCollisionStunTimer <= 0 && !this.isFeared) { // Don't collide if feared
                 if(gameContext) gameContext.playerCollidedWithBoss = this; 
 
                 const dist = Math.sqrt((this.x - playerInstance.x) ** 2 + (this.y - playerInstance.y) ** 2);
@@ -140,64 +154,58 @@ export class MirrorShieldBoss extends BossNPC { // <<< MAKE SURE 'export' IS HER
     }
 
     takeDamage(amount, ray, playerInstance, bossTakeDamageContext = {}) {
-        if (this.health <= 0) return false;
+        if (this.health <= 0) return 0; 
 
-        if (!ray) { // For non-ray damage, e.g. direct collision already handled or future ability
+        if (!ray) { 
             this.hitBodyFlash = true;
-            return super.takeDamage(amount, null, playerInstance); // Pass null for ray
+            return super.takeDamage(amount, null, playerInstance, bossTakeDamageContext);
         }
 
         let angleToRay = Math.atan2(ray.y - this.y, ray.x - this.x);
         let normalizedShieldAngle = this.shieldAngle;
-        // Normalize angleToRay to be within -PI to PI relative to shieldAngle
         while (angleToRay < normalizedShieldAngle - Math.PI) angleToRay += 2 * Math.PI;
         while (angleToRay > normalizedShieldAngle + Math.PI) angleToRay -= 2 * Math.PI;
         const distanceToCenter = Math.sqrt((ray.x - this.x) ** 2 + (ray.y - this.y) ** 2);
 
-        // Check if the ray hits the shield area
-        if (Math.abs(angleToRay - normalizedShieldAngle) <= this.shieldWidthAngle / 2 && distanceToCenter > this.radius * 0.8) { // Ray is within shield arc and not too close to center
+        if (Math.abs(angleToRay - normalizedShieldAngle) <= this.shieldWidthAngle / 2 && distanceToCenter > this.radius * 0.8) {
             this.hitFlashTimer = this.HIT_FLASH_DURATION;
-            this.hitBodyFlash = false; // It hit the shield, not the body
+            this.hitBodyFlash = false; 
 
-            // Reflection Logic (simplified dot product check for "front" hit)
-            const normalAngle = this.shieldAngle; // Shield's outward normal
+            const normalAngle = this.shieldAngle; 
             const incomingVec = { x: ray.dx, y: ray.dy };
             const normalVec = { x: Math.cos(normalAngle), y: Math.sin(normalAngle) };
-
-            // Dot product to see if ray is coming towards the shield face
-            // (-incoming . normal) > 0 means it's hitting the front face
             const dotIncomingNormal = (-incomingVec.x * normalVec.x) + (-incomingVec.y * normalVec.y);
 
-            if (dotIncomingNormal > 0.1) { // Ray is hitting the shield's front
+            if (dotIncomingNormal > 0.1) { 
                 const dotReflection = incomingVec.x * normalVec.x + incomingVec.y * normalVec.y;
                 ray.dx = incomingVec.x - 2 * dotReflection * normalVec.x;
                 ray.dy = incomingVec.y - 2 * dotReflection * normalVec.y;
                 const reflectedMagnitude = Math.sqrt(ray.dx ** 2 + ray.dy ** 2) || 1;
-                ray.dx = (ray.dx / reflectedMagnitude); // Normalize
-                ray.dy = (ray.dy / reflectedMagnitude); // Normalize
+                ray.dx = (ray.dx / reflectedMagnitude); 
+                ray.dy = (ray.dy / reflectedMagnitude); 
 
                 ray.speed = BASE_RAY_SPEED * REFLECTED_RAY_SPEED_MULTIPLIER;
-                ray.initialSpeedMultiplier = REFLECTED_RAY_SPEED_MULTIPLIER; // Update for new speed base
+                ray.initialSpeedMultiplier = REFLECTED_RAY_SPEED_MULTIPLIER; 
                 ray.color = REFLECTED_RAY_COLOR;
-                ray.isBossProjectile = true; // Now it's a boss projectile
-                ray.spawnGraceTimer = 50; // Short grace period to avoid immediate self-collision if reflected back at boss
+                ray.isBossProjectile = true; 
+                ray.spawnGraceTimer = 50; 
                 ray.maxLifetime = REFLECTED_RAY_LIFETIME_AFTER_REFLECTION;
                 ray.lifeTimer = ray.maxLifetime;
-                ray.wallBounceCount = 0; // Reset bounces
+                ray.wallBounceCount = 0; 
                 ray.uniqueWallsHitCount = 0;
                 ray.wallsHit = { top: false, bottom: false, left: false, right: false };
-                ray.isCorruptedByGravityWell = false; // Clear corruption states
+                ray.isCorruptedByGravityWell = false; 
                 ray.isCorruptedByPlayerWell = false;
-                return false; // Damage not applied to boss, ray was reflected
-            } else { // Ray hit shield from behind or tangentially, absorb it
+                return 0; 
+            } else { 
                 ray.isActive = false;
-                return false; // No damage taken
+                return 0; 
             }
-        } else { // Ray hit the body (not the shield)
+        } else { 
             this.hitBodyFlash = true;
-            super.takeDamage(amount, ray, playerInstance); // Use the base class's takeDamage
-            ray.isActive = false; // Ray is consumed
-            return true; // Damage applied
+            const damageDealt = super.takeDamage(amount, ray, playerInstance, bossTakeDamageContext); 
+            ray.isActive = false; 
+            return damageDealt; 
         }
     }
 }

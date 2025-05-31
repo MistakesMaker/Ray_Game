@@ -45,10 +45,11 @@ import {
     playerWellDeploySound, playerWellDetonateSound,
     shootSound,
     bossHitSound as audioBossHitSound,
-    savageHowlSound,
-    upgradeSound as audioUpgradeSound // For Kinetic Power Amplified notification
+    savageHowlSound, 
+    upgradeSound as audioUpgradeSound 
 } from './audio.js';
 import { PlayerGravityWell } from './ray.js';
+import { NexusWeaverBoss } from './nexusWeaverBoss.js'; // <<< IMPORT NexusWeaverBoss to check its type
 
 
 export class Player {
@@ -85,16 +86,15 @@ export class Player {
         this.abilityCritChance = 0.0;
         this.abilityCritDamageMultiplier = 1.5;
 
-        // Kinetic Conversion (Mage specific)
         this.kineticCharge = 0;
         this.baseKineticChargeRate = 0; 
         this.kineticConversionLevel = 0; 
         this.initialKineticDamageBonus = 0; 
         this.kineticChargeConsumption = 100; 
-        this.magePathTimeElapsed = 0; // <<< NEW: Timer for Mage path duration
-        this.kineticConversionScaleTimer = 0; // <<< NEW: Timer for scaling interval
-        this.kineticConversionScaleInterval = 60000; // <<< NEW: 1 minute
-        this.kineticConversionScalingFactor = 1.1; // <<< NEW: 1.1x multiplier
+        this.magePathTimeElapsed = 0; 
+        this.kineticConversionScaleTimer = 0; 
+        this.kineticConversionScaleInterval = 60000; 
+        this.kineticConversionScalingFactor = 1.1; 
 
         this.currentOmegaLaserKineticBoost = 1.0;
         this.currentGravityWellKineticBoost = 1.0;
@@ -219,8 +219,8 @@ export class Player {
         this.baseKineticChargeRate = 0; 
         this.kineticConversionLevel = 0; 
         this.initialKineticDamageBonus = 0; 
-        this.magePathTimeElapsed = 0;      // <<< RESET
-        this.kineticConversionScaleTimer = 0; // <<< RESET
+        this.magePathTimeElapsed = 0;      
+        this.kineticConversionScaleTimer = 0; 
 
         this.timeSinceLastHit = Number.MAX_SAFE_INTEGER;
         this.hpRegenTimer = 0;
@@ -789,16 +789,15 @@ export class Player {
             }
             if (this.hasShieldOvercharge) updateGenericMouseAbility('isShieldOvercharging', 'shieldOverchargeTimer', 'shieldOverchargeCooldownTimer', gameConstants.SHIELD_OVERCHARGE_COOLDOWN, gameConstants.SHIELD_OVERCHARGE_DURATION);
             
-            // Mage Kinetic Conversion Scaling
-            if (this.kineticConversionLevel > 0) { // Only if Mage path has been chosen
+            if (this.kineticConversionLevel > 0) { 
                 this.magePathTimeElapsed += dt;
                 this.kineticConversionScaleTimer += dt;
                 if (this.kineticConversionScaleTimer >= this.kineticConversionScaleInterval) {
                     this.initialKineticDamageBonus *= this.kineticConversionScalingFactor;
                     this.baseKineticChargeRate *= this.kineticConversionScalingFactor;
-                    this.kineticConversionScaleTimer -= this.kineticConversionScaleInterval; // More precise timing
+                    this.kineticConversionScaleTimer -= this.kineticConversionScaleInterval; 
                     if(activeBuffNotificationsArray) activeBuffNotificationsArray.push({ text: `Kinetic Power Amplified!`, timer: BUFF_NOTIFICATION_DURATION });
-                    playSound(audioUpgradeSound); // Re-use upgrade sound
+                    playSound(audioUpgradeSound); 
                 }
             }
 
@@ -884,11 +883,10 @@ export class Player {
             }
         }
 
-        if (this.kineticConversionLevel > 0) { // True for Mage path
+        if (this.kineticConversionLevel > 0) { 
             if (playerIsActuallyMoving) {
                 this.kineticCharge = Math.min(100, this.kineticCharge + this.baseKineticChargeRate * (dt / 1000));
             }
-            // No decay based on new requirement
         }
 
 
@@ -1188,7 +1186,7 @@ export class Player {
 
 
     activateAbility(slot, abilityContext) { 
-        const { isAnyPauseActiveCallback, updateAbilityCooldownCallback, activeBosses } = abilityContext; // Added activeBosses
+        const { isAnyPauseActiveCallback, updateAbilityCooldownCallback, activeBosses } = abilityContext; 
         if (isAnyPauseActiveCallback && isAnyPauseActiveCallback()) return;
 
         const slotStr = String(slot);
@@ -1216,12 +1214,12 @@ export class Player {
                 case 'teleport': this.doTeleport(abilityContext.bossDefeatEffectsArray, abilityContext.mouseX, abilityContext.mouseY, abilityContext.canvasWidth, abilityContext.canvasHeight); ability.cooldownTimer = effectiveCooldownToSet; abilityUsedSuccessfully = true; break;
                 case 'empBurst': 
                     this.triggerEmpBurst(abilityContext.bossDefeatEffectsArray, abilityContext.allRays, abilityContext.screenShakeParams, abilityContext.canvasWidth, abilityContext.canvasHeight); 
-                    if (this.currentPath === 'mage' && activeBosses) { // Ensure activeBosses is available
+                    if (this.currentPath === 'mage' && activeBosses) { 
                         let empDamage = 50 * (this.abilityDamageMultiplier || 1.0); 
                          if (this.abilityCritChance > 0 && Math.random() < this.abilityCritChance) empDamage *= this.abilityCritDamageMultiplier;
                         empDamage *= 2; 
 
-                        activeBosses.forEach(boss => { // Iterate through activeBosses from abilityContext
+                        activeBosses.forEach(boss => { 
                             if (boss.takeDamage) {
                                 const dmgDone = boss.takeDamage(Math.round(empDamage), null, this, { isAbility: true, abilityType: 'empBurst' });
                                 if(dmgDone > 0) this.totalDamageDealt += dmgDone;
@@ -1409,11 +1407,18 @@ export class Player {
             if (abilityContext.activeBosses) {
                 abilityContext.activeBosses.forEach(boss => {
                     if (Math.hypot(this.x - boss.x, this.y - boss.y) < SAVAGE_HOWL_FEAR_RADIUS + boss.radius) {
-                        if (boss.recoilVelX !== undefined) { 
-                            const angleFromPlayer = Math.atan2(boss.y - this.y, boss.x - this.x);
-                            boss.recoilVelX += Math.cos(angleFromPlayer) * 10; 
-                            boss.recoilVelY += Math.sin(angleFromPlayer) * 10;
-                            if(boss.hitStunTimer !== undefined) boss.hitStunTimer = Math.max(boss.hitStunTimer, SAVAGE_HOWL_FEAR_DURATION / 2); 
+                        if (typeof boss.applyFear === 'function') {
+                            boss.applyFear(SAVAGE_HOWL_FEAR_DURATION, this.x, this.y);
+                        }
+                        // Also apply to minions of Nexus Weaver
+                        if (boss instanceof NexusWeaverBoss && boss.activeMinions) {
+                            boss.activeMinions.forEach(minion => {
+                                if (minion.isActive && Math.hypot(this.x - minion.x, this.y - minion.y) < SAVAGE_HOWL_FEAR_RADIUS + minion.radius) {
+                                    if (typeof minion.applyFear === 'function') {
+                                        minion.applyFear(SAVAGE_HOWL_FEAR_DURATION, this.x, this.y);
+                                    }
+                                }
+                            });
                         }
                     }
                 });
