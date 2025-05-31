@@ -565,14 +565,14 @@ export class Player {
             this.velY += Math.sin(angleFromBoss) * AEGIS_PATH_BOSS_KNOCKBACK_FORCE * AEGIS_PATH_PLAYER_SELF_KNOCKBACK_FACTOR;
         }; 
 
-        console.log("[Player Constructor] AFTER explicit update assignment, typeof this.update:", typeof this.update);
-        console.log("[Player Constructor] AFTER explicit handleAegisCollisionWithBoss assignment, typeof this.handleAegisCollisionWithBoss:", typeof this.handleAegisCollisionWithBoss);
-        if (typeof this.update !== 'function' || typeof this.handleAegisCollisionWithBoss !== 'function') { 
-            console.error("CRITICAL: A required method is NOT a function AFTER explicit assignment in constructor!");
-        }
+        // console.log("[Player Constructor] AFTER explicit update assignment, typeof this.update:", typeof this.update);
+        // console.log("[Player Constructor] AFTER explicit handleAegisCollisionWithBoss assignment, typeof this.handleAegisCollisionWithBoss:", typeof this.handleAegisCollisionWithBoss);
+        // if (typeof this.update !== 'function' || typeof this.handleAegisCollisionWithBoss !== 'function') { 
+        //     console.error("CRITICAL: A required method is NOT a function AFTER explicit assignment in constructor!");
+        // }
     }
 
-    // Standard class methods below
+    // Standard class methods start here
     reset(canvasWidth, canvasHeight) {
         this.x = canvasWidth ? canvasWidth / 2 : PLAYER_BASE_RADIUS * 5;
         this.y = canvasHeight ? canvasHeight / 2 : PLAYER_BASE_RADIUS * 5;
@@ -1486,7 +1486,7 @@ export class Player {
         if (this.currentPath === 'mage') damagePerTickForCalc *= 2; 
         damagePerTickForCalc *= this.currentOmegaLaserKineticBoost;
         if (this.abilityCritChance > 0 && Math.random() < this.abilityCritChance) damagePerTickForCalc *= this.abilityCritDamageMultiplier;
-        const finalDamagePerTick = Math.round(Math.max(1, damagePerTickForCalc));
+        const finalDamagePerTick = Math.round(Math.max(1, finalDamagePerTick));
 
         if (targetsArray) {
             for (let i = targetsArray.length - 1; i >= 0; i--) {
