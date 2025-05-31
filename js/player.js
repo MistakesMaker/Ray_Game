@@ -186,12 +186,10 @@ export class Player {
         this.isFreezeModeActive = false;
         this.hasUsedFreezeForCurrentOffers = false;
         
-        // Constructor logs
-     //   console.log("[Player Constructor] 'this' object (before explicit update assignment):", this);
-     //   console.log("[Player Constructor] typeof this.draw (before explicit update assignment):", typeof this.draw);
-     //   console.log("[Player Constructor] typeof this.update (before explicit update assignment):", typeof this.update);
+        // console.log("[Player Constructor] 'this' object (before explicit update assignment):", this);
+        // console.log("[Player Constructor] typeof this.draw (before explicit update assignment):", typeof this.draw);
+        // console.log("[Player Constructor] typeof this.update (before explicit update assignment):", typeof this.update);
 
-        // Explicitly define update as an instance property using an arrow function
         this.update = (gameContext) => {
             const { dt, keys, mouseX, mouseY, canvasWidth, canvasHeight, targets, activeBosses,
                     currentGrowthFactor,
@@ -514,23 +512,67 @@ export class Player {
                     this.gainHealth(this.baseHpRegenAmount + this.hpRegenBonusFromEvolution, updateHealthDisplayCallback);
                 }
             }
-        }; // End of ASSIGNED update method
+        }; 
+        
+        this.handleAegisCollisionWithBoss = (boss, gameContext) => {
+            if (!this.hasAegisPathHelm || !boss || boss.health <= 0 || this.currentPath !== 'aegis') return;
+        
+            if (this.aegisRamCooldownTimer > 0) {
+                return; 
+            }
+            this.aegisRamCooldownTimer = AEGIS_RAM_COOLDOWN; 
+    
+            if (boss.lastHitByAegisTimer && (Date.now() - boss.lastHitByAegisTimer < 200) ) return; 
+            
+            let collisionDamage = AEGIS_PATH_BASE_COLLISION_DAMAGE;
+            collisionDamage += (this.maxHp * AEGIS_PATH_MAX_HP_SCALING_FACTOR);
+            collisionDamage += (this.radius * AEGIS_PATH_RADIUS_SCALING_FACTOR);
+            collisionDamage = Math.round(collisionDamage);
+    
+            if (typeof boss.takeDamage === 'function') {
+                const damageApplied = boss.takeDamage(collisionDamage, null, this, { isAegisCollision: true });
+                if (damageApplied > 0) { 
+                    playSound(audioBossHitSound); 
+                    this.totalDamageDealt += damageApplied; 
+                    boss.lastHitByAegisTimer = Date.now();
+                     if (gameContext.screenShakeParams) {
+                        gameContext.screenShakeParams.isScreenShaking = true;
+                        gameContext.screenShakeParams.screenShakeTimer = 200;
+                        gameContext.screenShakeParams.currentShakeMagnitude = 4;
+                        gameContext.screenShakeParams.currentShakeType = 'playerHit';
+                     }
+                }
+            }
+    
+            if (typeof boss.x !== 'undefined' && typeof boss.y !== 'undefined') {
+                const angleToBoss = Math.atan2(boss.y - this.y, boss.x - this.x);
+                const knockbackForce = AEGIS_PATH_BOSS_KNOCKBACK_FORCE;
+                if (typeof boss.recoilVelX === 'number' && typeof boss.recoilVelY === 'number') {
+                    boss.recoilVelX += Math.cos(angleToBoss) * knockbackForce;
+                    boss.recoilVelY += Math.sin(angleToBoss) * knockbackForce;
+                    if (typeof boss.playerCollisionStunTimer === 'number' && typeof boss.PLAYER_COLLISION_STUN_DURATION === 'number') {
+                        boss.playerCollisionStunTimer = Math.max(boss.playerCollisionStunTimer, boss.PLAYER_COLLISION_STUN_DURATION * 0.3);
+                        if(typeof boss.speed === 'number') boss.speed = 0;
+                    }
+                } else {
+                    boss.x += Math.cos(angleToBoss) * knockbackForce * 0.1;
+                    boss.y += Math.sin(angleToBoss) * knockbackForce * 0.1;
+                }
+            }
+    
+            const angleFromBoss = Math.atan2(this.y - boss.y, this.x - boss.x);
+            this.velX += Math.cos(angleFromBoss) * AEGIS_PATH_BOSS_KNOCKBACK_FORCE * AEGIS_PATH_PLAYER_SELF_KNOCKBACK_FACTOR;
+            this.velY += Math.sin(angleFromBoss) * AEGIS_PATH_BOSS_KNOCKBACK_FORCE * AEGIS_PATH_PLAYER_SELF_KNOCKBACK_FACTOR;
+        }; 
 
-        // ***** NEW DEBUG LOGS AFTER EXPLICIT ASSIGNMENT *****
         console.log("[Player Constructor] AFTER explicit update assignment, typeof this.update:", typeof this.update);
-        if (typeof this.update !== 'function') {
-            console.error("CRITICAL: this.update is STILL NOT a function AFTER explicit assignment in constructor!");
+        console.log("[Player Constructor] AFTER explicit handleAegisCollisionWithBoss assignment, typeof this.handleAegisCollisionWithBoss:", typeof this.handleAegisCollisionWithBoss);
+        if (typeof this.update !== 'function' || typeof this.handleAegisCollisionWithBoss !== 'function') { 
+            console.error("CRITICAL: A required method is NOT a function AFTER explicit assignment in constructor!");
         }
-        // ***** END NEW DEBUG LOGS *****
     }
 
-    // Make sure the original update(gameContext) { ... } method that was part of the class body is REMOVED or COMMENTED OUT
-    // For example, if you had:
-    // update(gameContext) { /* old logic */ }  <--- DELETE THIS or COMMENT IT OUT
-    // Player.prototype.update = function(gameContext) { /* old logic */ } <--- Also DELETE THIS if it exists
-
-
-    // CLASS METHODS (example, ensure all your other methods are here, not inside constructor)
+    // Standard class methods below
     reset(canvasWidth, canvasHeight) {
         this.x = canvasWidth ? canvasWidth / 2 : PLAYER_BASE_RADIUS * 5;
         this.y = canvasHeight ? canvasHeight / 2 : PLAYER_BASE_RADIUS * 5;
@@ -615,7 +657,6 @@ export class Player {
         this.isFreezeModeActive = false;
         this.hasUsedFreezeForCurrentOffers = false;
     }
-
 
     drawHpBar(ctx) {
         if (!this || typeof this.hp === 'undefined' || typeof this.maxHp === 'undefined' || typeof this.radius === 'undefined' || isNaN(this.radius)) {
@@ -1445,7 +1486,7 @@ export class Player {
         if (this.currentPath === 'mage') damagePerTickForCalc *= 2; 
         damagePerTickForCalc *= this.currentOmegaLaserKineticBoost;
         if (this.abilityCritChance > 0 && Math.random() < this.abilityCritChance) damagePerTickForCalc *= this.abilityCritDamageMultiplier;
-        const finalDamagePerTick = Math.round(Math.max(1, finalDamagePerTick));
+        const finalDamagePerTick = Math.round(Math.max(1, damagePerTickForCalc));
 
         if (targetsArray) {
             for (let i = targetsArray.length - 1; i >= 0; i--) {
