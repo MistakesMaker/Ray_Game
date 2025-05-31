@@ -34,8 +34,11 @@ class MinionBase {
     }
 
     takeDamage(amount, playerInstance, mainBoss) {
+        if (!this.isActive || this.hp <= 0) return 0; // No damage if not active or already dead
+
         this.hp -= amount;
         this.hitFlashTimer = this.HIT_FLASH_DURATION_MINION;
+
         if (playerInstance && typeof playerInstance.totalDamageDealt === 'number') {
              playerInstance.totalDamageDealt += amount;
         }
@@ -45,6 +48,7 @@ class MinionBase {
         if (this.hp <= 0) {
             this.isActive = false;
         }
+        return amount; // Return damage dealt
     }
 
     updateBase(dt) {
@@ -248,8 +252,6 @@ export class NexusWeaverBoss extends BossNPC {
         this.hitStunSlowFactor = 0.1;
 
         this.activeMinions = [];
-        // this.maxMinions = CONSTANTS.NEXUS_WEAVER_MAX_MINIONS_BASE + tier * CONSTANTS.NEXUS_WEAVER_MAX_MINIONS_PER_TIER; // <<< REMOVED MAXMINIONS PROPERTY
-
         this.spawnCooldown = Math.max(2000, CONSTANTS.NEXUS_WEAVER_SPAWN_COOLDOWN_BASE - tier * CONSTANTS.NEXUS_WEAVER_SPAWN_COOLDOWN_REDUCTION_PER_TIER);
         this.spawnTimer = this.spawnCooldown * 0.5;
         this.spawnTellDuration = CONSTANTS.NEXUS_WEAVER_SPAWN_TELL_DURATION;
@@ -350,8 +352,6 @@ export class NexusWeaverBoss extends BossNPC {
         spawnTypes.sort(() => Math.random() - 0.5);
 
         for (const type of spawnTypes) {
-            // if (this.activeMinions.length >= this.maxMinions) break; // <<< REMOVED THIS CHECK
-            
             const spawnAngle = Math.random() * Math.PI * 2;
             const spawnDist = this.radius + 20;
             const sx = this.x + Math.cos(spawnAngle) * spawnDist;
@@ -424,7 +424,7 @@ export class NexusWeaverBoss extends BossNPC {
 
         if (!this.isSpawning) {
             this.spawnTimer -= dt;
-            if (this.spawnTimer <= 0) { // Removed: && this.activeMinions.length < this.maxMinions) {
+            if (this.spawnTimer <= 0) { 
                 this.isSpawning = true;
                 this.spawnTellTimer = this.spawnTellDuration;
             }
@@ -482,9 +482,11 @@ export class NexusWeaverBoss extends BossNPC {
         }
     }
 
-    takeDamage(amount, ray, playerInstance) {
-        const damageTaken = super.takeDamage(amount, ray, playerInstance);
-        if (damageTaken && ray) this.lastDamageSourcePlayer();
-        return damageTaken;
+    takeDamage(amount, ray, playerInstance, context = {}) { // Added context
+        const damageTaken = super.takeDamage(amount, ray, playerInstance, context); // Use the base class logic
+        if (damageTaken > 0 && (ray || (context && (context.isAegisCollision || context.isSeismicSlam || context.isAegisChargeImpact)))) {
+             this.lastDamageSourcePlayer();
+        }
+        return damageTaken; // Return actual damage dealt by base method
     }
 }

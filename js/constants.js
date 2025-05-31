@@ -258,9 +258,6 @@ export const ABILITY_CRIT_DAMAGE_TIER_BONUS = { common: 0.10, rare: 0.15, epic: 
 
 // ---- Unique Path Buff Constants ----
 export const PERFECT_HARMONY_NO_DAMAGE_DURATION_THRESHOLD = 5000; // Was Path of Harmony
-// export const PERFECT_HARMONY_RAY_DAMAGE_BONUS = 0.20; // No longer used
-// export const PERFECT_HARMONY_SPEED_BONUS = 0.15; // No longer used
-// export const PERFECT_HARMONY_COOLDOWN_REDUCTION = 0.20; // No longer used
 
 export const BERSERKERS_ECHO_DAMAGE_PER_10_HP = 0.09;
 export const BERSERKERS_ECHO_SPEED_PER_10_HP = 0.03;
@@ -270,23 +267,62 @@ export const KINETIC_INITIAL_DAMAGE_BONUS = 0.30;
 export const KINETIC_BASE_CHARGE_RATE = 1.0;
 
 // ---- NEW: Aegis Path (Juggernaut) Constants ----
-export const AEGIS_PATH_BASE_COLLISION_DAMAGE = 50; // Flat damage per collision
-export const AEGIS_PATH_MAX_HP_SCALING_FACTOR = 0.13; // Damage = base + (maxHP * factor)
-export const AEGIS_PATH_RADIUS_SCALING_FACTOR = 1; // Damage += (radius * factor)
+export const AEGIS_PATH_BASE_COLLISION_DAMAGE = 1; // Flat damage per collision
+export const AEGIS_PATH_MAX_HP_SCALING_FACTOR = 0.05; // Damage = base + (maxHP * factor)
+export const AEGIS_PATH_RADIUS_SCALING_FACTOR = 0.1; // Damage += (radius * factor)
 export const AEGIS_PATH_BOSS_KNOCKBACK_FORCE = 30; // Base knockback force on boss
 export const AEGIS_PATH_PLAYER_SELF_KNOCKBACK_FACTOR = 0.3; // Player gets knocked back a bit too
 // ---- END Unique Path Buff Constants ----
 
-// Mouse Abilities Constants
+// ---- Path-Specific Mouse Abilities Constants ----
+
+// -- Aegis Path (Tank) --
+// LMB: Aegis Charge
+export const AEGIS_CHARGE_MAX_CHARGE_TIME = 5000; // ms
+export const AEGIS_CHARGE_MIN_DAMAGE = 20;
+export const AEGIS_CHARGE_MAX_DAMAGE_SCALE_PER_SECOND_CHARGED = 0.25; // e.g., 0.5 means +50% max damage per second charged
+export const AEGIS_CHARGE_AOE_RADIUS = 60;
+export const AEGIS_CHARGE_DR_DURING_DASH = 0.50; // 50% damage reduction
+export const AEGIS_CHARGE_COOLDOWN = 12000; // ms
+export const AEGIS_CHARGE_DASH_SPEED_FACTOR = 8; // Multiplier of base player speed
+
+// RMB: Seismic Slam
+export const SEISMIC_SLAM_DAMAGE_BASE = 30;
+export const SEISMIC_SLAM_DAMAGE_MAXHP_SCALE = 0.05; // 5% of MaxHP added to damage
+export const SEISMIC_SLAM_DAMAGE_RADIUS_SCALE = 0.1; // 0.5 damage per unit of player radius
+export const SEISMIC_SLAM_AOE_RADIUS = 350;
+export const SEISMIC_SLAM_KNOCKBACK_FORCE_NON_BOSS = 15;
+export const SEISMIC_SLAM_BOSS_STAGGER_DURATION = 2000; // ms
+export const SEISMIC_SLAM_BOSS_KNOCKBACK_MINOR = 5;
+export const SEISMIC_SLAM_COOLDOWN = 18000; // ms
+
+// -- Berserker's Echo Path (Fury) --
+// LMB: Bloodpact
+export const BLOODPACT_DURATION = 5000; // ms
+export const BLOODPACT_LIFESTEAL_PERCENT = 0.10; // 10% lifesteal on auto-fired rays
+export const BLOODPACT_COOLDOWN = 15000; // ms
+
+// RMB: Savage Howl
+export const SAVAGE_HOWL_FEAR_RADIUS = 350;
+export const SAVAGE_HOWL_FEAR_DURATION = 3000; // ms
+export const SAVAGE_HOWL_ATTACK_SPEED_BUFF_PERCENT = 0.30; // 30% faster auto-fire
+export const SAVAGE_HOWL_ATTACK_SPEED_BUFF_DURATION = 7000; // ms
+export const SAVAGE_HOWL_COOLDOWN = 22000; // ms
+
+// -- Ultimate Configuration Path (Mage) --
+// LMB: Omega Laser (Existing constants)
 export const OMEGA_LASER_DURATION = 2500;
 export const OMEGA_LASER_COOLDOWN = 20000;
 export const OMEGA_LASER_DAMAGE_PER_TICK = 3;
 export const OMEGA_LASER_TICK_INTERVAL = 100;
 export const OMEGA_LASER_RANGE = 2000;
 export const OMEGA_LASER_WIDTH = 15;
+
+// RMB: Shield Overcharge (Existing constants)
 export const SHIELD_OVERCHARGE_DURATION = 5000;
 export const SHIELD_OVERCHARGE_COOLDOWN = 25000;
 export const SHIELD_OVERCHARGE_HEAL_PER_RAY = 2;
+// ---- END Path-Specific Mouse Abilities Constants ----
 
 // Misc
 export const INITIAL_RAY_POOL_SIZE = 300;

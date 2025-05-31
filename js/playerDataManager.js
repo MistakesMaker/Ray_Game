@@ -13,34 +13,84 @@ function getFormattedAbilitiesForStats(playerInstance, bossLootPoolRef) {
     let mouseAbilities = [];
     let numericAbilities = [];
 
-    // --- Process Mouse Abilities First ---
-    if (playerInstance.hasOmegaLaser) {
-        let baseCooldown = CONSTANTS.OMEGA_LASER_COOLDOWN;
-        let effectiveCooldown = baseCooldown * (1.0 - (playerInstance.globalCooldownReduction || 0));
-        effectiveCooldown = Math.max(baseCooldown * 0.1, effectiveCooldown);
+    // --- Process Path-Specific Mouse Abilities ---
+    if (playerInstance.currentPath === 'mage') {
+        if (playerInstance.hasOmegaLaser) {
+            let baseCooldown = CONSTANTS.OMEGA_LASER_COOLDOWN;
+            let effectiveCooldown = baseCooldown * (1.0 - (playerInstance.globalCooldownReduction || 0));
+            effectiveCooldown = Math.max(baseCooldown * 0.1, effectiveCooldown);
+            let damagePerTick = CONSTANTS.OMEGA_LASER_DAMAGE_PER_TICK * (playerInstance.abilityDamageMultiplier || 1.0);
+            if (playerInstance.hasUltimateConfigurationHelm) damagePerTick *= 2;
 
-        let damagePerTick = CONSTANTS.OMEGA_LASER_DAMAGE_PER_TICK * (playerInstance.abilityDamageMultiplier || 1.0);
-        if (playerInstance.hasUltimateConfigurationHelm) damagePerTick *= 2;
+            mouseAbilities.push({
+                name: "Omega Laser (LMB)",
+                description: `CD: ${(effectiveCooldown / 1000).toFixed(1)}s`,
+                damage: `${damagePerTick.toFixed(1)}/tick`,
+                isMouseAbility: true
+            });
+        }
+        if (playerInstance.hasShieldOvercharge) {
+            let baseCooldown = CONSTANTS.SHIELD_OVERCHARGE_COOLDOWN;
+            let effectiveCooldown = baseCooldown * (1.0 - (playerInstance.globalCooldownReduction || 0));
+            effectiveCooldown = Math.max(baseCooldown * 0.1, effectiveCooldown);
+            mouseAbilities.push({
+                name: "Shield Overcharge (RMB)",
+                description: `CD: ${(effectiveCooldown / 1000).toFixed(1)}s, Dur: ${(CONSTANTS.SHIELD_OVERCHARGE_DURATION / 1000).toFixed(1)}s`,
+                damage: `Heal: ${CONSTANTS.SHIELD_OVERCHARGE_HEAL_PER_RAY}/ray`,
+                isMouseAbility: true
+            });
+        }
+    } else if (playerInstance.currentPath === 'aegis') {
+        if (playerInstance.hasAegisCharge) {
+            let baseCooldown = CONSTANTS.AEGIS_CHARGE_COOLDOWN;
+            let effectiveCooldown = baseCooldown * (1.0 - (playerInstance.globalCooldownReduction || 0));
+            effectiveCooldown = Math.max(baseCooldown * 0.1, effectiveCooldown);
+            mouseAbilities.push({
+                name: "Aegis Charge (LMB)",
+                description: `CD: ${(effectiveCooldown / 1000).toFixed(1)}s, Max Charge: ${(CONSTANTS.AEGIS_CHARGE_MAX_CHARGE_TIME / 1000).toFixed(1)}s`,
+                damage: `Impact AoE`, // Damage scales, complex to show simply
+                isMouseAbility: true
+            });
+        }
+        if (playerInstance.hasSeismicSlam) {
+            let baseCooldown = CONSTANTS.SEISMIC_SLAM_COOLDOWN;
+            let effectiveCooldown = baseCooldown * (1.0 - (playerInstance.globalCooldownReduction || 0));
+            effectiveCooldown = Math.max(baseCooldown * 0.1, effectiveCooldown);
+             let damage = CONSTANTS.SEISMIC_SLAM_DAMAGE_BASE + (playerInstance.maxHp * CONSTANTS.SEISMIC_SLAM_DAMAGE_MAXHP_SCALE) + (playerInstance.radius * CONSTANTS.SEISMIC_SLAM_DAMAGE_RADIUS_SCALE);
+            damage = Math.round(damage * (playerInstance.abilityDamageMultiplier || 1.0));
 
-        mouseAbilities.push({
-            name: "Omega Laser (LMB)",
-            description: `CD: ${(effectiveCooldown / 1000).toFixed(1)}s`,
-            damage: `${damagePerTick.toFixed(1)}/tick`,
-            isMouseAbility: true
-        });
+            mouseAbilities.push({
+                name: "Seismic Slam (RMB)",
+                description: `CD: ${(effectiveCooldown / 1000).toFixed(1)}s`,
+                damage: `AoE ${damage.toFixed(0)}`,
+                isMouseAbility: true
+            });
+        }
+    } else if (playerInstance.currentPath === 'berserker') {
+        if (playerInstance.hasBloodpact) {
+            let baseCooldown = CONSTANTS.BLOODPACT_COOLDOWN;
+            let effectiveCooldown = baseCooldown * (1.0 - (playerInstance.globalCooldownReduction || 0));
+            effectiveCooldown = Math.max(baseCooldown * 0.1, effectiveCooldown);
+            mouseAbilities.push({
+                name: "Bloodpact (LMB)",
+                description: `CD: ${(effectiveCooldown / 1000).toFixed(1)}s, Dur: ${(CONSTANTS.BLOODPACT_DURATION / 1000).toFixed(1)}s`,
+                damage: `${(CONSTANTS.BLOODPACT_LIFESTEAL_PERCENT * 100).toFixed(0)}% Lifesteal`,
+                isMouseAbility: true
+            });
+        }
+        if (playerInstance.hasSavageHowl) {
+            let baseCooldown = CONSTANTS.SAVAGE_HOWL_COOLDOWN;
+            let effectiveCooldown = baseCooldown * (1.0 - (playerInstance.globalCooldownReduction || 0));
+            effectiveCooldown = Math.max(baseCooldown * 0.1, effectiveCooldown);
+            mouseAbilities.push({
+                name: "Savage Howl (RMB)",
+                description: `CD: ${(effectiveCooldown / 1000).toFixed(1)}s, Buff Dur: ${(CONSTANTS.SAVAGE_HOWL_ATTACK_SPEED_BUFF_DURATION / 1000).toFixed(1)}s`,
+                damage: `Fear & +${(CONSTANTS.SAVAGE_HOWL_ATTACK_SPEED_BUFF_PERCENT * 100).toFixed(0)}% Atk Spd`,
+                isMouseAbility: true
+            });
+        }
     }
-    if (playerInstance.hasShieldOvercharge) {
-        let baseCooldown = CONSTANTS.SHIELD_OVERCHARGE_COOLDOWN;
-        let effectiveCooldown = baseCooldown * (1.0 - (playerInstance.globalCooldownReduction || 0));
-        effectiveCooldown = Math.max(baseCooldown * 0.1, effectiveCooldown);
 
-        mouseAbilities.push({
-            name: "Shield Overcharge (RMB)",
-            description: `CD: ${(effectiveCooldown / 1000).toFixed(1)}s, Dur: ${(CONSTANTS.SHIELD_OVERCHARGE_DURATION / 1000).toFixed(1)}s`,
-            damage: `Heal: ${CONSTANTS.SHIELD_OVERCHARGE_HEAL_PER_RAY}/ray`,
-            isMouseAbility: true
-        });
-    }
 
     // --- Process Numeric Key Abilities ---
     if (playerInstance.activeAbilities) {
@@ -53,7 +103,8 @@ function getFormattedAbilitiesForStats(playerInstance, bossLootPoolRef) {
                     let baseCooldown = definition.cooldown;
                     let currentEffectDescription = "";
 
-                    if (playerInstance.hasUltimateConfigurationHelm) {
+                    // Mage path Ultimate Configuration increases cooldowns of numeric abilities
+                    if (playerInstance.currentPath === 'mage') {
                         baseCooldown *= 1.5;
                     }
                     let effectiveCooldown = baseCooldown * (1.0 - (playerInstance.globalCooldownReduction || 0));
@@ -84,9 +135,10 @@ function prepareGearForStats(playerInstance, bossLootPoolRef, lootManagerRef) {
     let gearList = [];
 
     let chosenPathName = null;
-    if (playerInstance.hasAegisPathHelm) chosenPathName = "Aegis Path"; // <<< USING CONSISTENT NAME
-    else if (playerInstance.hasBerserkersEchoHelm) chosenPathName = "Path of Fury";
-    else if (playerInstance.hasUltimateConfigurationHelm) chosenPathName = "Path of Power (Offense)";
+    if (playerInstance.currentPath === 'aegis') chosenPathName = "Aegis Path";
+    else if (playerInstance.currentPath === 'berserker') chosenPathName = "Path of Fury";
+    else if (playerInstance.currentPath === 'mage') chosenPathName = "Path of Power";
+
 
     if (chosenPathName) {
         gearList.push({ name: chosenPathName, description: "(Path Buff)" });
@@ -192,9 +244,10 @@ export function createFinalStatsSnapshot(playerInstance, bossTiers, bossLootPool
     });
 
     let currentHelmTypeForPreview = null;
-    if (playerInstance.hasAegisPathHelm) currentHelmTypeForPreview = "aegisPath"; // <<< USING CONSISTENT ID
-    else if (playerInstance.hasBerserkersEchoHelm) currentHelmTypeForPreview = "berserkersEcho";
-    else if (playerInstance.hasUltimateConfigurationHelm) currentHelmTypeForPreview = "ultimateConfiguration";
+    if (playerInstance.currentPath === 'aegis') currentHelmTypeForPreview = "aegisPath";
+    else if (playerInstance.currentPath === 'berserker') currentHelmTypeForPreview = "berserkersEcho";
+    else if (playerInstance.currentPath === 'mage') currentHelmTypeForPreview = "ultimateConfiguration";
+
 
     const playerDataForPreview = {
         finalRadius: playerInstance.radius,
@@ -204,7 +257,7 @@ export function createFinalStatsSnapshot(playerInstance, bossTiers, bossLootPool
         ablativeAnimTimer: playerInstance.ablativeAnimTimer,
         momentumAnimTimer: playerInstance.momentumAnimTimer,
         naniteAnimTimer: playerInstance.naniteAnimTimer,
-        aegisAnimTimer: playerInstance.aegisAnimTimer, // Make sure this is on playerInstance
+        aegisAnimTimer: playerInstance.aegisAnimTimer, 
         hp: playerInstance.hp,
         maxHp: playerInstance.maxHp
     };

@@ -43,37 +43,38 @@ export function initializeLootPools(playerInstance, updateBuffIndicatorCallback)
                 }
             }
         },
+        // Numeric abilities remain in the general pool if desired, or could also become path-specific if needed.
+        // For now, keeping them general as per original structure.
         { id: 'empBurst',        type: 'ability', slot: '1', name: 'EMP Burst',        description: 'Activate [1]: Destroy ALL non-boss rays on screen.', cooldown: 25000, radius: CONSTANTS.canvas?.width || 800, apply: ()=>{} },
         { id: 'miniGravityWell', type: 'ability', slot: '2', name: 'Mini Gravity Well',description: 'Activate [2]: Deploy a well that pulls rays. Activate again to launch them.', cooldown: 25000, duration: 7000, apply: ()=>{} },
         { id: 'teleport',        type: 'ability', slot: '3', name: 'Teleport',         description: 'Activate [3]: Instantly move to cursor. Brief immunity on arrival.', cooldown: 20000, duration: CONSTANTS.TELEPORT_IMMUNITY_DURATION, apply: ()=>{} },
-        {
-            id: 'omegaLaser', type: 'ability_mouse', name: 'Omega Laser',
-            description: 'Hold Left Mouse: Fire a continuous damaging beam. Slows movement. Significant cooldown.',
-            cooldown: CONSTANTS.OMEGA_LASER_COOLDOWN, duration: CONSTANTS.OMEGA_LASER_DURATION,
-            apply: () => { if(playerInstance) playerInstance.hasOmegaLaser = true; }
-        },
-        {
-            id: 'shieldOvercharge', type: 'ability_mouse', name: 'Shield Overcharge',
-            description: `Hold Right Mouse: Become invulnerable for ${CONSTANTS.SHIELD_OVERCHARGE_DURATION / 1000}s and absorb ANY ray to heal ${CONSTANTS.SHIELD_OVERCHARGE_HEAL_PER_RAY} HP per ray.`,
-            cooldown: CONSTANTS.SHIELD_OVERCHARGE_COOLDOWN, duration: CONSTANTS.SHIELD_OVERCHARGE_DURATION,
-            apply: () => { if(playerInstance) playerInstance.hasShieldOvercharge = true; }
-        }
+        // Omega Laser and Shield Overcharge are removed from general pool, now tied to Mage path.
     ];
 
     firstBossPathChoices = [
         {
-            id: 'aegisPath',
+            id: 'aegisPath', // Tank Path
             type: 'path_buff',
             name: 'Aegis Path',
-            description: `Become a living battering ram. Gain immunity to boss collision damage. Colliding with bosses damages them and knocks them back significantly. Damage scales with your Max HP and Size. Grants the Aegis Helm.`
+            description: `Become a living battering ram. Colliding with bosses damages them and knocks them back. Grants Aegis Helm. LMB: Hold to charge, release to dash. RMB: AoE Seismic Slam.`,
+            grants_LMB: 'aegisCharge',
+            grants_RMB: 'seismicSlam'
         },
         {
-            id: 'berserkersEcho', type: 'path_buff', name: 'Path of Fury',
-            description: `Per 10% missing Max HP: +${CONSTANTS.BERSERKERS_ECHO_DAMAGE_PER_10_HP*100}% normal ray damage & +${CONSTANTS.BERSERKERS_ECHO_SPEED_PER_10_HP*100}% speed. Grants the Berserker's Helm.`
+            id: 'berserkersEcho', // Fury Path
+            type: 'path_buff',
+            name: 'Path of Fury',
+            description: `Per 10% missing Max HP: +${CONSTANTS.BERSERKERS_ECHO_DAMAGE_PER_10_HP*100}% normal ray damage & +${CONSTANTS.BERSERKERS_ECHO_SPEED_PER_10_HP*100}% speed. Grants Berserker's Helm. LMB: Activate Bloodpact for ray lifesteal. RMB: Savage Howl to fear enemies and boost attack speed.`,
+            grants_LMB: 'bloodpact',
+            grants_RMB: 'savageHowl'
         },
         {
-            id: 'ultimateConfiguration', type: 'path_buff', name: 'Path of Power (Offense)',
-            description: `Omega Laser Dmg x2, Mini-Well Launched Rays +100% Dmg. Numbered Ability Cooldowns +50%. Grants the Wizard's Hat.`
+            id: 'ultimateConfiguration', // Mage Path
+            type: 'path_buff',
+            name: 'Path of Power',
+            description: `Omega Laser Dmg x2, Mini-Well Launched Rays +100% Dmg. Numbered Ability Cooldowns +50%. Grants Wizard's Hat. LMB: Omega Laser. RMB: Shield Overcharge.`,
+            grants_LMB: 'omegaLaser', // Existing ability ID
+            grants_RMB: 'shieldOvercharge' // Existing ability ID
         }
     ];
 }
@@ -94,9 +95,6 @@ export function getLootChoices(playerInstance, numberOfChoices = 3) {
     const availableUpgrades = bossLootPool.filter(upgrade => {
         if (upgrade.type === 'ability' && upgrade.slot) {
             if (playerInstance.activeAbilities[upgrade.slot] && playerInstance.activeAbilities[upgrade.slot].id === upgrade.id) return false;
-        } else if (upgrade.type === 'ability_mouse') {
-            if (upgrade.id === 'omegaLaser' && playerInstance.hasOmegaLaser) return false;
-            if (upgrade.id === 'shieldOvercharge' && playerInstance.hasShieldOvercharge) return false;
         } else if (playerInstance.acquiredBossUpgrades && playerInstance.acquiredBossUpgrades.includes(upgrade.id)) {
             return false;
         }
@@ -126,7 +124,7 @@ export function presentLootUI(choices, playerInstance, dependencies, isFirstBoss
 
     const title = isFirstBossLoot ? "Forge Your Path!" : "Salvaged Technology!";
     const description = isFirstBossLoot
-        ? "The first trial overcome. Choose a defining power for this journey (this choice is permanent):"
+        ? "The first trial overcome. Choose a defining power for this journey (this choice is permanent and grants unique mouse abilities):"
         : "Choose one permanent upgrade:";
 
     if (_currentLootUIDependencies.UIManager.lootChoiceScreen) {
@@ -161,10 +159,7 @@ function confirmLootSelection(chosenUpgrade, playerInstance) {
     }
 
     if (playerInstance && chosenUpgrade.id) {
-        if(chosenUpgrade.type === 'ability_mouse') {
-            if (chosenUpgrade.id === 'omegaLaser') playerInstance.hasOmegaLaser = true;
-            if (chosenUpgrade.id === 'shieldOvercharge') playerInstance.hasShieldOvercharge = true;
-        } else if (chosenUpgrade.type === 'ability' && chosenUpgrade.slot) {
+        if (chosenUpgrade.type === 'ability' && chosenUpgrade.slot) {
             const slotStr = String(chosenUpgrade.slot);
             if (playerInstance.activeAbilities.hasOwnProperty(slotStr) && playerInstance.activeAbilities[slotStr] === null) {
                 playerInstance.activeAbilities[slotStr] = {
@@ -175,10 +170,8 @@ function confirmLootSelection(chosenUpgrade, playerInstance) {
                     radius: chosenUpgrade.radius,
                     justBecameReady: true
                 };
-            } else {
-                // console.warn(`LootManager: Slot ${slotStr} for ability ${chosenUpgrade.id} already taken or invalid.`);
             }
-        } else if (chosenUpgrade.type !== 'ability') {
+        } else if (chosenUpgrade.type !== 'ability') { // Gear, etc.
              playerInstance.acquiredBossUpgrades.push(chosenUpgrade.id);
         }
      }
@@ -191,25 +184,38 @@ function confirmPathSelection(chosenPathBuff, playerInstance) {
         if (_currentLootUIDependencies.onPathSelectedCallback) _currentLootUIDependencies.onPathSelectedCallback(null, playerInstance, _currentLootUIDependencies);
         return;
     }
-    // console.log("[LootManager] Confirming Path Selection. Chosen ID:", chosenPathBuff.id, "Chosen Name:", chosenPathBuff.name);
 
+    // Reset all path-specific flags and mouse ability flags first
+    playerInstance.currentPath = null;
+    playerInstance.hasAegisPathHelm = false;
     playerInstance.hasBerserkersEchoHelm = false;
     playerInstance.hasUltimateConfigurationHelm = false;
-    playerInstance.hasAegisPathHelm = false;
 
+    playerInstance.hasOmegaLaser = false;
+    playerInstance.hasShieldOvercharge = false;
+    playerInstance.hasAegisCharge = false;
+    playerInstance.hasSeismicSlam = false;
+    playerInstance.hasBloodpact = false;
+    playerInstance.hasSavageHowl = false;
+
+    // Apply chosen path
     if (chosenPathBuff.id === 'aegisPath') {
+        playerInstance.currentPath = 'aegis';
         playerInstance.hasAegisPathHelm = true;
-        // console.log("[LootManager] Aegis Path Helm FLAG SET to true for player.");
+        if (chosenPathBuff.grants_LMB === 'aegisCharge') playerInstance.hasAegisCharge = true;
+        if (chosenPathBuff.grants_RMB === 'seismicSlam') playerInstance.hasSeismicSlam = true;
     } else if (chosenPathBuff.id === 'berserkersEcho') {
+        playerInstance.currentPath = 'berserker';
         playerInstance.hasBerserkersEchoHelm = true;
-        // console.log("[LootManager] Berserker's Echo Helm FLAG SET to true for player.");
+        if (chosenPathBuff.grants_LMB === 'bloodpact') playerInstance.hasBloodpact = true;
+        if (chosenPathBuff.grants_RMB === 'savageHowl') playerInstance.hasSavageHowl = true;
     } else if (chosenPathBuff.id === 'ultimateConfiguration') {
+        playerInstance.currentPath = 'mage';
         playerInstance.hasUltimateConfigurationHelm = true;
-        // console.log("[LootManager] Ultimate Configuration Helm FLAG SET to true for player.");
+        if (chosenPathBuff.grants_LMB === 'omegaLaser') playerInstance.hasOmegaLaser = true;
+        if (chosenPathBuff.grants_RMB === 'shieldOvercharge') playerInstance.hasShieldOvercharge = true;
     } else {
-        // console.error("[LootManager] Unknown path ID chosen during confirmation:", chosenPathBuff.id);
+        console.error("[LootManager] Unknown path ID chosen during confirmation:", chosenPathBuff.id);
     }
-
-    // console.log("[LootManager] Player Aegis Flag after selection logic:", playerInstance.hasAegisPathHelm);
     _currentLootUIDependencies.onPathSelectedCallback(chosenPathBuff, playerInstance, _currentLootUIDependencies);
 }

@@ -25,7 +25,7 @@ import {
     chainReactionSound,
     bossHitSound,
     gravityWellChargeSound,
-    upgradeSound as audioUpgradeSound // Make sure upgradeSound is available if used directly here
+    upgradeSound as audioUpgradeSound 
 } from './audio.js';
 
 
@@ -64,7 +64,7 @@ let _mainCallbacks = {
     getGameContextForBossManager: null,
     updateLastEvolutionScore: null,
     updateShootInterval: null,
-    handleFullHealthHeartPickup: null, // <<< ADD NEW CALLBACK
+    handleFullHealthHeartPickup: null, 
 };
 
 export function getScreenShakeParams() {
@@ -112,7 +112,7 @@ export function initializeGameLogic(canvasElement, inputStateRef, mainCallbacksO
     _canvas = canvasElement;
     _ctx = _canvas.getContext('2d');
     _inputState = inputStateRef;
-    _mainCallbacks = mainCallbacksObj; // Assign all passed callbacks
+    _mainCallbacks = mainCallbacksObj; 
 
     activeBuffNotifications = [];
 
@@ -328,8 +328,8 @@ export function updateGame(deltaTime) {
             const playerUpdateContext = {
                 dt: deltaTime,
                 keys: _inputState.keys,
-                mouseX: _inputState.mouseX, // This is now always relative to canvas
-                mouseY: _inputState.mouseY, // This is now always relative to canvas
+                mouseX: _inputState.mouseX, 
+                mouseY: _inputState.mouseY, 
                 canvasWidth: _canvas.width, canvasHeight: _canvas.height,
                 targets: targets, activeBosses: bossManager ? bossManager.activeBosses : [],
                 currentGrowthFactor: GameState.getCurrentPlayerRadiusGrowthFactor(),
@@ -339,7 +339,7 @@ export function updateGame(deltaTime) {
                 ui: { updateKineticChargeUI: UIManager.updateKineticChargeUI },
                 updateHealthDisplayCallback: (currentHp, maxHp) => UIManager.updateHealthDisplay(currentHp, maxHp),
                 updateAbilityCooldownCallback: (pInst) => UIManager.updateAbilityCooldownUI(pInst),
-                isAnyPauseActiveCallback: GameState.isAnyPauseActive, // <<< ENSURE THIS IS PASSED
+                isAnyPauseActiveCallback: GameState.isAnyPauseActive, 
                 decoysArray: decoys, bossDefeatEffectsArray: bossDefeatEffects, allRays: rays,
                 screenShakeParams: getScreenShakeParams(),
                 activeBuffNotificationsArray: activeBuffNotifications, CONSTANTS,
@@ -388,9 +388,10 @@ export function updateGame(deltaTime) {
                     let baseRayDmg = 1 + (player ? player.rayDamageBonus : 0);
                     let finalDamage = baseRayDmg;
                     if (player) {
-                        if (player.isHarmonized && player.hasPerfectHarmonyHelm) {
-                            finalDamage *= (1 + CONSTANTS.PERFECT_HARMONY_RAY_DAMAGE_BONUS);
-                        }
+                        // Removed PERFECT_HARMONY_RAY_DAMAGE_BONUS as it's not in constants.js currently
+                        // if (player.isHarmonized && player.hasPerfectHarmonyHelm) {
+                        //     finalDamage *= (1 + CONSTANTS.PERFECT_HARMONY_RAY_DAMAGE_BONUS); 
+                        // }
                         if (!r.isPlayerAbilityRay && player.hasBerserkersEchoHelm) {
                             const missingHpPercentage = (player.maxHp - player.hp) / player.maxHp;
                             const tenPercentIncrements = Math.floor(missingHpPercentage * 10);
@@ -404,12 +405,13 @@ export function updateGame(deltaTime) {
                             if (typeof player.abilityDamageMultiplier === 'number') {
                                  abilityBaseDamage *= player.abilityDamageMultiplier;
                             }
-                            if (player.hasUltimateConfigurationHelm && r.sourceAbility === 'miniGravityWell') {
+                            if (player.currentPath === 'mage' && player.hasUltimateConfigurationHelm && r.sourceAbility === 'miniGravityWell') { 
                                    abilityBaseDamage *= 2;
                             }
-                            if (player.isHarmonized && player.hasPerfectHarmonyHelm) {
-                                abilityBaseDamage *= (1 + CONSTANTS.PERFECT_HARMONY_RAY_DAMAGE_BONUS);
-                            }
+                            // Re-check if PERFECT_HARMONY_RAY_DAMAGE_BONUS is intended to be used here
+                            // if (player.isHarmonized && player.hasPerfectHarmonyHelm) { 
+                            //    abilityBaseDamage *= (1 + CONSTANTS.PERFECT_HARMONY_RAY_DAMAGE_BONUS); 
+                            // }
                             finalDamage = abilityBaseDamage;
                         }
                         finalDamage *= (1 + (r.momentumDamageBonusValue || 0));
@@ -436,6 +438,12 @@ export function updateGame(deltaTime) {
                             }
                             targets.splice(j,1); GameState.incrementScore(10); UIManager.updateScoreDisplay(GameState.getScore()); if(_mainCallbacks.checkForNewColorUnlock) _mainCallbacks.checkForNewColorUnlock();
                             if (!aoeTriggeredOnHit) playSound(audioTargetHitSound);
+                            
+                            // LIFESTEAL ON TARGET HIT
+                            if (player && typeof r.lifestealPercent === 'number' && r.lifestealPercent > 0) {
+                                player.applyLifesteal(currentRayDamage, UIManager.updateHealthDisplay);
+                            }
+
                             if (r.pierceUsesLeft > 0) r.pierceUsesLeft--; else r.isActive = false;
                             if (!r.isActive) break;
                         }
@@ -450,23 +458,39 @@ export function updateGame(deltaTime) {
                     if (bossManager && bossManager.activeBosses.length > 0) {
                         for(const currentBoss of bossManager.activeBosses) {
                              if (checkCollision(r, currentBoss)) {
-                                let consumedByShield = false; let damageAppliedToBoss = false;
+                                let consumedByShield = false; let damageAppliedToBossValue = 0;
                                 const bossTakeDmgCtx = {CONSTANTS, playerInstance: player};
                                 if (currentBoss instanceof MirrorShieldBoss) {
-                                    damageAppliedToBoss = currentBoss.takeDamage(currentRayDamage, r, player, bossTakeDmgCtx);
-                                    consumedByShield = !r.isActive || damageAppliedToBoss;
+                                    if(currentBoss.takeDamage(currentRayDamage, r, player, bossTakeDmgCtx)) damageAppliedToBossValue = currentRayDamage;
+                                    consumedByShield = !r.isActive || damageAppliedToBossValue > 0;
                                 } else if (currentBoss instanceof NexusWeaverBoss) {
-                                    damageAppliedToBoss = currentBoss.takeDamage(currentRayDamage, r, player, bossTakeDmgCtx);
-                                    consumedByShield = true;
-                                } else {
-                                    damageAppliedToBoss = currentBoss.takeDamage(currentRayDamage, r, player, bossTakeDmgCtx);
+                                    if(currentBoss.takeDamage(currentRayDamage, r, player, bossTakeDmgCtx)) damageAppliedToBossValue = currentRayDamage;
+                                    consumedByShield = true; 
+                                    if (damageAppliedToBossValue > 0 && currentBoss.activeMinions){ 
+                                        currentBoss.activeMinions.forEach(minion => {
+                                            if(minion.isActive && Math.hypot(r.x - minion.x, r.y - minion.y) < CONSTANTS.CHAIN_REACTION_RADIUS) { 
+                                                minion.takeDamage(currentRayDamage * 0.3, player, currentBoss);
+                                                 // LIFESTEAL ON MINION HIT (chained from boss hit)
+                                                if (player && typeof r.lifestealPercent === 'number' && r.lifestealPercent > 0) {
+                                                    player.applyLifesteal(currentRayDamage * 0.3, UIManager.updateHealthDisplay);
+                                                }
+                                            }
+                                        });
+                                    }
+                                } else { 
+                                    if(currentBoss.takeDamage(currentRayDamage, r, player, bossTakeDmgCtx)) damageAppliedToBossValue = currentRayDamage;
                                     consumedByShield = true;
                                 }
-                                if(damageAppliedToBoss) {
+
+                                if(damageAppliedToBossValue > 0) {
                                     playSound(bossHitSound);
                                     if (player && player.bleedOnHit) {
                                         const bleed = currentRayDamage * 0.05;
                                         if (typeof currentBoss.applyBleed === 'function') currentBoss.applyBleed(bleed, 3000);
+                                    }
+                                    // LIFESTEAL ON BOSS HIT
+                                    if (player && typeof r.lifestealPercent === 'number' && r.lifestealPercent > 0) {
+                                        player.applyLifesteal(damageAppliedToBossValue, UIManager.updateHealthDisplay);
                                     }
                                 }
                                 if (player && player.chainReactionChance > 0 && Math.random() < player.chainReactionChance) {
@@ -476,7 +500,7 @@ export function updateGame(deltaTime) {
                                         timer: CONSTANTS.CHAIN_REACTION_EXPLOSION_DURATION, duration: CONSTANTS.CHAIN_REACTION_EXPLOSION_DURATION,
                                         color: CONSTANTS.CHAIN_REACTION_EXPLOSION_COLOR,
                                         maxRadius: CONSTANTS.CHAIN_REACTION_RADIUS, initialRadius: CONSTANTS.CHAIN_REACTION_RADIUS * 0.1,
-                                        isAOEDamage: true, damage: currentRayDamage * 0.5
+                                        isAOEDamage: true, damage: currentRayDamage * 0.5 
                                     });
                                 }
                                 if(consumedByShield && r.isActive) r.isActive = false;
@@ -486,9 +510,14 @@ export function updateGame(deltaTime) {
                                 for (let mIdx = currentBoss.activeMinions.length - 1; mIdx >=0; mIdx--) {
                                     const minion = currentBoss.activeMinions[mIdx];
                                     if (minion.isActive && checkCollision(r, minion)) {
-                                        minion.takeDamage(currentRayDamage, player, currentBoss);
+                                        const damageToMinion = currentRayDamage; // Minions take full ray damage unless specified otherwise
+                                        minion.takeDamage(damageToMinion, player, currentBoss);
+                                        // LIFESTEAL ON MINION HIT
+                                        if (player && typeof r.lifestealPercent === 'number' && r.lifestealPercent > 0) {
+                                            player.applyLifesteal(damageToMinion, UIManager.updateHealthDisplay);
+                                        }
                                         r.isActive = false;
-                                        break;
+                                        break; 
                                     }
                                 }
                                 if (!r.isActive) break;
@@ -535,11 +564,11 @@ export function updateGame(deltaTime) {
                         damageDealt = player.takeDamage(r, ptdGameCtxForRay, ptdDamageCtxForRay);
                         r.isActive = false;
                     } else { r.isActive = false; }
-                } else {
-                    if (!isImmuneToThisColor) {
+                } else { // Player's own ray hitting player (e.g., from weird bounce or future mechanic)
+                    if (!isImmuneToThisColor) { // Should generally not happen with own rays unless mechanics change
                         damageDealt = player.takeDamage(r, ptdGameCtxForRay, ptdDamageCtxForRay);
                     }
-                    r.isActive = false;
+                    r.isActive = false; // Own ray should always deactivate on hitting player
                 }
 
                 if (damageDealt > 0) { GameState.setPostDamageImmunityTimer(CONSTANTS.POST_DAMAGE_IMMUNITY_DURATION); }
@@ -556,15 +585,13 @@ export function updateGame(deltaTime) {
                  if(checkCollision(player,h)){
                      hearts.splice(i,1); player.gainHealth(CONSTANTS.HP_REGEN_PER_PICKUP + player.hpPickupBonus, (hp,maxHp)=>UIManager.updateHealthDisplay(hp,maxHp)); playSound(heartSound);
                      if (player.hp === player.maxHp) {
-                        // <<< MODIFIED SECTION FOR HEART PICKUP >>>
                         if (_mainCallbacks.handleFullHealthHeartPickup) {
                             _mainCallbacks.handleFullHealthHeartPickup(player);
-                        } else { // Fallback if callback not defined
+                        } else { 
                             activeBuffNotifications.push({ text: "Max HP! +10 Score!", timer: CONSTANTS.BUFF_NOTIFICATION_DURATION});
                             GameState.incrementScore(10);
                             UIManager.updateScoreDisplay(GameState.getScore());
                         }
-                        // <<< END MODIFIED SECTION >>>
                      }
                      GameState.setPostPopupImmunityTimer(CONSTANTS.POST_POPUP_IMMUNITY_DURATION * 0.75);
                  }
@@ -581,13 +608,13 @@ export function updateGame(deltaTime) {
 
     for (let i = bossDefeatEffects.length - 1; i >= 0; i--) {
         const effect = bossDefeatEffects[i];
-        if (effect.isAOEDamage && effect.timer === effect.duration) {
+        if (effect.isAOEDamage && effect.timer === effect.duration) { 
             for (let tIdx = targets.length - 1; tIdx >= 0; tIdx--) {
                 const target = targets[tIdx];
                 const dist = Math.sqrt((effect.x - target.x) ** 2 + (effect.y - target.y) ** 2);
                 if (dist < effect.maxRadius + target.radius) {
                     targets.splice(tIdx, 1);
-                    GameState.incrementScore(5);
+                    GameState.incrementScore(5); 
                     UIManager.updateScoreDisplay(GameState.getScore());
                 }
             }
@@ -596,7 +623,8 @@ export function updateGame(deltaTime) {
                     const dist = Math.sqrt((effect.x - currentBoss.x) ** 2 + (effect.y - currentBoss.y) ** 2);
                     if (dist < effect.maxRadius + currentBoss.radius) {
                         if (typeof currentBoss.takeDamage === 'function') {
-                            currentBoss.takeDamage(effect.damage, null, player);
+                            const damageDealtByAoe = currentBoss.takeDamage(effect.damage, null, player); 
+                             if (player && damageDealtByAoe) player.totalDamageDealt += effect.damage;
                         }
                     }
                     if (currentBoss instanceof NexusWeaverBoss && currentBoss.activeMinions) {
@@ -606,6 +634,7 @@ export function updateGame(deltaTime) {
                                 const distMinion = Math.sqrt((effect.x - minion.x) ** 2 + (effect.y - minion.y) ** 2);
                                 if (distMinion < effect.maxRadius + minion.radius) {
                                     minion.takeDamage(effect.damage, player, currentBoss);
+                                     if (player) player.totalDamageDealt += effect.damage;
                                 }
                             }
                         }
@@ -638,14 +667,14 @@ export function drawGame() {
     rays.forEach(r => { if (r && r.isActive) r.draw(_ctx); });
     if (bossManager) bossManager.draw(_ctx, { canvasWidth: _canvas.width, canvasHeight: _canvas.height });
     for (let i = bossDefeatEffects.length - 1; i >= 0; i--) {
-        const e = bossDefeatEffects[i]; e.timer -= (16.67);
+        const e = bossDefeatEffects[i]; e.timer -= (16.67); 
         if (e.timer <= 0) { bossDefeatEffects.splice(i, 1); continue; }
         e.opacity = e.timer / e.duration;
        if(e.maxRadius && e.initialRadius !== undefined) {
            let p = e.shrink ? (e.timer / e.duration) : (1 - (e.timer / e.duration));
            e.radius = e.initialRadius + (e.maxRadius - e.initialRadius) * p;
        }
-       else e.radius += 1.5;
+       else e.radius += 1.5; 
        _ctx.beginPath(); _ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2);
        _ctx.fillStyle = e.color ? e.color.replace('opacity', (e.opacity * 0.6).toString()) : `rgba(255, 255, 180, ${e.opacity * 0.6})`; _ctx.fill();
    }

@@ -140,26 +140,48 @@ export function setupEventListeners(canvasElement, gameContext) {
 
     canvasElement.addEventListener('mousedown', (e) => {
         const playerInstance = gameContext.getPlayerInstance ? gameContext.getPlayerInstance() : null;
-        const activeBuffsArray = gameContext.getActiveBuffNotificationsArray ? gameContext.getActiveBuffNotificationsArray() : [];
         const abilityContext = gameContext.getForPlayerAbilityContext ? gameContext.getForPlayerAbilityContext() : {};
 
         if (playerInstance && gameContext.isGameRunning && gameContext.isGameRunning() &&
             (!gameContext.isAnyPauseActiveExceptEsc || !gameContext.isAnyPauseActiveExceptEsc()) &&
             (!gameContext.isGamePausedByEsc || !gameContext.isGamePausedByEsc())
             ) {
-            if (e.button === 0) { 
-                if (playerInstance.hasOmegaLaser) {
-                    playerInstance.activateOmegaLaser(activeBuffsArray, abilityContext);
+            if (e.button === 0) { // Left Mouse Button
+                if (playerInstance.activateLMB) { // Check if the method exists
+                    playerInstance.activateLMB(abilityContext, false); // Pass false for isRelease on mousedown
                     e.preventDefault();
                 }
-            } else if (e.button === 2) { 
-                if (playerInstance.hasShieldOvercharge) {
-                    playerInstance.activateShieldOvercharge(activeBuffsArray, abilityContext);
+            } else if (e.button === 2) { // Right Mouse Button
+                if (playerInstance.activateRMB) { // Check if the method exists
+                    playerInstance.activateRMB(abilityContext);
                     e.preventDefault();
                 }
             }
         }
     });
+    
+    // Aegis Charge needs mouseup to release the charge
+    canvasElement.addEventListener('mouseup', (e) => {
+        const playerInstance = gameContext.getPlayerInstance ? gameContext.getPlayerInstance() : null;
+        const abilityContext = gameContext.getForPlayerAbilityContext ? gameContext.getForPlayerAbilityContext() : {};
+
+        if (playerInstance && gameContext.isGameRunning && gameContext.isGameRunning() &&
+            (!gameContext.isAnyPauseActiveExceptEsc || !gameContext.isAnyPauseActiveExceptEsc()) &&
+            (!gameContext.isGamePausedByEsc || !gameContext.isGamePausedByEsc())
+        ) {
+            if (e.button === 0) { // Left Mouse Button release
+                // Specifically for Aegis Charge release or similar hold-and-release abilities
+                if (playerInstance.currentPath === 'aegis' && playerInstance.hasAegisCharge && playerInstance.isChargingAegisCharge) {
+                     if (playerInstance.activateAegisCharge_LMB_Aegis) {
+                        playerInstance.activateAegisCharge_LMB_Aegis(abilityContext, true); // Pass true for isRelease
+                        e.preventDefault();
+                    }
+                }
+                // Other paths might not have a mouseup action for LMB
+            }
+        }
+    });
+
 
     canvasElement.addEventListener('contextmenu', e => e.preventDefault());
 

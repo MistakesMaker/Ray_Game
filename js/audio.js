@@ -7,14 +7,17 @@ let bgMusic, playerHitSound, targetHitSound, gameOverSoundFX, heartSound, shootS
     playerWellDetonateSound, lootPickupSound, abilityUseSound, abilityReadySound,
     chaserSpawnSound, reflectorSpawnSound, singularitySpawnSound, bossHitSound,
     teleportSound, empBurstSound, omegaLaserSound, shieldOverchargeSound,
-    nexusWeaverSpawnSound; // <<< ADDED
+    nexusWeaverSpawnSound,
+    // New path-specific ability sounds
+    aegisChargeSound_charge, aegisChargeSound_release, seismicSlamSound, 
+    bloodpactSound, savageHowlSound;
 
 // --- Audio State ---
 let audioInitialized = false;
 let soundEnabled = true;
 
 // --- Volume Levels ---
-let currentMusicVolume = 0.25; // << SET YOUR DESIRED DEFAULT HERE (e.g., 0.0 for muted, 0.05 for 5%)
+let currentMusicVolume = 0.25; 
 let shootSoundVolume = 0.25;
 let hitSoundVolume = 0.25;
 let pickupSoundVolume = 0.25;
@@ -32,7 +35,7 @@ let soundToggleButtonElem,
 // --- Functions ---
 
 export function initializeAudio(audioDomElements) {
-    // if (audioInitialized) return; // Can keep this to prevent re-initialization if called multiple times
+    // if (audioInitialized) return; 
 
     soundToggleButtonElem = audioDomElements.soundToggleButton;
     musicVolumeSliderElem = audioDomElements.musicVolumeSlider;
@@ -65,7 +68,7 @@ export function initializeAudio(audioDomElements) {
         playerWellDeploySound = new Audio('assets/audio/player_well_deploy.mp3');
         playerWellDetonateSound = new Audio('assets/audio/player_well_detonate.mp3');
         lootPickupSound = new Audio('assets/audio/loot_pickup_shine.mp3');
-        abilityUseSound = new Audio('assets/audio/ability_use.mp3');
+        abilityUseSound = new Audio('assets/audio/ability_use.mp3'); // Generic ability use
         abilityReadySound = new Audio('assets/audio/ability_ready.mp3');
         chaserSpawnSound = new Audio('assets/audio/chaser_spawn.mp3');
         reflectorSpawnSound = new Audio('assets/audio/reflector_spawn.mp3');
@@ -75,23 +78,23 @@ export function initializeAudio(audioDomElements) {
         empBurstSound = new Audio('assets/audio/emp_burst_activate.mp3');
         omegaLaserSound = new Audio('assets/audio/omega_laser.mp3');
         shieldOverchargeSound = new Audio('assets/audio/shield_overcharge.mp3');
-        nexusWeaverSpawnSound = new Audio('assets/audio/nexus_weaver_spawn.mp3'); // <<< ADDED (Assuming you'll add this mp3)
+        nexusWeaverSpawnSound = new Audio('assets/audio/nexus_weaver_spawn.mp3');
+        
+        // New Path-Specific Ability Sounds (using placeholders)
+        aegisChargeSound_charge = new Audio('assets/audio/aegis_charge_start.mp3'); // Placeholder
+        aegisChargeSound_release = new Audio('assets/audio/aegis_charge_release.mp3'); // Placeholder
+        seismicSlamSound = new Audio('assets/audio/seismic_slam.mp3'); // Placeholder
+        bloodpactSound = new Audio('assets/audio/bloodpact_activate.mp3'); // Placeholder
+        savageHowlSound = new Audio('assets/audio/savage_howl.mp3'); // Placeholder
+
         bgMusic = bgMusicAudioElement;
-
-        // --- Set audioInitialized to true AFTER audio objects are created but BEFORE volumes are applied ---
         audioInitialized = true;
-
-        // --- Load settings and apply them ---
-        // These functions will now correctly apply volumes because audioInitialized is true
         loadVolumeSettingsInternal();
-        loadSoundEnabledSettingInternal(); // This also calls updateSoundButtonVisualInternal
-
-        // Initial music play state is typically handled by main.js after UI is ready
-        // or by the first call to applyMusicPlayState from main.js
+        loadSoundEnabledSettingInternal(); 
 
     } catch (e) {
         console.error("Error creating Audio objects:", e);
-        audioInitialized = false; // Ensure it's false on error
+        audioInitialized = false; 
     }
 }
 
@@ -110,14 +113,10 @@ export function stopSound(soundEffectInstance) {
 }
 
 export function toggleSoundEnabled() {
-    // This function will be called by an event listener in main.js or eventListeners.js
-    // It should then trigger a call to applyMusicPlayState from main.js
     if (!audioInitialized) return;
     soundEnabled = !soundEnabled;
     localStorage.setItem('lightBlasterSoundEnabled', JSON.stringify(soundEnabled));
     updateSoundButtonVisualInternal();
-    // The actual starting/stopping of music should be handled by a call to applyMusicPlayState
-    // from the main game logic, which knows the current game state.
 }
 
 function loadSoundEnabledSettingInternal() {
@@ -166,7 +165,7 @@ export function applyMusicPlayState(
 
 export function updateMusicVolume(volume) {
     currentMusicVolume = parseFloat(volume);
-    if (bgMusic && audioInitialized) { // Ensure bgMusic exists and audio is initialized
+    if (bgMusic && audioInitialized) { 
          bgMusic.volume = currentMusicVolume;
     }
     if (musicVolumeValueElem) musicVolumeValueElem.textContent = `${Math.round(currentMusicVolume * 100)}%`;
@@ -177,13 +176,13 @@ export function updateSpecificSfxVolume(soundTypeKey, volume) {
     const vol = parseFloat(volume);
     let storageKey = '';
     let displayElement = null;
-    let soundObjectsToUpdate = []; // Array to hold {sound: object, multiplier: optional_float}
+    let soundObjectsToUpdate = []; 
 
     switch (soundTypeKey) {
         case 'shoot':
             shootSoundVolume = vol;
             if(shootSound) soundObjectsToUpdate.push({sound: shootSound});
-            if(omegaLaserSound) soundObjectsToUpdate.push({sound: omegaLaserSound});
+            // Note: Omega Laser is path-specific, handled under UI/Event now
             storageKey = 'lightBlasterShootVol'; displayElement = shootVolumeValueElem;
             break;
         case 'hit':
@@ -201,7 +200,7 @@ export function updateSpecificSfxVolume(soundTypeKey, volume) {
             if(lootPickupSound) soundObjectsToUpdate.push({sound: lootPickupSound});
             storageKey = 'lightBlasterPickupVol'; displayElement = pickupVolumeValueElem;
             break;
-        case 'ui':
+        case 'ui': // Consolidating most non-combat sounds here, including abilities
             uiSoundVolume = vol;
             if(evolutionSound) soundObjectsToUpdate.push({sound: evolutionSound});
             if(upgradeSound) soundObjectsToUpdate.push({sound: upgradeSound});
@@ -217,10 +216,19 @@ export function updateSpecificSfxVolume(soundTypeKey, volume) {
             if(singularitySpawnSound) soundObjectsToUpdate.push({sound: singularitySpawnSound});
             if(teleportSound) soundObjectsToUpdate.push({sound: teleportSound});
             if(empBurstSound) soundObjectsToUpdate.push({sound: empBurstSound});
-            if(abilityUseSound) soundObjectsToUpdate.push({sound: abilityUseSound});
+            if(abilityUseSound) soundObjectsToUpdate.push({sound: abilityUseSound}); // Generic use
             if(abilityReadySound) soundObjectsToUpdate.push({sound: abilityReadySound});
-            if(shieldOverchargeSound) soundObjectsToUpdate.push({sound: shieldOverchargeSound});
-            if(nexusWeaverSpawnSound) soundObjectsToUpdate.push({sound: nexusWeaverSpawnSound}); // <<< ADDED
+            if(nexusWeaverSpawnSound) soundObjectsToUpdate.push({sound: nexusWeaverSpawnSound});
+            
+            // Path-specific mouse abilities
+            if(omegaLaserSound) soundObjectsToUpdate.push({sound: omegaLaserSound}); // Mage
+            if(shieldOverchargeSound) soundObjectsToUpdate.push({sound: shieldOverchargeSound}); // Mage
+            if(aegisChargeSound_charge) soundObjectsToUpdate.push({sound: aegisChargeSound_charge}); // Aegis
+            if(aegisChargeSound_release) soundObjectsToUpdate.push({sound: aegisChargeSound_release}); // Aegis
+            if(seismicSlamSound) soundObjectsToUpdate.push({sound: seismicSlamSound}); // Aegis
+            if(bloodpactSound) soundObjectsToUpdate.push({sound: bloodpactSound}); // Berserker
+            if(savageHowlSound) soundObjectsToUpdate.push({sound: savageHowlSound}); // Berserker
+
             storageKey = 'lightBlasterUiVol'; displayElement = uiVolumeValueElem;
             break;
         default:
@@ -228,7 +236,7 @@ export function updateSpecificSfxVolume(soundTypeKey, volume) {
             return;
     }
 
-    if (audioInitialized) { // Only try to set volume if audio objects are created
+    if (audioInitialized) { 
         soundObjectsToUpdate.forEach(item => {
             if (item && item.sound) {
                 item.sound.volume = vol * (item.multiplier || 1.0);
@@ -242,14 +250,12 @@ export function updateSpecificSfxVolume(soundTypeKey, volume) {
 
 
 function loadVolumeSettingsInternal() {
-    // Load from localStorage or use the hardcoded defaults
-    currentMusicVolume = parseFloat(localStorage.getItem('lightBlasterMusicVol') || currentMusicVolume); // Use existing default if not in localStorage
+    currentMusicVolume = parseFloat(localStorage.getItem('lightBlasterMusicVol') || currentMusicVolume); 
     shootSoundVolume = parseFloat(localStorage.getItem('lightBlasterShootVol') || shootSoundVolume);
     hitSoundVolume = parseFloat(localStorage.getItem('lightBlasterHitVol') || hitSoundVolume);
     pickupSoundVolume = parseFloat(localStorage.getItem('lightBlasterPickupVol') || pickupSoundVolume);
     uiSoundVolume = parseFloat(localStorage.getItem('lightBlasterUiVol') || uiSoundVolume);
 
-    // Update UI sliders
     if (musicVolumeSliderElem) musicVolumeSliderElem.value = currentMusicVolume.toString();
     if (musicVolumeValueElem) musicVolumeValueElem.textContent = `${Math.round(currentMusicVolume * 100)}%`;
     if (shootVolumeSliderElem) shootVolumeSliderElem.value = shootSoundVolume.toString();
@@ -261,9 +267,8 @@ function loadVolumeSettingsInternal() {
     if (uiVolumeSliderElem) uiVolumeSliderElem.value = uiSoundVolume.toString();
     if (uiVolumeValueElem) uiVolumeValueElem.textContent = `${Math.round(uiSoundVolume * 100)}%`;
 
-    // Apply volumes to actual audio objects IF they are initialized
     if (audioInitialized) {
-        updateMusicVolume(currentMusicVolume); // This will set bgMusic.volume
+        updateMusicVolume(currentMusicVolume); 
         updateSpecificSfxVolume('shoot', shootSoundVolume);
         updateSpecificSfxVolume('hit', hitSoundVolume);
         updateSpecificSfxVolume('pickup', pickupSoundVolume);
@@ -278,6 +283,9 @@ export {
     playerWellDetonateSound, lootPickupSound, abilityUseSound, abilityReadySound,
     chaserSpawnSound, reflectorSpawnSound, singularitySpawnSound, bossHitSound,
     teleportSound, empBurstSound, omegaLaserSound, shieldOverchargeSound,
-    nexusWeaverSpawnSound, // <<< ADDED
+    nexusWeaverSpawnSound, 
+    // New sounds
+    aegisChargeSound_charge, aegisChargeSound_release, seismicSlamSound, 
+    bloodpactSound, savageHowlSound,
     bgMusic
 };
