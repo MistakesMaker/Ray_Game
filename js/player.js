@@ -49,7 +49,7 @@ import {
     upgradeSound as audioUpgradeSound 
 } from './audio.js';
 import { PlayerGravityWell } from './ray.js';
-import { NexusWeaverBoss } from './nexusWeaverBoss.js'; // <<< IMPORT NexusWeaverBoss to check its type
+import { NexusWeaverBoss } from './nexusWeaverBoss.js'; // <<< ENSURE THIS IS IMPORTED
 
 
 export class Player {
@@ -67,7 +67,8 @@ export class Player {
 
         this.immuneColorsList = [];
         this.velX = 0; this.velY = 0;
-        this.pickupAttractionLevel = 0; this.pickupAttractionRadius = 0;
+        this.pickupAttractionLevel = 0;
+        this.pickupAttractionRadius = 0;
         this.evolutionIntervalModifier = 1.0; this.rayDamageBonus = 0;
         this.hasTargetPierce = false; this.chainReactionChance = 0.0;
         this.scatterShotLevel = 0; this.ownRaySpeedMultiplier = 1.0;
@@ -1404,13 +1405,13 @@ export class Player {
                 abilityContext.screenShakeParams.currentShakeType = 'bonus';
             }
 
+            // Apply Fear to bosses and their minions
             if (abilityContext.activeBosses) {
                 abilityContext.activeBosses.forEach(boss => {
                     if (Math.hypot(this.x - boss.x, this.y - boss.y) < SAVAGE_HOWL_FEAR_RADIUS + boss.radius) {
                         if (typeof boss.applyFear === 'function') {
                             boss.applyFear(SAVAGE_HOWL_FEAR_DURATION, this.x, this.y);
                         }
-                        // Also apply to minions of Nexus Weaver
                         if (boss instanceof NexusWeaverBoss && boss.activeMinions) {
                             boss.activeMinions.forEach(minion => {
                                 if (minion.isActive && Math.hypot(this.x - minion.x, this.y - minion.y) < SAVAGE_HOWL_FEAR_RADIUS + minion.radius) {

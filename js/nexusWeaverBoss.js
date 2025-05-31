@@ -11,19 +11,19 @@ class MinionBase {
         this.radius = radius;
         this.hp = hp;
         this.color = color;
-        this.bossTier = bossTier; // Keep for scaling, though not directly used in base
+        this.bossTier = bossTier; 
         this.isActive = true;
         this.hitFlashTimer = 0;
         this.HIT_FLASH_DURATION_MINION = 80;
+        this.HIT_FLASH_BLINK_INTERVAL_MINION = 40; 
 
-        // Fear related properties for Minions
         this.isFeared = false;
         this.fearTimer = 0;
         this.fearSourceX = 0;
         this.fearSourceY = 0;
-        this.FEAR_SPEED_MULTIPLIER_MINION = 1.3; // Minions might panic a bit more
-        this.baseSpeed = 1; // Placeholder, subclasses should set their actual base speed
-        this.speed = 1;     // Placeholder, subclasses should set their actual speed
+        this.FEAR_SPEED_MULTIPLIER_MINION = 1.3; 
+        this.baseSpeed = 1; 
+        this.speed = 1;     
     }
 
     applyFear(duration, sourceX, sourceY) {
@@ -31,9 +31,8 @@ class MinionBase {
         this.fearTimer = duration;
         this.fearSourceX = sourceX;
         this.fearSourceY = sourceY;
-        // Minions might also have their current actions interrupted
-        if (this.state && this.state !== 'roaming') { // Lancer specific, but good general idea
-            this.state = 'roaming'; // Force back to a less aggressive state if applicable
+        if (this.state && this.state !== 'roaming') { 
+            this.state = 'roaming'; 
             this.aimTimer = 0;
             this.dashTimer = 0;
         }
@@ -42,11 +41,13 @@ class MinionBase {
     draw(ctx) {
         if (!this.isActive || !ctx) return;
         let effectiveColor = this.color;
-        if (this.isFeared) {
-            effectiveColor = 'rgba(255, 0, 255, 0.7)'; // Magenta when feared
-        } else if (this.hitFlashTimer > 0 && Math.floor(this.hitFlashTimer / 40) % 2 === 0) {
-            effectiveColor = '#FFFFFF';
+        
+        if (this.hitFlashTimer > 0 && Math.floor(this.hitFlashTimer / this.HIT_FLASH_BLINK_INTERVAL_MINION) % 2 === 0) {
+            effectiveColor = '#FFFFFF'; 
+        } else if (this.isFeared) {
+            effectiveColor = 'rgba(255, 0, 255, 0.9)'; // Slightly more opaque fear for minions
         }
+
 
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
@@ -68,7 +69,8 @@ class MinionBase {
         if (!this.isActive || this.hp <= 0) return 0;
 
         this.hp -= amount;
-        this.hitFlashTimer = this.HIT_FLASH_DURATION_MINION;
+        this.hitFlashTimer = this.HIT_FLASH_DURATION_MINION; 
+
         if (playerInstance && typeof playerInstance.totalDamageDealt === 'number') {
              playerInstance.totalDamageDealt += amount;
         }
@@ -78,22 +80,24 @@ class MinionBase {
         if (this.hp <= 0) {
             this.isActive = false;
         }
-        if (this.isFeared) { // Taking damage might reduce fear
+        if (this.isFeared) { 
             this.fearTimer -= amount * 15;
         }
         return amount; 
     }
 
-    updateBase(dt, canvasWidth, canvasHeight) { // Pass canvas dimensions
+    updateBase(dt, canvasWidth, canvasHeight) { 
         if (this.hitFlashTimer > 0) {
             this.hitFlashTimer -= dt;
+            if (this.hitFlashTimer < 0) this.hitFlashTimer = 0;
         }
 
         if (this.isFeared) {
             this.fearTimer -= dt;
             if (this.fearTimer <= 0) {
                 this.isFeared = false;
-                this.speed = this.baseSpeed; // Restore normal speed
+                this.fearTimer = 0;
+                this.speed = this.baseSpeed; 
             } else {
                 const angleAwayFromSource = Math.atan2(this.y - this.fearSourceY, this.x - this.fearSourceX);
                 const currentFearSpeed = (this.baseSpeed || 1) * this.FEAR_SPEED_MULTIPLIER_MINION;
@@ -106,10 +110,10 @@ class MinionBase {
                     this.x = Math.max(this.radius, Math.min(canvasWidth - this.radius, this.x));
                     this.y = Math.max(this.radius, Math.min(canvasHeight - this.radius, this.y));
                 }
-                return true; // Indicate that fear movement overrode normal movement
+                return true; 
             }
         }
-        return false; // Fear did not override movement
+        return false; 
     }
 }
 
@@ -122,7 +126,7 @@ class DroneMinion extends MinionBase {
     }
 
     update(dt, playerInstance, canvasWidth, canvasHeight, gameContext) { 
-        if (this.updateBase(dt, canvasWidth, canvasHeight)) return; // Fear movement handled
+        if (this.updateBase(dt, canvasWidth, canvasHeight)) return; 
         if (!this.isActive || !playerInstance) return;
 
         const normalizedDtFactor = dt / (1000 / 60) || 1;
@@ -159,8 +163,8 @@ class LancerMinion extends MinionBase {
     }
 
     update(dt, playerInstance, canvasWidth, canvasHeight, gameContext) { 
-        if (this.updateBase(dt, canvasWidth, canvasHeight)) { // Fear movement handled
-            if (this.isFeared) this.state = 'roaming'; // Interrupt dash/aim if feared
+        if (this.updateBase(dt, canvasWidth, canvasHeight)) { 
+            if (this.isFeared) this.state = 'roaming'; 
             return;
         }
         if (!this.isActive || !playerInstance) return;
@@ -186,7 +190,7 @@ class LancerMinion extends MinionBase {
         } else if (this.state === 'aiming') {
             this.aimTimer -= dt;
             const angleToPlayer = Math.atan2(playerInstance.y - this.y, playerInstance.x - this.x);
-            this.x += Math.cos(angleToPlayer) * this.speed * 0.2 * normalizedDtFactor; // Slower movement while aiming
+            this.x += Math.cos(angleToPlayer) * this.speed * 0.2 * normalizedDtFactor; 
             this.y += Math.sin(angleToPlayer) * this.speed * 0.2 * normalizedDtFactor;
 
             if (this.aimTimer <= 0) {
@@ -205,7 +209,7 @@ class LancerMinion extends MinionBase {
             }
         } else if (this.state === 'cooldown') {
             this.postDashCooldownTimer -= dt;
-            this.x += (Math.random() - 0.5) * this.speed * 0.1 * normalizedDtFactor; // Slow drift
+            this.x += (Math.random() - 0.5) * this.speed * 0.1 * normalizedDtFactor; 
             this.y += (Math.random() - 0.5) * this.speed * 0.1 * normalizedDtFactor;
             if (this.postDashCooldownTimer <= 0) {
                 this.state = 'roaming';
@@ -225,8 +229,8 @@ class LancerMinion extends MinionBase {
     }
 
     draw(ctx) {
-        super.draw(ctx); // Handles base draw and fear visual
-        if (!this.isActive || !ctx || this.isFeared) return; // Don't draw aim indicator if feared
+        super.draw(ctx); 
+        if (!this.isActive || !ctx || this.isFeared) return; 
 
         if (this.state === 'aiming') {
             ctx.save();
@@ -248,34 +252,32 @@ class OrbiterMinion extends MinionBase {
         this.nexusWeaver = nexusWeaverInstance;
         this.orbitDistance = CONSTANTS.ORBITER_ORBIT_DISTANCE_BASE + bossTier * CONSTANTS.ORBITER_ORBIT_DISTANCE_PER_TIER;
         this.currentOrbitAngle = Math.random() * Math.PI * 2;
-        this.orbitSpeed = CONSTANTS.ORBITER_ORBIT_SPEED * (Math.random() < 0.5 ? 1 : -1); // Radians per ms
-        this.baseSpeed = this.orbitSpeed; // Store for potential restoration after fear
+        this.orbitSpeed = CONSTANTS.ORBITER_ORBIT_SPEED * (Math.random() < 0.5 ? 1 : -1); 
+        this.baseSpeed = this.orbitSpeed; 
         this.shootCooldown = CONSTANTS.ORBITER_SHOOT_COOLDOWN_BASE - bossTier * CONSTANTS.ORBITER_SHOOT_COOLDOWN_REDUCTION_PER_TIER;
         this.shootTimer = Math.random() * this.shootCooldown;
-        this.damage = CONSTANTS.DRONE_DAMAGE; // Contact damage
+        this.damage = CONSTANTS.DRONE_DAMAGE; 
     }
 
     update(dt, playerInstance, canvasWidth, canvasHeight, gameContext) { 
-        if (this.updateBase(dt, canvasWidth, canvasHeight)) return; // Fear movement handled
-        if (!this.isActive || !playerInstance || !this.nexusWeaver || !this.nexusWeaver.isActive) { // Check if nexus weaver is active
-            if (!this.nexusWeaver || !this.nexusWeaver.isActive) this.isActive = false; // Deactivate if weaver is gone
+        if (this.updateBase(dt, canvasWidth, canvasHeight)) return; 
+        if (!this.isActive || !playerInstance || !this.nexusWeaver || !this.nexusWeaver.isActive) { 
+            if (!this.nexusWeaver || !this.nexusWeaver.isActive) this.isActive = false; 
             return;
         }
 
-
-        const normalizedDtFactor = dt; // Orbit speed is per ms
+        const normalizedDtFactor = dt; 
 
         this.currentOrbitAngle += this.orbitSpeed * normalizedDtFactor;
         this.x = this.nexusWeaver.x + Math.cos(this.currentOrbitAngle) * this.orbitDistance;
         this.y = this.nexusWeaver.y + Math.sin(this.currentOrbitAngle) * this.orbitDistance;
 
-        // Boundary clamp for orbiters if weaver gets too close to edge (less critical than direct movers)
         this.x = Math.max(this.radius, Math.min(canvasWidth - this.radius, this.x));
         this.y = Math.max(this.radius, Math.min(canvasHeight - this.radius, this.y));
 
 
         this.shootTimer -= dt;
-        if (this.shootTimer <= 0 && !this.isFeared) { // Don't shoot if feared
+        if (this.shootTimer <= 0 && !this.isFeared) { 
             this.shootTimer = this.shootCooldown;
             if (gameContext && gameContext.nexusWeaverShootsOrbiterProjectile) { 
                 gameContext.nexusWeaverShootsOrbiterProjectile(this, playerInstance);
@@ -290,12 +292,12 @@ class OrbiterMinion extends MinionBase {
     }
 
     draw(ctx) {
-        super.draw(ctx); // Handles base draw and fear visual
-        if (!this.isActive || !ctx || this.isFeared) return; // Don't draw wings if feared (or make them droop)
+        super.draw(ctx); 
+        if (!this.isActive || !ctx || this.isFeared) return; 
 
         ctx.save();
         ctx.translate(this.x, this.y);
-        ctx.rotate(this.currentOrbitAngle * 2 + Date.now() * 0.001); // Spin wings
+        ctx.rotate(this.currentOrbitAngle * 2 + Date.now() * 0.001); 
         for (let i = 0; i < 3; i++) {
             const angle = (i / 3) * Math.PI * 2;
             const wingX = Math.cos(angle) * (this.radius * 0.7);
@@ -316,7 +318,7 @@ export class NexusWeaverBoss extends BossNPC {
             CONSTANTS.NEXUS_WEAVER_BASE_HP,
             CONSTANTS.NEXUS_WEAVER_HP_PER_TIER_FACTOR,
             CONSTANTS.NEXUS_WEAVER_RADIUS_BASE + tier * CONSTANTS.NEXUS_WEAVER_RADIUS_PER_TIER,
-            CONSTANTS.NEXUS_WEAVER_COLOR
+            CONSTANTS.NEXUS_WEAVER_COLOR // This should be a solid color string e.g., '#4B0082'
         );
         this.baseSpeed = CONSTANTS.NEXUS_WEAVER_BASE_SPEED + tier * CONSTANTS.NEXUS_WEAVER_SPEED_PER_TIER;
         this.speed = this.baseSpeed;
@@ -347,37 +349,45 @@ export class NexusWeaverBoss extends BossNPC {
 
     draw(ctx) {
         if (!ctx) return;
-        let effectiveColor = this.color;
-        let highlightColor = '#FF00FF';
+        let mainBodyFillColor = this.color; // Start with base color
+        let mainBodyStrokeColor = 'rgba(200, 100, 255, 0.7)'; // Default stroke
+        let facetFillColor = '#FF00FF'; // Default highlight for facets
 
-        if (this.isFeared) {
-            effectiveColor = 'rgba(255, 0, 255, 0.6)';
-        } else if (this.hitFlashTimer > 0 && Math.floor(this.hitFlashTimer / 50) % 2 === 0) {
-            effectiveColor = '#FFFFFF';
+        // State-based color changes
+        if (this.hitFlashTimer > 0 && Math.floor(this.hitFlashTimer / this.HIT_FLASH_BLINK_INTERVAL) % 2 === 0) {
+            mainBodyFillColor = '#FFFFFF'; // White flash for body
+            facetFillColor = '#FFFFFF';    // Facets also flash white
+        } else if (this.isFeared) {
+            mainBodyFillColor = 'rgba(200, 0, 200, 0.85)'; // Darker, solid magenta for feared body
+            facetFillColor = 'rgba(255, 100, 255, 0.9)';   // Lighter magenta for feared facets
+            mainBodyStrokeColor = 'rgba(255, 0, 255, 0.9)';
         } else if (this.bleedTimer > 0 && Math.floor(this.bleedTimer / 100) % 2 === 0) {
-            effectiveColor = '#300052';
+            mainBodyFillColor = '#300052'; // Darker purple for bleed
         } else if (this.hitStunTimer > 0 || this.playerCollisionStunTimer > 0) {
-            effectiveColor = `rgba(100, 100, 200, 0.8)`;
+            mainBodyFillColor = `rgba(100, 100, 200, 0.9)`; // Solid-ish stun color
         }
 
         ctx.save();
         ctx.translate(this.x, this.y);
 
-        if (this.isSpawning && this.spawnTellTimer > 0 && !this.isFeared) { // Spawn tell only if not feared
+        // Spawn Tell Glow (this is an additive effect, so semi-transparent is okay here)
+        if (this.isSpawning && this.spawnTellTimer > 0 && !this.isFeared) { 
             const spawnProgress = 1 - (this.spawnTellTimer / this.spawnTellDuration);
             const glowRadius = this.radius + 10 + spawnProgress * 20;
-            const glowAlpha = 0.2 + spawnProgress * 0.5;
+            const glowAlpha = 0.15 + spawnProgress * 0.35; // Make it a bit more subtle
             ctx.beginPath();
             ctx.arc(0, 0, glowRadius, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(255, 0, 255, ${glowAlpha})`;
+            ctx.fillStyle = `rgba(255, 0, 255, ${glowAlpha})`; 
             ctx.fill();
         }
 
+        // Main Body - Ensure this is drawn with a solid color mostly
         ctx.beginPath();
         ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-        ctx.fillStyle = effectiveColor;
+        ctx.fillStyle = mainBodyFillColor; 
         ctx.fill();
 
+        // Facets
         const numFacets = 5 + this.tier;
         for (let i = 0; i < numFacets; i++) {
             const angle = (i / numFacets) * Math.PI * 2 + (Date.now() * 0.0001 * (i % 2 === 0 ? 1 : -1));
@@ -388,33 +398,45 @@ export class NexusWeaverBoss extends BossNPC {
             ctx.save();
             ctx.translate(facetX, facetY);
             ctx.rotate(angle + Math.PI / 4);
-            ctx.fillStyle = (this.isSpawning && !this.isFeared) ? `rgba(255,100,255,0.8)` : highlightColor;
-            ctx.fill();
+            // Use the determined facetFillColor, if spawning and not feared, make it more vibrant pink
+            ctx.fillStyle = (this.isSpawning && !this.isFeared && !(this.hitFlashTimer > 0)) ? `rgba(255,100,255,0.95)` : facetFillColor;
+            ctx.fillRect(-facetSize / 2, -facetSize / 2, facetSize, facetSize);
             ctx.restore();
         }
-        ctx.strokeStyle = 'rgba(200, 100, 255, 0.7)';
+        // Main body stroke
+        ctx.strokeStyle = mainBodyStrokeColor;
         ctx.lineWidth = 2 + this.tier * 0.5;
-        ctx.stroke();
+        ctx.stroke(); 
         ctx.restore();
 
-        super.draw(ctx); // Health bar and base fear visual
+        super.draw(ctx); // Draws health bar and base fear visual (which is a STROKED circle)
 
-        if (this.pulseNovaActive && !this.isFeared) { // Pulse nova only if not feared
+        // Pulse Nova visual (only stroked)
+        if (this.pulseNovaActive && !this.isFeared) {
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.pulseNovaCurrentRadius, 0, Math.PI * 2);
-            const novaAlpha = 0.8 * (this.pulseNovaTimer / CONSTANTS.PULSE_NOVA_DURATION);
-            ctx.fillStyle = `rgba(200, 50, 255, ${novaAlpha * 0.5})`;
-            ctx.fill();
-            ctx.strokeStyle = `rgba(255, 150, 255, ${novaAlpha})`;
-            ctx.lineWidth = 4 + (1 - (this.pulseNovaTimer / CONSTANTS.PULSE_NOVA_DURATION)) * 8;
-            ctx.stroke();
+
+            let alphaProgress = this.pulseNovaTimer / CONSTANTS.PULSE_NOVA_DURATION; 
+            alphaProgress = Math.max(0, Math.min(1, alphaProgress)); 
+            
+            ctx.strokeStyle = `rgba(255, 100, 255, ${alphaProgress * 0.9})`; // Make stroke quite visible
+            
+            const expansionProgress = 1 - alphaProgress; 
+            let lineWidth;
+            if (expansionProgress < 0.85) { 
+                lineWidth = Math.max(1.5, 12 - (expansionProgress * 12)); 
+            } else { 
+                lineWidth = 1.5 + (expansionProgress - 0.85) * 15; 
+            }
+            ctx.lineWidth = lineWidth; 
+            ctx.stroke(); // Only stroke, no fill for the nova wave
         }
         this.activeMinions.forEach(minion => minion.draw(ctx));
     }
 
     spawnMinions() {
         this.isSpawning = false;
-        if (this.isFeared) return; // Don't spawn if feared
+        if (this.isFeared) return; 
 
         let dronesToSpawn = 2 + Math.floor(this.tier * 0.8);
         let lancersToSpawn = (this.tier >= 2) ? 1 + Math.floor((this.tier - 1) * 0.5) : 0;
@@ -441,7 +463,7 @@ export class NexusWeaverBoss extends BossNPC {
 
     tryPulseNova(playerInstance, dt, gameContext) {
         if (this.isFeared || this.tier < 3 || this.pulseNovaActive || this.pulseNovaCooldownTimer > 0) {
-            if (this.pulseNovaCooldownTimer > 0 && !this.isFeared) this.pulseNovaCooldownTimer -= dt; // Cooldown only ticks if not feared
+            if (this.pulseNovaCooldownTimer > 0 && !this.isFeared) this.pulseNovaCooldownTimer -= dt; 
             return;
         }
         const distToPlayer = Math.hypot(playerInstance.x - this.x, playerInstance.y - this.y);
@@ -461,7 +483,7 @@ export class NexusWeaverBoss extends BossNPC {
             this.pulseNovaActive = true;
             this.pulseNovaTimer = CONSTANTS.PULSE_NOVA_DURATION;
             this.pulseNovaMaxRadius = this.radius * CONSTANTS.PULSE_NOVA_RADIUS_FACTOR;
-            this.pulseNovaCurrentRadius = this.radius * 0.5;
+            this.pulseNovaCurrentRadius = this.radius * 0.1; 
             this.pulseNovaCooldownTimer = CONSTANTS.PULSE_NOVA_COOLDOWN + Math.random() * 2000;
             this.playerCloseTimer = 0;
         } else if (this.pulseNovaCooldownTimer > 0) {
@@ -472,7 +494,7 @@ export class NexusWeaverBoss extends BossNPC {
     update(playerInstance, gameContext) {
         const { dt, canvasWidth, canvasHeight, postDamageImmunityTimer, isPlayerShieldOvercharging, allRays } = gameContext;
 
-        super.update(dt, playerInstance, canvasWidth, canvasHeight); // Handles fear movement, bleed, hitstun timers
+        super.update(dt, playerInstance, canvasWidth, canvasHeight); 
         if (this.health <= 0) {
             this.activeMinions.forEach(m => m.isActive = false);
             this.activeMinions = [];
@@ -480,14 +502,11 @@ export class NexusWeaverBoss extends BossNPC {
         }
 
         if (this.isFeared) {
-            // Movement is handled by super.update()
-            // Suppress spawning and pulse nova if feared
             this.isSpawning = false;
             this.spawnTellTimer = 0;
             this.pulseNovaActive = false;
             this.pulseNovaTimer = 0;
         } else {
-            // Normal AI logic if not feared
             const normalizedDtFactor = dt / (1000 / 60) || 1;
             if (this.hitStunTimer <= 0 && this.playerCollisionStunTimer <= 0) {
                 const angleToPlayer = Math.atan2(playerInstance.y - this.y, playerInstance.x - this.x);
@@ -513,25 +532,32 @@ export class NexusWeaverBoss extends BossNPC {
                     this.isSpawning = true;
                     this.spawnTellTimer = this.spawnTellDuration;
                 }
-            } else { // isSpawning
+            } else { 
                 this.spawnTellTimer -= dt;
                 if (this.spawnTellTimer <= 0) {
                     this.spawnMinions();
-                    this.spawnTimer = this.spawnCooldown; // Reset cooldown after spawning
+                    this.spawnTimer = this.spawnCooldown; 
                 }
             }
             this.tryPulseNova(playerInstance, dt, gameContext);
             if (this.pulseNovaActive) {
                 this.pulseNovaTimer -= dt;
-                const novaProgress = 1 - (this.pulseNovaTimer / CONSTANTS.PULSE_NOVA_DURATION);
-                this.pulseNovaCurrentRadius = this.pulseNovaMaxRadius * Math.sqrt(novaProgress);
+                const novaProgress = 1 - (this.pulseNovaTimer / CONSTANTS.PULSE_NOVA_DURATION); 
+                this.pulseNovaCurrentRadius = this.pulseNovaMaxRadius * Math.sqrt(novaProgress); 
                 if (this.pulseNovaTimer <= 0) {
                     this.pulseNovaActive = false;
                 } else {
                     const distToPlayerNova = Math.hypot(playerInstance.x - this.x, playerInstance.y - this.y);
                     const effectivePlayerRadiusForNova = playerInstance.radius * 0.8;
-                    if (distToPlayerNova < this.pulseNovaCurrentRadius + effectivePlayerRadiusForNova &&
-                        distToPlayerNova > this.pulseNovaCurrentRadius - effectivePlayerRadiusForNova - (this.pulseNovaCurrentRadius * 0.1) ) {
+                    const novaEdgeOuter = this.pulseNovaCurrentRadius + effectivePlayerRadiusForNova;
+                    const expansionProgress = 1 - (this.pulseNovaTimer / CONSTANTS.PULSE_NOVA_DURATION);
+                    let currentNovaWaveThickness = Math.max(1, 12 - (expansionProgress * 12));
+                     if (expansionProgress >= 0.85) {
+                         currentNovaWaveThickness = 1.5 + (expansionProgress - 0.85) * 15;
+                     }
+                    const novaEdgeInner = this.pulseNovaCurrentRadius - effectivePlayerRadiusForNova - (currentNovaWaveThickness * 0.5); 
+                    
+                    if (distToPlayerNova < novaEdgeOuter && distToPlayerNova > novaEdgeInner) {
                         if (gameContext && gameContext.callbacks && gameContext.callbacks.onPlayerBossAttackCollision) {
                             gameContext.callbacks.onPlayerBossAttackCollision({
                                 damage: CONSTANTS.PULSE_NOVA_DAMAGE,
@@ -542,13 +568,12 @@ export class NexusWeaverBoss extends BossNPC {
                     }
                 }
             }
-        } // End of !isFeared block
+        } 
 
         const safeCallbacks = gameContext && gameContext.callbacks ? gameContext.callbacks : {};
-        const minionGameContext = { // Pass necessary context to minions
+        const minionGameContext = { 
             playerCollidedWithMinion: safeCallbacks.onPlayerMinionCollision,
             nexusWeaverShootsOrbiterProjectile: safeCallbacks.nexusWeaverShootsOrbiterProjectile,
-            // Pass other things minions might need, like playerInstance, canvas dimensions, etc.
              dt: gameContext.dt, 
              canvasWidth: gameContext.canvasWidth, 
              canvasHeight: gameContext.canvasHeight
@@ -556,7 +581,7 @@ export class NexusWeaverBoss extends BossNPC {
 
         for (let i = this.activeMinions.length - 1; i >= 0; i--) {
             const minion = this.activeMinions[i];
-            minion.update(dt, playerInstance, canvasWidth, canvasHeight, minionGameContext); // Pass full context
+            minion.update(dt, playerInstance, canvasWidth, canvasHeight, minionGameContext); 
             if (!minion.isActive) {
                 this.activeMinions.splice(i, 1);
             }

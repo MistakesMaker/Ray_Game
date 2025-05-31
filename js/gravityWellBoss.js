@@ -34,15 +34,18 @@ export class GravityWellBoss extends BossNPC {
     draw(ctx) {
         if (!ctx) return;
         let effectiveColor = this.color;
-        if (this.isFeared) {
+
+        // Prioritize hit flash for the main body color
+        if (this.hitFlashTimer > 0 && Math.floor(this.hitFlashTimer / this.HIT_FLASH_BLINK_INTERVAL) % 2 === 0) {
+            effectiveColor = '#FFFFFF'; // Flash white
+        } else if (this.isFeared) {
             effectiveColor = 'rgba(255, 0, 255, 0.6)'; // Magenta when feared
-        } else if (this.hitFlashTimer > 0 && Math.floor(this.hitFlashTimer / 50) % 2 === 0) {
-            effectiveColor = '#FFFFFF';
         } else if (this.bleedTimer > 0 && Math.floor(this.bleedTimer / 100) % 2 === 0) {
-            effectiveColor = '#10605A';
+            effectiveColor = '#10605A'; // Darker shade for bleed
         } else if (this.hitStunTimer > 0 || this.playerCollisionStunTimer > 0) {
-            effectiveColor = `rgba(100, 100, 200, 0.8)`;
+            effectiveColor = `rgba(100, 100, 200, 0.8)`; // Stun color
         }
+
 
         ctx.save();
         ctx.translate(this.x, this.y);
@@ -50,19 +53,19 @@ export class GravityWellBoss extends BossNPC {
         ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
         ctx.fillStyle = effectiveColor;
         ctx.fill();
-        ctx.strokeStyle = '#FFFFFF';
+        ctx.strokeStyle = '#FFFFFF'; // Keep a distinct outline
         ctx.lineWidth = 2;
         ctx.stroke();
         ctx.restore();
 
-        super.draw(ctx); 
+        super.draw(ctx); // Draws health bar and base fear visual
 
         if (this.activeDetonationEffect) {
             const effect = this.activeDetonationEffect;
             const progress = (effect.duration - effect.timer) / effect.duration;
             const currentRadius = effect.maxRadius * progress;
             let opacity = 1 - progress;
-            opacity = opacity * opacity * opacity;
+            opacity = opacity * opacity * opacity; // Faster fade for opacity
             ctx.beginPath();
             ctx.arc(effect.x, effect.y, currentRadius, 0, Math.PI * 2);
             ctx.fillStyle = GRAVITY_RAY_DETONATION_EXPLOSION_COLOR.replace('opacity', (opacity * 0.8).toString());
@@ -73,11 +76,11 @@ export class GravityWellBoss extends BossNPC {
     update(playerInstance, gameContext) {
         const { dt, allRays, canvasWidth, canvasHeight, postDamageImmunityTimer, isPlayerShieldOvercharging, getPooledRay } = gameContext;
 
-        super.update(dt, playerInstance, canvasWidth, canvasHeight); // Pass canvas dimensions
+        super.update(dt, playerInstance, canvasWidth, canvasHeight); 
         if (this.health <= 0) {
             if (this.gravityRay && this.gravityRay.isActive) {
                 if(stopSound && gravityWellChargeSound) stopSound(gravityWellChargeSound);
-                this.gravityRay.isActive = false; // Deactivate its well if boss dies
+                this.gravityRay.isActive = false; 
             }
             this.gravityRay = null;
             return;
@@ -87,14 +90,11 @@ export class GravityWellBoss extends BossNPC {
         const angleToPlayer = Math.atan2(playerInstance.y - this.y, playerInstance.x - this.x);
 
         if (this.isFeared) {
-            // Base class handles fear movement.
-            // Stop initiating new spawns if feared.
             if (this.isInitiatingSpawn) {
                 this.isInitiatingSpawn = false;
                 this.initiationTimer = 0;
-                if(stopSound && gravityWellChargeSound) stopSound(gravityWellChargeSound); // Stop charge sound if it started
+                if(stopSound && gravityWellChargeSound) stopSound(gravityWellChargeSound); 
             }
-            // Existing gravityRay will continue its lifecycle independently.
         } else if (this.playerCollisionStunTimer > 0) {
             this.playerCollisionStunTimer -= dt;
             this.x += this.recoilVelX * normalizedDtFactor;
@@ -116,14 +116,13 @@ export class GravityWellBoss extends BossNPC {
             }
         } 
 
-        // Boundary check handled by super.update if feared, otherwise here.
         if (!this.isFeared) {
             this.x = Math.max(this.radius, Math.min(canvasWidth - this.radius, this.x));
             this.y = Math.max(this.radius, Math.min(canvasHeight - this.radius, this.y));
         }
 
 
-        if (this.isInitiatingSpawn && !this.isFeared) { // Don't progress spawn if feared
+        if (this.isInitiatingSpawn && !this.isFeared) { 
             this.initiationTimer -= dt;
             if (this.initiationTimer <= 0) {
                 this.isInitiatingSpawn = false;
@@ -259,7 +258,7 @@ export class GravityWellBoss extends BossNPC {
              const playerCanTakeDamage = (postDamageImmunityTimer === undefined || postDamageImmunityTimer <= 0) &&
                                         !(playerInstance.teleporting && playerInstance.teleportEffectTimer > 0) &&
                                         !isPlayerShieldOvercharging;
-            if (playerCanTakeDamage && this.playerCollisionStunTimer <=0 && !this.isFeared) { // Don't collide if feared
+            if (playerCanTakeDamage && this.playerCollisionStunTimer <=0 && !this.isFeared) { 
                  if(gameContext) gameContext.playerCollidedWithBoss = this;
                 const dist = Math.sqrt((this.x - playerInstance.x) ** 2 + (this.y - playerInstance.y) ** 2);
                 const overlap = (this.radius + playerInstance.radius) - dist;

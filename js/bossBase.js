@@ -15,24 +15,25 @@ export class BossNPC {
         this.radius = radius; this.color = color;
 
         this.hitFlashTimer = 0;
-        this.HIT_FLASH_DURATION = 120;
+        this.HIT_FLASH_DURATION = 120; // Duration of the entire flash effect in ms
+        this.HIT_FLASH_BLINK_INTERVAL = 50; // Interval for on/off blinking in ms
+
         this.hitStunTimer = 0;
         this.HIT_STUN_DURATION = 200;
-        this.originalSpeed = 0; // Stores speed before hitStun
-        this.speed = 0; // Actual current speed, will be set by subclasses
-        this.baseSpeed = 0; // Base speed for the boss, set by subclasses
+        this.originalSpeed = 0; 
+        this.speed = 0; 
+        this.baseSpeed = 0; 
         this.hitStunSlowFactor = 0.3;
 
         this.bleedDamagePerTick = 0;
         this.bleedTimer = 0;
         this.playerCollisionStunTimer = 0; 
 
-        // Fear related properties
         this.isFeared = false;
         this.fearTimer = 0;
         this.fearSourceX = 0;
         this.fearSourceY = 0;
-        this.FEAR_SPEED_MULTIPLIER = 1.2; // How much faster they run when feared
+        this.FEAR_SPEED_MULTIPLIER = 1.2; 
     }
 
     applyBleed(dpt, duration) {
@@ -46,14 +47,12 @@ export class BossNPC {
         this.fearTimer = duration;
         this.fearSourceX = sourceX;
         this.fearSourceY = sourceY;
-        // Optionally interrupt current actions
-        if (this.hitStunTimer > 0) { // If stunned by hit, fear might override or be less effective
-            this.hitStunTimer = Math.min(this.hitStunTimer, duration / 2); // Fear might shorten hit stun
+        if (this.hitStunTimer > 0) { 
+            this.hitStunTimer = Math.min(this.hitStunTimer, duration / 2); 
         }
         if (this.playerCollisionStunTimer > 0) {
             this.playerCollisionStunTimer = Math.min(this.playerCollisionStunTimer, duration / 2);
         }
-        // For specific boss actions, they'd need to check this.isFeared in their update
     }
 
 
@@ -62,11 +61,11 @@ export class BossNPC {
 
         let actualDamageTaken = amount; 
         this.health -= actualDamageTaken;
-        this.hitFlashTimer = this.HIT_FLASH_DURATION;
+        this.hitFlashTimer = this.HIT_FLASH_DURATION; // Set the timer on taking damage
         if (this.health < 0) this.health = 0;
 
-        if (this.isFeared) { // Fear might make them more susceptible or interrupt stun application
-            this.fearTimer -= actualDamageTaken * 10; // Taking damage reduces fear timer slightly
+        if (this.isFeared) { 
+            this.fearTimer -= actualDamageTaken * 10; 
         }
 
         if (ray && typeof this.speed !== 'undefined' && this.hitStunTimer <= 0 && !this.isFeared && 
@@ -97,69 +96,71 @@ export class BossNPC {
         ctx.strokeRect(barX, barY, BOSS_HEALTH_BAR_WIDTH, BOSS_HEALTH_BAR_HEIGHT);
     }
 
-    draw(ctx) {
+    draw(ctx) { // Base draw method, subclasses will call super.draw(ctx)
         if (!ctx) return;
-         // Add a visual indicator for fear
+        this.drawHealthBar(ctx); // Health bar is common
+        
+        // Fear visual indicator common to all bosses
         if (this.isFeared) {
             ctx.save();
-            ctx.strokeStyle = 'rgba(255, 0, 255, 0.7)'; // Magenta for fear
-            ctx.lineWidth = 2;
+            // Pulsing magenta circle around the boss when feared
+            const fearPulseProgress = Math.abs(Math.sin(this.fearTimer * 0.01)); // Slow pulse based on remaining fear time
+            const fearCircleRadius = this.radius + 3 + fearPulseProgress * 3;
+            const fearCircleAlpha = 0.3 + fearPulseProgress * 0.3;
+            
+            ctx.strokeStyle = `rgba(255, 0, 255, ${fearCircleAlpha})`;
+            ctx.lineWidth = 1 + fearPulseProgress * 2;
             ctx.beginPath();
-            const fearRadius = this.radius + 5 + Math.sin(Date.now() / 100) * 2;
-            ctx.arc(this.x, this.y, fearRadius, 0, Math.PI * 2);
+            ctx.arc(this.x, this.y, fearCircleRadius, 0, Math.PI * 2);
             ctx.stroke();
-            // Small "!!!" above head
+
+            // Small "!!!" above head more reliably
             ctx.fillStyle = 'rgba(255, 0, 255, 0.9)';
-            ctx.font = 'bold 16px Arial';
+            ctx.font = 'bold 16px Arial'; // Ensure font is set if not elsewhere
             ctx.textAlign = 'center';
-            ctx.fillText("!!!", this.x, this.y - this.radius - 15);
+            ctx.fillText("!!!", this.x, this.y - this.radius - BOSS_HEALTH_BAR_OFFSET_Y - 20); // Adjusted Y
             ctx.restore();
         }
-        this.drawHealthBar(ctx);
     }
 
-    update(dt, playerInstance, canvasWidth, canvasHeight) { // Added canvasWidth/Height for boundary checks during fear
-        // Handle Fear State first
+    update(dt, playerInstance, canvasWidth, canvasHeight) { 
+        if (this.hitFlashTimer > 0) {
+            this.hitFlashTimer -= dt;
+            if (this.hitFlashTimer < 0) {
+                this.hitFlashTimer = 0; // Ensure it doesn't stay negative
+            }
+        }
+
         if (this.isFeared) {
             this.fearTimer -= dt;
             if (this.fearTimer <= 0) {
                 this.isFeared = false;
-                this.speed = this.baseSpeed; // Restore normal speed
+                this.fearTimer = 0;
+                if(this.hitStunTimer <=0) { // Only restore speed if not also hit-stunned
+                   this.speed = this.baseSpeed; 
+                }
             } else {
                 const angleAwayFromSource = Math.atan2(this.y - this.fearSourceY, this.x - this.fearSourceX);
-                // If too close to source, ensure it tries to move directly away
-                // let distanceToSource = Math.hypot(this.x - this.fearSourceX, this.y - this.fearSourceY);
-                // if (distanceToSource < this.radius) { 
-                //     // angleAwayFromSource is already correct
-                // }
-
-                const currentSpeed = (this.baseSpeed || this.speed || 1) * this.FEAR_SPEED_MULTIPLIER; // Use baseSpeed if available, else current speed, fallback to 1
+                const currentFearSpeed = (this.baseSpeed || this.speed || 1) * this.FEAR_SPEED_MULTIPLIER; 
                 const normalizedDtFactor = dt / (1000 / 60) || 1;
 
-                this.x += Math.cos(angleAwayFromSource) * currentSpeed * normalizedDtFactor;
-                this.y += Math.sin(angleAwayFromSource) * currentSpeed * normalizedDtFactor;
+                this.x += Math.cos(angleAwayFromSource) * currentFearSpeed * normalizedDtFactor;
+                this.y += Math.sin(angleAwayFromSource) * currentFearSpeed * normalizedDtFactor;
 
-                // Keep within bounds while feared
-                if(canvasWidth && canvasHeight){ // check if dimensions are passed
+                if(canvasWidth && canvasHeight){ 
                     this.x = Math.max(this.radius, Math.min(canvasWidth - this.radius, this.x));
                     this.y = Math.max(this.radius, Math.min(canvasHeight - this.radius, this.y));
                 }
-                // Most other logic (like shooting) should be skipped or modified in subclasses when feared.
-                // For base class, we just handle movement.
             }
         }
 
 
-        // Bleed and Hitstun timers (can still tick down even if feared, movement is just overridden)
         if (this.bleedTimer > 0) {
             this.bleedTimer -= dt;
             const ticks = Math.floor(dt / 100); 
             if (ticks > 0) {
                 const damageThisFrame = this.bleedDamagePerTick * ticks;
                 this.health -= damageThisFrame; 
-                if (playerInstance && typeof playerInstance.totalDamageDealt === 'number') {
-                     // playerInstance.totalDamageDealt += damageThisFrame; 
-                }
                 if (this.health < 0) this.health = 0;
             }
             if (this.bleedTimer <= 0) {
@@ -170,11 +171,15 @@ export class BossNPC {
 
         if (this.hitStunTimer > 0) {
             this.hitStunTimer -= dt;
-            if (this.hitStunTimer <= 0 && this.originalSpeed > 0 && typeof this.speed !== 'undefined' && !this.isFeared) { // Don't restore speed if feared
-                this.speed = this.originalSpeed;
-                this.originalSpeed = 0; 
+            if (this.hitStunTimer <= 0) {
+                this.hitStunTimer = 0;
+                if (this.originalSpeed > 0 && typeof this.speed !== 'undefined' && !this.isFeared) { 
+                    this.speed = this.originalSpeed;
+                    this.originalSpeed = 0; 
+                } else if (!this.isFeared) { // If originalSpeed wasn't set (e.g. stun from non-ray source), restore base speed
+                    this.speed = this.baseSpeed;
+                }
             }
         }
-        // Player collision stun timer is typically handled by specific boss logic
     }
 }
