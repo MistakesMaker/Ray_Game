@@ -4,7 +4,7 @@ import * as GameState from './gameState.js';
 import { getReadableColorName as getReadableColorNameFromUtils } from './utils.js';
 
 let evolutionChoicesMasterList = [];
-let _currentlyDisplayedEvolutionOffers = []; 
+let _currentlyDisplayedEvolutionOffers = [];
 let _isBlockModeActiveManager = false;
 
 let _dependencies = {
@@ -16,7 +16,7 @@ let _dependencies = {
     audioUpgradeSound: null,
     updateLastEvolutionScore: null,
     triggerBossSpawnCheck: null,
-    inputState: null 
+    inputState: null
 };
 
 
@@ -37,11 +37,14 @@ function generateSingleNewOffer(playerInstance, existingOfferBaseIds, additional
 
     const availableChoices = evolutionChoicesMasterList.filter(c => {
         if (exclusionList.includes(c.id)) return false;
+        if (c.requiresPath && playerInstance.currentPath !== c.requiresPath) {
+            return false;
+        }
         return !(c.isMaxed && c.isMaxed(playerInstance));
     });
 
     if (availableChoices.length > 0) {
-        const baseEvo = availableChoices[Math.floor(Math.random() * availableChoices.length)]; 
+        const baseEvo = availableChoices[Math.floor(Math.random() * availableChoices.length)];
         let rolledTierIfApplicable = baseEvo.isTiered ? rollTier() : 'common';
         const tierSpecificData = baseEvo.isTiered ? baseEvo.tiers[rolledTierIfApplicable] : baseEvo;
 
@@ -96,7 +99,7 @@ export function initializeEvolutionMasterList() {
                 return"No new colors left!";
             },
             getEffectString: function(playerInstance) { return `Currently Immune to ${playerInstance?playerInstance.immuneColorsList.length:0} colors`; },
-            getCardEffectString: function(tier, playerInstance) { 
+            getCardEffectString: function(tier, playerInstance) {
                  return `Gain immunity to a new random color.`;
             }
         },
@@ -242,14 +245,6 @@ export function initializeEvolutionMasterList() {
             getEffectString: function(p) { return `Current Ray Crit Damage: x${(p && p.rayCritDamageMultiplier !== undefined ? p.rayCritDamageMultiplier:1.5).toFixed(2)}`; },
             getCardEffectString: function(tier) { return `+${(CONSTANTS.RAY_CRIT_DAMAGE_TIER_BONUS[tier]*100).toFixed(0)}% Ray Crit Damage`;}
         },
-        // { // <<< KINETIC CONVERSION REMOVED FROM HERE
-        //     id: 'kineticConversion', classType: 'ability', text: "Kinetic Conversion", level: 0, maxLevel: 999,
-        //     isTiered: true,
-        //     isMaxed: function(p) { return false; },
-        //     tiers: { ... },
-        //     getEffectString: function(playerInstance) { ... },
-        //     getCardEffectString: function(tier, playerInstance) { ... }
-        // },
         {
             id: 'temporalEcho', classType: 'ability', text: "Temporal Echo", level: 0, maxLevel: 999,
             detailedDescription: function(playerInstance) {
@@ -288,6 +283,7 @@ export function initializeEvolutionMasterList() {
         },
         {
             id: 'abilityPotency', classType: 'ability', text: "Empowered Abilities", level: 0, maxLevel: 999,
+            requiresPath: 'mage',
             isTiered: true,
             isMaxed: function(p) { return false; },
             tiers: {
@@ -301,6 +297,7 @@ export function initializeEvolutionMasterList() {
         },
         {
             id: 'abilityCritChance', classType: 'ability', text: "Unstable Energies", level: 0, maxLevel: 999,
+            requiresPath: 'mage',
             isTiered: true,
             isMaxed: function(p) { return p && (p.abilityCritChance !== undefined ? p.abilityCritChance >= 1.0 : false); },
             tiers: {
@@ -314,6 +311,7 @@ export function initializeEvolutionMasterList() {
         },
         {
             id: 'abilityCritDamage', classType: 'ability', text: "Focused Overload", level: 0, maxLevel: 999,
+            requiresPath: 'mage',
             isTiered: true,
             isMaxed: function(p) { return false; },
             tiers: {
@@ -350,14 +348,19 @@ export function generateEvolutionOffers(playerInstance) {
     let offeredBaseIds = [];
     let filledIndices = [false, false, false];
 
+    // Handle frozen choice first
     if (playerInstance.frozenEvolutionChoice && playerInstance.frozenEvolutionChoice.choiceData && playerInstance.frozenEvolutionChoice.originalIndex !== undefined) {
         const frozenSnapshot = playerInstance.frozenEvolutionChoice.choiceData;
         const originalMasterEvo = evolutionChoicesMasterList.find(e => e.id === frozenSnapshot.baseId);
         let isValidAndReconstructable = false;
 
         if (originalMasterEvo) {
+            let pathRequirementMet = true;
+            if (originalMasterEvo.requiresPath && playerInstance.currentPath !== originalMasterEvo.requiresPath) {
+                pathRequirementMet = false;
+            }
             const isMaxed = originalMasterEvo.isMaxed ? originalMasterEvo.isMaxed(playerInstance) : false;
-            if (!isMaxed) {
+            if (!isMaxed && pathRequirementMet) {
                 isValidAndReconstructable = true;
             }
         }
@@ -411,51 +414,57 @@ export function generateEvolutionOffers(playerInstance) {
         }
     }
 
-    const slotsToFill = 3 - offers.filter(o => o !== null).length;
-    if (slotsToFill > 0) {
-        const exclusionList = [...playerInstance.blockedEvolutionIds, ...offeredBaseIds];
-        const availableChoices = evolutionChoicesMasterList.filter(c => {
-            if (exclusionList.includes(c.id)) return false;
-            return !(c.isMaxed && c.isMaxed(playerInstance));
-        });
+    // Fill remaining slots
+    // const slotsToFill = 3 - offers.filter(o => o !== null).length; // This was the old way
+    // if (slotsToFill > 0) { // We always try to fill all slots not filled by frozen
 
-        let shuffledAvailable = [...availableChoices].sort(() => 0.5 - Math.random());
+    // Corrected: Filter available choices *once* then pick from them
+    const exclusionListForNewRolls = [...playerInstance.blockedEvolutionIds, ...offeredBaseIds];
+    const availableChoicesForNewRolls = evolutionChoicesMasterList.filter(c => {
+        if (exclusionListForNewRolls.includes(c.id)) return false;
+        if (c.requiresPath && playerInstance.currentPath !== c.requiresPath) { // Path check
+            return false;
+        }
+        return !(c.isMaxed && c.isMaxed(playerInstance));
+    });
 
-        for (let i = 0; i < 3; i++) {
-            if (!filledIndices[i]) {
-                if (shuffledAvailable.length > 0) {
-                    const baseEvo = shuffledAvailable.shift();
-                    let rolledTierIfApplicable = baseEvo.isTiered ? rollTier() : 'common';
-                    const tierSpecificData = baseEvo.isTiered ? baseEvo.tiers[rolledTierIfApplicable] : baseEvo;
+    let shuffledAvailableForNewRolls = [...availableChoicesForNewRolls].sort(() => 0.5 - Math.random());
 
-                    const offer = {
-                        baseId: baseEvo.id,
-                        classType: baseEvo.classType,
-                        rolledTier: baseEvo.isTiered ? rolledTierIfApplicable : null,
-                        text: baseEvo.text,
-                        detailedDescription: baseEvo.isTiered && tierSpecificData
-                            ? (typeof tierSpecificData.description === 'function' ? tierSpecificData.description(playerInstance, rolledTierIfApplicable) : tierSpecificData.description)
-                            : (typeof baseEvo.detailedDescription === 'function' ? baseEvo.detailedDescription(playerInstance) : baseEvo.detailedDescription),
-                        applyEffect: baseEvo.isTiered && tierSpecificData ? tierSpecificData.apply : baseEvo.apply,
-                        cardEffectString: (typeof baseEvo.getCardEffectString === 'function')
-                            ? baseEvo.getCardEffectString(rolledTierIfApplicable, playerInstance)
-                            : (baseEvo.getEffectString ? baseEvo.getEffectString(playerInstance) : 'Effect details vary'),
-                        originalEvolution: baseEvo
-                    };
-                    offers[i] = offer;
-                    offeredBaseIds.push(offer.baseId);
-                    filledIndices[i] = true;
-                } else {
-                    offers[i] = {
-                        baseId: `empty_slot_${i}`, classType: 'ability', text:"No More Options", rolledTier: null,
-                        detailedDescription: "No further upgrades available or other slots took priority.", applyEffect: ()=>{},
-                        cardEffectString: "Unavailable", originalEvolution: { id: `empty_slot_${i}`, isMaxed: ()=>true, isTiered: false, getEffectString: (p) => "N/A" }
-                    };
-                    filledIndices[i] = true;
-                }
+    for (let i = 0; i < 3; i++) {
+        if (!filledIndices[i]) { // If this slot wasn't filled by a valid frozen choice
+            if (shuffledAvailableForNewRolls.length > 0) {
+                const baseEvo = shuffledAvailableForNewRolls.shift(); // Take one from the pre-filtered, shuffled list
+                let rolledTierIfApplicable = baseEvo.isTiered ? rollTier() : 'common';
+                const tierSpecificData = baseEvo.isTiered ? baseEvo.tiers[rolledTierIfApplicable] : baseEvo;
+
+                const offer = {
+                    baseId: baseEvo.id,
+                    classType: baseEvo.classType,
+                    rolledTier: baseEvo.isTiered ? rolledTierIfApplicable : null,
+                    text: baseEvo.text,
+                    detailedDescription: baseEvo.isTiered && tierSpecificData
+                        ? (typeof tierSpecificData.description === 'function' ? tierSpecificData.description(playerInstance, rolledTierIfApplicable) : tierSpecificData.description)
+                        : (typeof baseEvo.detailedDescription === 'function' ? baseEvo.detailedDescription(playerInstance) : baseEvo.detailedDescription),
+                    applyEffect: baseEvo.isTiered && tierSpecificData ? tierSpecificData.apply : baseEvo.apply,
+                    cardEffectString: (typeof baseEvo.getCardEffectString === 'function')
+                        ? baseEvo.getCardEffectString(rolledTierIfApplicable, playerInstance)
+                        : (baseEvo.getEffectString ? baseEvo.getEffectString(playerInstance) : 'Effect details vary'),
+                    originalEvolution: baseEvo
+                };
+                offers[i] = offer;
+                // offeredBaseIds.push(offer.baseId); // Already handled if it came from frozen, or will be excluded next iteration if needed by exclusionListForNewRolls
+                filledIndices[i] = true;
+            } else {
+                offers[i] = {
+                    baseId: `empty_slot_${i}`, classType: 'ability', text:"No More Options", rolledTier: null,
+                    detailedDescription: "No further upgrades available or other slots took priority.", applyEffect: ()=>{},
+                    cardEffectString: "Unavailable", originalEvolution: { id: `empty_slot_${i}`, isMaxed: ()=>true, isTiered: false, getEffectString: (p) => "N/A" }
+                };
+                filledIndices[i] = true;
             }
         }
     }
+    // } // End of old slotsToFill block
 
     if (offers.every(o => o === null || o.baseId.startsWith('empty_slot_') || o.baseId === 'noMoreEvolutions')) {
          offers[0] = {
