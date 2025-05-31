@@ -24,7 +24,7 @@ function formatMillisecondsToTimeInternal(ms) {
     minutes = (minutes < 10) ? "0" + minutes : minutes.toString();
     seconds = (seconds < 10) ? "0" + seconds : seconds.toString();
     milliseconds = (milliseconds < 10) ? "0" + milliseconds : milliseconds.toString();
-    if (milliseconds.length === 1) milliseconds = "0" + milliseconds; 
+    if (milliseconds.length === 1) milliseconds = "0" + milliseconds;
 
     return minutes + ":" + seconds + "." + milliseconds;
 }
@@ -46,7 +46,7 @@ this.standardAvailableBossTypes = [ChaserBoss, MirrorShieldBoss, GravityWellBoss
     this.nexusWeaverBossType = NexusWeaverBoss;
     this.nexusWeaverBossName = "NEXUS WEAVER";
     this.nexusWeaverBossKey = "nexusWeaver";
-    this.nexusWeaverSpawnInterval = 5; 
+    this.nexusWeaverSpawnInterval = 5;
     this.totalBossEncountersTriggered = 0;
 
     this.isWaveInProgress = false;
@@ -82,7 +82,7 @@ trySpawnBoss(currentScore) {
             let bossKeyToSpawnThisEncounter;
 
             if (this.totalBossEncountersTriggered > 0 && (this.totalBossEncountersTriggered % this.nexusWeaverSpawnInterval === 0)) {
-                this.bossesToSpawnInCurrentWave = 1; 
+                this.bossesToSpawnInCurrentWave = 1;
                 bossTypeToSpawnThisEncounter = this.nexusWeaverBossType;
                 bossNameToSpawnThisEncounter = this.nexusWeaverBossName;
                 bossKeyToSpawnThisEncounter = this.nexusWeaverBossKey;
@@ -96,11 +96,11 @@ trySpawnBoss(currentScore) {
 
             for (let i = 0; i < this.bossesToSpawnInCurrentWave; i++) {
                 let currentBossType, currentBossName, currentBossKey;
-                if (i === 0) { 
+                if (i === 0) {
                     currentBossType = bossTypeToSpawnThisEncounter;
                     currentBossName = bossNameToSpawnThisEncounter;
                     currentBossKey = bossKeyToSpawnThisEncounter;
-                } else { 
+                } else {
                     const randomIndex = Math.floor(Math.random() * this.standardAvailableBossTypes.length);
                     currentBossType = this.standardAvailableBossTypes[randomIndex];
                     currentBossName = this.standardBossTypeNames[randomIndex];
@@ -151,12 +151,12 @@ processBossSpawnQueue(gameContext) {
 
         const spawnX = gameContext.canvasWidth / 2 + (Math.random() - 0.5) * 200;
         const spawnY = 100 + (Math.random() - 0.5) * 50;
-        const newBoss = new bossInfo.constructor(spawnX, spawnY, bossInfo.tier); 
+        const newBoss = new bossInfo.constructor(spawnX, spawnY, bossInfo.tier);
 
         if (gameContext.callbacks && gameContext.callbacks.getGameplayTimeElapsed) {
             newBoss.spawnTimestamp = gameContext.callbacks.getGameplayTimeElapsed();
         } else {
-            newBoss.spawnTimestamp = 0; 
+            newBoss.spawnTimestamp = 0;
         }
 
         this.activeBosses.push(newBoss);
@@ -172,6 +172,7 @@ processBossSpawnQueue(gameContext) {
 
 update(playerInstance, gameContext) {
     if (!gameContext || typeof gameContext.dt === 'undefined') {
+        console.warn("[BossManager Update] gameContext or dt is undefined. Skipping update.");
         return;
     }
 
@@ -201,13 +202,19 @@ update(playerInstance, gameContext) {
         playerCollidedWithBossAttack: null,
         CONSTANTS: gameContext.CONSTANTS,
         getPooledRay: gameContext.getPooledRay,
-        callbacks: gameContext.callbacks, 
+        callbacks: gameContext.callbacks,
         nexusWeaverShootsOrbiterProjectile: gameContext.callbacks ? gameContext.callbacks.nexusWeaverShootsOrbiterProjectile : null
     };
 
 
     for (let i = this.activeBosses.length - 1; i >= 0; i--) {
         const boss = this.activeBosses[i];
+        if (!boss) { // Safety check
+            console.warn(`[BossManager Update] Found undefined boss at index ${i}. Splicing out.`);
+            this.activeBosses.splice(i, 1);
+            continue;
+        }
+        // console.log(`[BossManager Update] Updating boss: ${boss.constructor.name}, Health: ${boss.health}`); // LOGGING
         boss.update(playerInstance, bossUpdateContext);
 
         if (bossUpdateContext.playerCollidedWithBoss && bossUpdateContext.callbacks && bossUpdateContext.callbacks.onPlayerBossCollision) {
@@ -225,6 +232,7 @@ update(playerInstance, gameContext) {
 
 
         if (boss.health <= 0) {
+            // console.log(`[BossManager Update] Boss ${boss.constructor.name} health <= 0. Calling handleBossDefeat.`); // LOGGING
             this.handleBossDefeat(boss, i, playerInstance, gameContext);
         }
     }
@@ -232,8 +240,22 @@ update(playerInstance, gameContext) {
 
 
 handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
-    if (!defeatedBoss) return;
-    if (!gameContext || !gameContext.callbacks || !gameContext.firstBossDefeatedThisRunRef || typeof gameContext.currentRunId === 'undefined') { // <<< CHECK FOR currentRunId
+    // ADD DETAILED LOGGING HERE
+    console.log(`[BossManager] handleBossDefeat called for: ${defeatedBoss ? defeatedBoss.constructor.name : 'undefined boss'} at index ${index}. Health: ${defeatedBoss ? defeatedBoss.health : 'N/A'}`);
+    const stack = new Error().stack;
+    console.log("[BossManager] Call stack for handleBossDefeat:\n", stack);
+
+
+    if (!defeatedBoss) {
+        console.error("[BossManager] handleBossDefeat: defeatedBoss is null or undefined. This should not happen.");
+        // Attempt to clean up the array if index is valid
+        if (index >= 0 && index < this.activeBosses.length) {
+            console.warn(`[BossManager] Splicing out potentially problematic entry at index ${index} due to null/undefined boss.`);
+            this.activeBosses.splice(index, 1);
+        }
+        return;
+    }
+    if (!gameContext || !gameContext.callbacks || !gameContext.firstBossDefeatedThisRunRef || typeof gameContext.currentRunId === 'undefined') {
         console.error("[BossManager] handleBossDefeat: Missing critical gameContext properties (including currentRunId).");
         return;
     }
@@ -253,7 +275,22 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
     if (gameContext.bossDefeatEffectsArray) {
         gameContext.bossDefeatEffectsArray.push({ x: defeatedBoss.x, y: defeatedBoss.y, radius: defeatedBoss.radius * 1.2, opacity: 1, timer: 800, duration: 800, initialRadius: defeatedBoss.radius * 1.2, color: 'rgba(255, 255, 180, opacity)' });
     }
-    this.activeBosses.splice(index, 1);
+    
+    // Ensure the boss being removed is the one we expect
+    if (this.activeBosses[index] === defeatedBoss) {
+        this.activeBosses.splice(index, 1);
+        // console.log(`[BossManager] Successfully spliced boss: ${defeatedBoss.constructor.name}. Active bosses remaining: ${this.activeBosses.length}`);
+    } else {
+        console.warn(`[BossManager] Mismatch during boss removal. Expected ${defeatedBoss.constructor.name} at index ${index}, found ${this.activeBosses[index] ? this.activeBosses[index].constructor.name : 'nothing'}. Searching and removing by reference instead.`);
+        const actualIndex = this.activeBosses.indexOf(defeatedBoss);
+        if (actualIndex > -1) {
+            this.activeBosses.splice(actualIndex, 1);
+            // console.log(`[BossManager] Successfully spliced boss by reference: ${defeatedBoss.constructor.name}. Active bosses remaining: ${this.activeBosses.length}`);
+        } else {
+            console.error(`[BossManager] CRITICAL: Boss ${defeatedBoss.constructor.name} not found in activeBosses array for removal.`);
+        }
+    }
+
 
     if (defeatedBoss instanceof NexusWeaverBoss &&
         gameContext.callbacks.hasNexusWeaverTierTimeBeenRecordedThisRun &&
@@ -272,23 +309,21 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
         if (gameContext.callbacks.getSpecificHighScores) {
             currentCategoryHighScores = gameContext.callbacks.getSpecificHighScores(category);
         }
-        
+
         let isNewRecord = false;
-        const MAX_ENTRIES_PER_CAT = 10; 
+        const MAX_ENTRIES_PER_CAT = 10;
         if (currentCategoryHighScores.length < MAX_ENTRIES_PER_CAT) {
             isNewRecord = true;
         } else {
-            const slowestRecordTime = currentCategoryHighScores[currentCategoryHighScores.length - 1].value; 
+            const slowestRecordTime = currentCategoryHighScores[currentCategoryHighScores.length - 1].value;
             if (gameplayTimeAtKill < slowestRecordTime) {
                 isNewRecord = true;
             }
         }
 
         if (isNewRecord) {
-            // const playerNameForRecord = playerInstance ? (playerInstance.name || "CHAMPION") : "CHAMPION"; // Old way
             if (gameContext.callbacks.recordBossKillTime) {
-                // Pass PENDING_RECORD_NAME and currentRunId. The actual name will be updated later by main.js if a survival score is submitted.
-                gameContext.callbacks.recordBossKillTime(category, PENDING_RECORD_NAME, gameplayTimeAtKill, statsSnapshotForBossKill, gameContext.currentRunId); // <<< PASS runId
+                gameContext.callbacks.recordBossKillTime(category, PENDING_RECORD_NAME, gameplayTimeAtKill, statsSnapshotForBossKill, gameContext.currentRunId);
             }
             if (gameContext.activeBuffNotificationsArray && playerInstance) {
                 gameContext.activeBuffNotificationsArray.push({
@@ -404,7 +439,15 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
 
 draw(ctx, gameDrawContext) {
     if (!ctx) return;
-    this.activeBosses.forEach(boss => boss.draw(ctx));
+    this.activeBosses.forEach(boss => {
+        if (boss && typeof boss.draw === 'function') { // Safety check
+            boss.draw(ctx);
+        } else if (boss) {
+            console.warn(`[BossManager Draw] Boss object in activeBosses does not have a draw method:`, boss);
+        } else {
+            console.warn(`[BossManager Draw] Undefined boss object found in activeBosses.`);
+        }
+    });
 
     if (this.bossWarningActive && this.nextBossToSpawnInfo && gameDrawContext && gameDrawContext.canvasWidth && gameDrawContext.canvasHeight) {
         ctx.save();
@@ -470,7 +513,7 @@ debugSpawnBoss(tierToSpawn, bossTypeKey = 'nexusWeaver') {
         name: nameToUse,
         typeKey: bossTypeKey
     });
-    this.isWaveInProgress = true; 
+    this.isWaveInProgress = true;
     this.waveRewardTier = tier;
     this.bossesToSpawnInCurrentWave = 1;
     this.bossesDefeatedInCurrentWave = 0;
