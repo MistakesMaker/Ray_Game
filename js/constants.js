@@ -299,7 +299,7 @@ export const SEISMIC_SLAM_COOLDOWN = 18000; // ms
 // -- Berserker's Echo Path (Fury) --
 // LMB: Bloodpact
 export const BLOODPACT_DURATION = 5000; // ms
-export const BLOODPACT_LIFESTEAL_PERCENT = 0.10; // 10% lifesteal on auto-fired rays
+export const BLOODPACT_LIFESTEAL_PERCENT = 0.20; // 10% lifesteal on auto-fired rays
 export const BLOODPACT_COOLDOWN = 15000; // ms
 
 // RMB: Savage Howl
