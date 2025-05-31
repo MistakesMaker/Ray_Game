@@ -55,7 +55,7 @@ function generateSingleNewOffer(playerInstance, existingOfferBaseIds, additional
             text: baseEvo.text,
             detailedDescription: baseEvo.isTiered && tierSpecificData
                 ? (typeof tierSpecificData.description === 'function' ? tierSpecificData.description(playerInstance, rolledTierIfApplicable) : tierSpecificData.description)
-                : (typeof baseEvo.detailedDescription === 'function' ? baseEvo.detailedDescription(playerInstance) : baseEvo.detailedDescription),
+                : (typeof baseEvo.detailedDescription === 'function' ? baseEvo.detailedDescription(playerInstance, baseEvo.id) : baseEvo.detailedDescription), // Pass baseEvo.id for context
             applyEffect: baseEvo.isTiered && tierSpecificData ? tierSpecificData.apply : baseEvo.apply,
             cardEffectString: (typeof baseEvo.getCardEffectString === 'function')
                 ? baseEvo.getCardEffectString(rolledTierIfApplicable, playerInstance)
@@ -247,24 +247,27 @@ export function initializeEvolutionMasterList() {
         },
         {
             id: 'temporalEcho', classType: 'ability', text: "Temporal Echo", level: 0, maxLevel: 999,
-            detailedDescription: function(playerInstance) {
+            // MODIFIED: detailedDescription function to correctly format the time
+            detailedDescription: function(playerInstance, evolutionId) { // evolutionId can be used if needed for context
                 const chance = playerInstance ? Math.round(playerInstance.temporalEchoChance * 100) : 0;
-                return `Grants a ${chance}% chance, when any ability is used, to also reduce the current cooldown of your *other* active abilities and mouse abilities by a fixed ${CONSTANTS.TEMPORAL_ECHO_FIXED_REDUCTION / 1000} seconds. This echo does not affect the ability that triggered it.`;
+                // Use the constant directly for the description, as playerInstance.temporalEchoFixedReduction might not be set if this is the first time offered.
+                const reductionSeconds = (CONSTANTS.TEMPORAL_ECHO_FIXED_REDUCTION / 1000).toFixed(1);
+                return `Grants a ${chance}% chance, when any ability is used, to also reduce the current cooldown of your *other* active abilities and mouse abilities by a fixed ${reductionSeconds} seconds. This echo does not affect the ability that triggered it.`;
             },
             isTiered: true,
             isMaxed: function(p) { return p && p.temporalEchoChance >= 1.0; },
             tiers: {
-                common:    { description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.common}%.`,   apply: function(p) { p.temporalEchoChance = Math.min(1.0, p.temporalEchoChance + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.common / 100); }},
-                rare:      { description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.rare}%.`,     apply: function(p) { p.temporalEchoChance = Math.min(1.0, p.temporalEchoChance + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.rare / 100); }},
-                epic:      { description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.epic}%.`,     apply: function(p) { p.temporalEchoChance = Math.min(1.0, p.temporalEchoChance + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.epic / 100); }},
-                legendary: { description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.legendary}%.`, apply: function(p) { p.temporalEchoChance = Math.min(1.0, p.temporalEchoChance + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.legendary / 100); }}
+                common:    { description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.common}%.`,   apply: function(p) { p.temporalEchoChance = Math.min(1.0, (p.temporalEchoChance || 0) + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.common / 100); }}, // Ensure p.temporalEchoChance is initialized
+                rare:      { description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.rare}%.`,     apply: function(p) { p.temporalEchoChance = Math.min(1.0, (p.temporalEchoChance || 0) + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.rare / 100); }},
+                epic:      { description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.epic}%.`,     apply: function(p) { p.temporalEchoChance = Math.min(1.0, (p.temporalEchoChance || 0) + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.epic / 100); }},
+                legendary: { description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.legendary}%.`, apply: function(p) { p.temporalEchoChance = Math.min(1.0, (p.temporalEchoChance || 0) + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.legendary / 100); }}
             },
             getEffectString: function(playerInstance) { return `Current Echo Chance: ${Math.round((playerInstance ? playerInstance.temporalEchoChance : 0) * 100)}%`; },
             getCardEffectString: function(tier) { return `+${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE[tier]}% Echo Chance`;}
         },
         {
             id: 'streamlinedSystems', classType: 'ability', text: "Streamlined Systems", level: 0, maxLevel: 999,
-            detailedDescription: function(tier) {
+            detailedDescription: function(tier) { // This function is fine as it uses the passed tier for description
                 const reduction = tier ? CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION[tier] : 0;
                 return `Permanently reduces the cooldowns of ALL your current and future abilities by an additional ${reduction}%. Stacks additively.`;
             },
@@ -348,7 +351,6 @@ export function generateEvolutionOffers(playerInstance) {
     let offeredBaseIds = [];
     let filledIndices = [false, false, false];
 
-    // Handle frozen choice first
     if (playerInstance.frozenEvolutionChoice && playerInstance.frozenEvolutionChoice.choiceData && playerInstance.frozenEvolutionChoice.originalIndex !== undefined) {
         const frozenSnapshot = playerInstance.frozenEvolutionChoice.choiceData;
         const originalMasterEvo = evolutionChoicesMasterList.find(e => e.id === frozenSnapshot.baseId);
@@ -380,7 +382,13 @@ export function generateEvolutionOffers(playerInstance) {
                     const tierSpecificData = originalMasterEvo.tiers[heldTier];
                     reconstructedHeldOffer.rolledTier = heldTier;
                     const descFunc = typeof tierSpecificData.description === 'function' ? tierSpecificData.description : (typeof originalMasterEvo.detailedDescription === 'function' ? originalMasterEvo.detailedDescription : null);
-                    reconstructedHeldOffer.detailedDescription = descFunc ? descFunc(playerInstance, heldTier) : (tierSpecificData.description || originalMasterEvo.detailedDescription);
+                    // Pass baseId to detailedDescription if it's a function
+                    reconstructedHeldOffer.detailedDescription = descFunc
+                        ? descFunc(playerInstance, heldTier)
+                        : (typeof originalMasterEvo.detailedDescription === 'function'
+                            ? originalMasterEvo.detailedDescription(playerInstance, originalMasterEvo.id)
+                            : (tierSpecificData.description || originalMasterEvo.detailedDescription));
+
                     reconstructedHeldOffer.applyEffect = tierSpecificData.apply;
                     reconstructedHeldOffer.cardEffectString = (typeof originalMasterEvo.getCardEffectString === 'function')
                                                                 ? originalMasterEvo.getCardEffectString(heldTier, playerInstance)
@@ -390,7 +398,10 @@ export function generateEvolutionOffers(playerInstance) {
                 }
             } else {
                 reconstructedHeldOffer.rolledTier = null;
-                reconstructedHeldOffer.detailedDescription = typeof originalMasterEvo.detailedDescription === 'function' ? originalMasterEvo.detailedDescription(playerInstance) : originalMasterEvo.detailedDescription;
+                // Pass baseId to detailedDescription if it's a function
+                reconstructedHeldOffer.detailedDescription = typeof originalMasterEvo.detailedDescription === 'function'
+                    ? originalMasterEvo.detailedDescription(playerInstance, originalMasterEvo.id)
+                    : originalMasterEvo.detailedDescription;
                 reconstructedHeldOffer.applyEffect = originalMasterEvo.apply;
                 reconstructedHeldOffer.cardEffectString = (typeof originalMasterEvo.getCardEffectString === 'function')
                                                             ? originalMasterEvo.getCardEffectString(null, playerInstance)
@@ -414,15 +425,10 @@ export function generateEvolutionOffers(playerInstance) {
         }
     }
 
-    // Fill remaining slots
-    // const slotsToFill = 3 - offers.filter(o => o !== null).length; // This was the old way
-    // if (slotsToFill > 0) { // We always try to fill all slots not filled by frozen
-
-    // Corrected: Filter available choices *once* then pick from them
     const exclusionListForNewRolls = [...playerInstance.blockedEvolutionIds, ...offeredBaseIds];
     const availableChoicesForNewRolls = evolutionChoicesMasterList.filter(c => {
         if (exclusionListForNewRolls.includes(c.id)) return false;
-        if (c.requiresPath && playerInstance.currentPath !== c.requiresPath) { // Path check
+        if (c.requiresPath && playerInstance.currentPath !== c.requiresPath) {
             return false;
         }
         return !(c.isMaxed && c.isMaxed(playerInstance));
@@ -431,9 +437,9 @@ export function generateEvolutionOffers(playerInstance) {
     let shuffledAvailableForNewRolls = [...availableChoicesForNewRolls].sort(() => 0.5 - Math.random());
 
     for (let i = 0; i < 3; i++) {
-        if (!filledIndices[i]) { // If this slot wasn't filled by a valid frozen choice
+        if (!filledIndices[i]) {
             if (shuffledAvailableForNewRolls.length > 0) {
-                const baseEvo = shuffledAvailableForNewRolls.shift(); // Take one from the pre-filtered, shuffled list
+                const baseEvo = shuffledAvailableForNewRolls.shift();
                 let rolledTierIfApplicable = baseEvo.isTiered ? rollTier() : 'common';
                 const tierSpecificData = baseEvo.isTiered ? baseEvo.tiers[rolledTierIfApplicable] : baseEvo;
 
@@ -442,9 +448,10 @@ export function generateEvolutionOffers(playerInstance) {
                     classType: baseEvo.classType,
                     rolledTier: baseEvo.isTiered ? rolledTierIfApplicable : null,
                     text: baseEvo.text,
+                    // Pass baseId to detailedDescription if it's a function
                     detailedDescription: baseEvo.isTiered && tierSpecificData
                         ? (typeof tierSpecificData.description === 'function' ? tierSpecificData.description(playerInstance, rolledTierIfApplicable) : tierSpecificData.description)
-                        : (typeof baseEvo.detailedDescription === 'function' ? baseEvo.detailedDescription(playerInstance) : baseEvo.detailedDescription),
+                        : (typeof baseEvo.detailedDescription === 'function' ? baseEvo.detailedDescription(playerInstance, baseEvo.id) : baseEvo.detailedDescription),
                     applyEffect: baseEvo.isTiered && tierSpecificData ? tierSpecificData.apply : baseEvo.apply,
                     cardEffectString: (typeof baseEvo.getCardEffectString === 'function')
                         ? baseEvo.getCardEffectString(rolledTierIfApplicable, playerInstance)
@@ -452,7 +459,6 @@ export function generateEvolutionOffers(playerInstance) {
                     originalEvolution: baseEvo
                 };
                 offers[i] = offer;
-                // offeredBaseIds.push(offer.baseId); // Already handled if it came from frozen, or will be excluded next iteration if needed by exclusionListForNewRolls
                 filledIndices[i] = true;
             } else {
                 offers[i] = {
@@ -464,7 +470,6 @@ export function generateEvolutionOffers(playerInstance) {
             }
         }
     }
-    // } // End of old slotsToFill block
 
     if (offers.every(o => o === null || o.baseId.startsWith('empty_slot_') || o.baseId === 'noMoreEvolutions')) {
          offers[0] = {
