@@ -588,11 +588,28 @@ export class NexusWeaverBoss extends BossNPC {
         }
 
         if (checkCollision(this, playerInstance)) {
-            const playerCanTakeDamage = (postDamageImmunityTimer === undefined || postDamageImmunityTimer <= 0) &&
-                                        !(playerInstance.teleporting && playerInstance.teleportEffectTimer > 0) &&
-                                        !isPlayerShieldOvercharging;
-            if (playerCanTakeDamage && this.playerCollisionStunTimer <= 0 && !this.isFeared) {
-                 if(gameContext && gameContext.playerCollidedWithBoss !== undefined) gameContext.playerCollidedWithBoss = this;
+            const playerIsTeleporting = (playerInstance.teleporting && playerInstance.teleportEffectTimer > 0);
+            const playerIsCurrentlyShieldOvercharging = isPlayerShieldOvercharging;
+            const playerIsDamageImmuneFromRecentHit = (postDamageImmunityTimer !== undefined && postDamageImmunityTimer > 0);
+            const canPlayerInteract = !playerIsTeleporting && !playerIsCurrentlyShieldOvercharging;
+            
+            if (canPlayerInteract) {
+                if (playerInstance.hasAegisPathHelm && playerInstance.aegisRamCooldownTimer <= 0) {
+                    if (gameContext && gameContext.playerCollidedWithBoss !== undefined) {
+                        gameContext.playerCollidedWithBoss = this;
+                    }
+                } else {
+                    // Player is NOT Aegis OR Aegis Ram IS ON COOLDOWN
+                    // Standard collision damage & knockback logic for the player
+                    if (!playerIsDamageImmuneFromRecentHit && this.playerCollisionStunTimer <= 0 && !this.isFeared) {
+                        if(gameContext && gameContext.playerCollidedWithBoss !== undefined) {
+                            gameContext.playerCollidedWithBoss = this;
+                        }
+                        // Nexus Weaver itself doesn't have a strong recoil/stun from player collision
+                        // like Chaser or Mirror Shield, its defense is minions and nova.
+                        // Player will take damage via gameLogic's handling of playerCollidedWithBoss.
+                    }
+                }
             }
         }
     }

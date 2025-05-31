@@ -49,8 +49,9 @@ import {
     upgradeSound as audioUpgradeSound 
 } from './audio.js';
 import { PlayerGravityWell } from './ray.js';
-import { NexusWeaverBoss } from './nexusWeaverBoss.js'; // <<< ENSURE THIS IS IMPORTED
+import { NexusWeaverBoss } from './nexusWeaverBoss.js'; 
 
+const AEGIS_RAM_COOLDOWN = 1000; 
 
 export class Player {
     constructor(x, y, initialPlayerSpeed) {
@@ -109,6 +110,9 @@ export class Player {
         this.hasBerserkersEchoHelm = false;
         this.hasUltimateConfigurationHelm = false; 
         this.hasAegisPathHelm = false;
+        this.berserkerPermanentRayDamageMultiplier = 1.0; 
+        this.berserkerRagePercentage = 0; 
+        this.aegisRamCooldownTimer = 0; 
 
         this.activeAbilities = {
             '1': null,
@@ -181,8 +185,352 @@ export class Player {
         this.frozenEvolutionChoice = null;
         this.isFreezeModeActive = false;
         this.hasUsedFreezeForCurrentOffers = false;
+        
+        // Constructor logs
+     //   console.log("[Player Constructor] 'this' object (before explicit update assignment):", this);
+     //   console.log("[Player Constructor] typeof this.draw (before explicit update assignment):", typeof this.draw);
+     //   console.log("[Player Constructor] typeof this.update (before explicit update assignment):", typeof this.update);
+
+        // Explicitly define update as an instance property using an arrow function
+        this.update = (gameContext) => {
+            const { dt, keys, mouseX, mouseY, canvasWidth, canvasHeight, targets, activeBosses,
+                    currentGrowthFactor,
+                    currentEffectiveDefaultGrowthFactor,
+                    updateHealthDisplayCallback, updateAbilityCooldownCallback,
+                    isAnyPauseActiveCallback, decoysArray, bossDefeatEffectsArray, allRays,
+                    screenShakeParams, activeBuffNotificationsArray, score,
+                    evolutionChoices,
+                    ui, CONSTANTS: gameConstants, 
+                    endGameCallback, updateScoreCallback
+                  } = gameContext;
+
+
+            this.timeSinceLastHit += dt;
+            this.aegisAnimTimer += dt;
+
+            if (this.aegisRamCooldownTimer > 0) { 
+                this.aegisRamCooldownTimer -= dt;
+                if (this.aegisRamCooldownTimer < 0) this.aegisRamCooldownTimer = 0;
+            }
+
+            if (this.teleporting && this.teleportEffectTimer > 0) {
+                this.teleportEffectTimer -= dt;
+                if (this.teleportEffectTimer <= 0) {
+                    this.teleporting = false; this.teleportEffectTimer = 0;
+                }
+            }
+            
+            if (this.currentPath === 'aegis' && this.isChargingAegisCharge) {
+                const chargeProgress = Math.min(1, this.aegisChargeCurrentChargeTime / AEGIS_CHARGE_MAX_CHARGE_TIME);
+                const maxSpinSpeed = Math.PI / 15; 
+                const currentSpinSpeed = chargeProgress * maxSpinSpeed;
+                this.currentChargeRotation += currentSpinSpeed * (dt / (1000/60)); 
+                this.currentChargeRotation %= (Math.PI * 2);
+            } else if (this.currentPath === 'aegis' && !this.isChargingAegisCharge && !this.isAegisChargingDash) {
+                 if (this.currentChargeRotation !== 0) {
+                    this.currentChargeRotation *= 0.9; 
+                    if (Math.abs(this.currentChargeRotation) < 0.01) this.currentChargeRotation = 0;
+                }
+            } else if (this.currentPath !== 'aegis' && this.currentChargeRotation !== 0) {
+                this.currentChargeRotation = 0; 
+            }
+
+
+            let numericAbilityUIUpdateNeeded = false;
+            for (const slot in this.activeAbilities) {
+                 if (this.activeAbilities[slot]) {
+                    let effectiveCooldownMultiplier = 1.0 - this.globalCooldownReduction;
+                    effectiveCooldownMultiplier = Math.max(0.1, effectiveCooldownMultiplier);
+
+                    if (this.activeAbilities[slot].cooldownTimer > 0) {
+                        this.activeAbilities[slot].cooldownTimer -= dt / effectiveCooldownMultiplier;
+                        numericAbilityUIUpdateNeeded = true;
+                        if (this.activeAbilities[slot].cooldownTimer <= 0) {
+                            this.activeAbilities[slot].cooldownTimer = 0;
+                            this.activeAbilities[slot].justBecameReady = true;
+                        } else {
+                            this.activeAbilities[slot].justBecameReady = false;
+                        }
+                    } else if (this.activeAbilities[slot].cooldownTimer <= 0 && !this.activeAbilities[slot].justBecameReady) {
+                         this.activeAbilities[slot].justBecameReady = true;
+                         numericAbilityUIUpdateNeeded = true;
+                    }
+                }
+            }
+
+            let mouseAbilityUIUpdateNeeded = false;
+            const updateGenericMouseAbility_local = (abilityActiveProp, abilityTimerProp, abilityCooldownTimerProp, abilityCooldownConst, abilityDurationConst = 0) => {
+                let effectiveCooldownMultiplier = 1.0 - this.globalCooldownReduction;
+                effectiveCooldownMultiplier = Math.max(0.1, effectiveCooldownMultiplier);
+
+                if (this[abilityActiveProp]) {
+                    this[abilityTimerProp] -= dt;
+                    mouseAbilityUIUpdateNeeded = true;
+                    if (this[abilityTimerProp] <= 0) {
+                        this[abilityActiveProp] = false; 
+                        let cd = abilityCooldownConst * (1.0 - this.globalCooldownReduction);
+                        this[abilityCooldownTimerProp] = Math.max(abilityCooldownConst * 0.1, cd);
+                        return true; 
+                    }
+                } else if (this[abilityCooldownTimerProp] > 0) {
+                    this[abilityCooldownTimerProp] -= dt / effectiveCooldownMultiplier;
+                    mouseAbilityUIUpdateNeeded = true;
+                    if (this[abilityCooldownTimerProp] < 0) this[abilityCooldownTimerProp] = 0;
+                }
+                return false;
+            };
+
+            if (this.currentPath === 'mage') {
+                if (this.hasOmegaLaser) {
+                    if (this.isFiringOmegaLaser) {
+                        if (isAnyPauseActiveCallback && !isAnyPauseActiveCallback()) this.omegaLaserAngle = Math.atan2(mouseY - this.y, mouseX - this.x);
+                        this.omegaLaserTimer -= dt; this.omegaLaserCurrentTickTimer -= dt; mouseAbilityUIUpdateNeeded = true;
+                        if (this.omegaLaserCurrentTickTimer <= 0) { this.dealOmegaLaserDamage(targets, activeBosses, { updateScoreCallback }); this.omegaLaserCurrentTickTimer = gameConstants.OMEGA_LASER_TICK_INTERVAL; }
+                        if (this.omegaLaserTimer <= 0) {
+                            this.isFiringOmegaLaser = false; stopSound(omegaLaserSound);
+                            let cd = gameConstants.OMEGA_LASER_COOLDOWN * (1.0 - this.globalCooldownReduction); this.omegaLaserCooldownTimer = Math.max(gameConstants.OMEGA_LASER_COOLDOWN * 0.1, cd);
+                            this.currentOmegaLaserKineticBoost = 1.0;
+                        }
+                    } else if (this.omegaLaserCooldownTimer > 0) { let ecm = Math.max(0.1, 1.0 - this.globalCooldownReduction); this.omegaLaserCooldownTimer -= dt/ecm; mouseAbilityUIUpdateNeeded = true; if(this.omegaLaserCooldownTimer < 0) this.omegaLaserCooldownTimer=0;}
+                }
+                if (this.hasShieldOvercharge) updateGenericMouseAbility_local('isShieldOvercharging', 'shieldOverchargeTimer', 'shieldOverchargeCooldownTimer', gameConstants.SHIELD_OVERCHARGE_COOLDOWN, gameConstants.SHIELD_OVERCHARGE_DURATION);
+                
+                if (this.kineticConversionLevel > 0) { 
+                    this.magePathTimeElapsed += dt;
+                    this.kineticConversionScaleTimer += dt;
+                    if (this.kineticConversionScaleTimer >= this.kineticConversionScaleInterval) {
+                        this.initialKineticDamageBonus *= this.kineticConversionScalingFactor;
+                        this.baseKineticChargeRate *= this.kineticConversionScalingFactor;
+                        this.kineticConversionScaleTimer -= this.kineticConversionScaleInterval; 
+                        if(activeBuffNotificationsArray) activeBuffNotificationsArray.push({ text: `Kinetic Power Amplified!`, timer: BUFF_NOTIFICATION_DURATION });
+                        playSound(audioUpgradeSound); 
+                    }
+                }
+
+            } else if (this.currentPath === 'aegis') {
+                if (this.hasAegisCharge) {
+                    if(this.isChargingAegisCharge) {
+                         this.aegisChargeCurrentChargeTime += dt;
+                         if (this.aegisChargeCurrentChargeTime > AEGIS_CHARGE_MAX_CHARGE_TIME) {
+                            this.aegisChargeCurrentChargeTime = AEGIS_CHARGE_MAX_CHARGE_TIME; 
+                         }
+                    }
+                    if(this.isAegisChargingDash) {
+                        this.aegisChargeDashTimer -= dt;
+                        const dashSpeed = this.originalPlayerSpeed * gameConstants.AEGIS_CHARGE_DASH_SPEED_FACTOR;
+                        const angle = Math.atan2(this.aegisChargeDashTargetY - this.y, this.aegisChargeDashTargetX - this.x);
+                        const dxDash = Math.cos(angle) * dashSpeed;
+                        const dyDash = Math.sin(angle) * dashSpeed;
+                        this.x += dxDash * (dt / (1000/60)); this.y += dyDash * (dt / (1000/60));
+                        if (Math.hypot(this.x - this.aegisChargeDashTargetX, this.y - this.aegisChargeDashTargetY) < dashSpeed * 0.5 || this.aegisChargeDashTimer <= 0) { 
+                            this.isAegisChargingDash = false; this.aegisChargeDashTimer = 0;
+                            this.currentChargeRotation = 0; 
+                            this.dealAegisChargeImpactDamage(activeBosses, targets, {updateScoreCallback}); 
+                            let cd = gameConstants.AEGIS_CHARGE_COOLDOWN * (1.0 - this.globalCooldownReduction); this.aegisChargeCooldownTimer = Math.max(gameConstants.AEGIS_CHARGE_COOLDOWN * 0.1, cd);
+                        }
+                         mouseAbilityUIUpdateNeeded = true;
+                    } else if (this.aegisChargeCooldownTimer > 0) { let ecm = Math.max(0.1, 1.0 - this.globalCooldownReduction); this.aegisChargeCooldownTimer -= dt/ecm; mouseAbilityUIUpdateNeeded = true; if(this.aegisChargeCooldownTimer < 0) this.aegisChargeCooldownTimer=0;}
+                }
+                if (this.hasSeismicSlam && this.seismicSlamCooldownTimer > 0) {let ecm = Math.max(0.1, 1.0 - this.globalCooldownReduction); this.seismicSlamCooldownTimer -= dt/ecm; mouseAbilityUIUpdateNeeded = true; if(this.seismicSlamCooldownTimer < 0) this.seismicSlamCooldownTimer=0;}
+            } else if (this.currentPath === 'berserker') {
+                if (this.hasBloodpact) updateGenericMouseAbility_local('isBloodpactActive', 'bloodpactTimer', 'bloodpactCooldownTimer', gameConstants.BLOODPACT_COOLDOWN, gameConstants.BLOODPACT_DURATION);
+                if (this.hasSavageHowl) {
+                     if (this.savageHowlAttackSpeedBuffTimer > 0) { this.savageHowlAttackSpeedBuffTimer -= dt; mouseAbilityUIUpdateNeeded = true; if (this.savageHowlAttackSpeedBuffTimer <= 0) this.isSavageHowlAttackSpeedBuffActive = false;}
+                     if (this.savageHowlCooldownTimer > 0) {let ecm = Math.max(0.1, 1.0 - this.globalCooldownReduction); this.savageHowlCooldownTimer -= dt/ecm; mouseAbilityUIUpdateNeeded = true; if(this.savageHowlCooldownTimer < 0) this.savageHowlCooldownTimer=0;}
+                }
+            }
+
+
+            const forceUIUpdate = gameContext && gameContext.forceAbilityUIUpdate;
+            if (numericAbilityUIUpdateNeeded || mouseAbilityUIUpdateNeeded || forceUIUpdate) {
+                if (updateAbilityCooldownCallback) updateAbilityCooldownCallback(this);
+                if(forceUIUpdate && gameContext) gameContext.forceAbilityUIUpdate = false;
+            }
+
+
+            this.x += this.velX; this.y += this.velY;
+            this.velX *= 0.95; this.velY *= 0.95;
+            if (Math.abs(this.velX) < 0.1) this.velX = 0;
+            if (Math.abs(this.velY) < 0.1) this.velY = 0;
+
+            let dxMovement = 0, dyMovement = 0;
+            if (!this.isAegisChargingDash) { 
+                if (keys.ArrowUp || keys.w) dyMovement -= 1;
+                if (keys.ArrowDown || keys.s) dyMovement += 1;
+                if (keys.ArrowLeft || keys.a) dxMovement -= 1;
+                if (keys.ArrowRight || keys.d) dxMovement += 1;
+            }
+
+
+            let actualCurrentSpeed = this.originalPlayerSpeed;
+            if (this.isFiringOmegaLaser && this.currentPath === 'mage') actualCurrentSpeed = this.originalPlayerSpeed / 2;
+            else {
+                let speedMultiplier = 1.0;
+                if (this.hasBerserkersEchoHelm) {
+                    const missingHpPercentage = (this.maxHp - this.hp) / this.maxHp;
+                    const tenPercentIncrements = Math.floor(missingHpPercentage * 10);
+                    if (tenPercentIncrements > 0) speedMultiplier *= (1 + (tenPercentIncrements * BERSERKERS_ECHO_SPEED_PER_10_HP));
+                }
+                actualCurrentSpeed *= speedMultiplier;
+            }
+            this.currentSpeed = actualCurrentSpeed;
+
+
+            let playerIsActuallyMoving = false;
+            if (dxMovement !== 0 || dyMovement !== 0) {
+                playerIsActuallyMoving = true;
+                if (dxMovement !== 0 && dyMovement !== 0) {
+                    const m = Math.sqrt(2);
+                    dxMovement = (dxMovement / m) * this.currentSpeed;
+                    dyMovement = (dyMovement / m) * this.currentSpeed;
+                } else {
+                    dxMovement *= this.currentSpeed;
+                    dyMovement *= this.currentSpeed;
+                }
+            }
+
+            if (this.kineticConversionLevel > 0) { 
+                if (playerIsActuallyMoving) {
+                    this.kineticCharge = Math.min(100, this.kineticCharge + this.baseKineticChargeRate * (dt / 1000));
+                }
+            }
+
+            if (this.currentPath === 'berserker') { 
+                const missingHpPercentage = Math.max(0, (this.maxHp - this.hp) / this.maxHp);
+                const tenPercentIncrements = Math.floor(missingHpPercentage * 10);
+                this.berserkerRagePercentage = tenPercentIncrements * BERSERKERS_ECHO_DAMAGE_PER_10_HP * 100;
+            }
+
+
+            let nX = this.x + dxMovement; let nY = this.y + dyMovement;
+            if(targets && targets.length > 0){
+                for (const t of targets) { if (checkCollision({ x: nX, y: this.y, radius: this.radius }, t)) { nX = this.x; break; } }
+                for (const t of targets) { if (checkCollision({ x: this.x, y: nY, radius: this.radius }, t)) { nY = this.y; break; } }
+            }
+            if (activeBosses && activeBosses.length > 0) {
+                if (!(this.teleporting && this.teleportEffectTimer > 0)) {
+                    for (const boss of activeBosses) {
+                        if (checkCollision({ x: nX, y: this.y, radius: this.radius }, boss)) {
+                            if (this.hasAegisPathHelm && this.currentPath === 'aegis') this.handleAegisCollisionWithBoss(boss, gameContext);
+                            nX = this.x; break;
+                        }
+                    }
+                    for (const boss of activeBosses) {
+                        if (checkCollision({ x: this.x, y: nY, radius: this.radius }, boss)) {
+                             if (this.hasAegisPathHelm && this.currentPath === 'aegis') this.handleAegisCollisionWithBoss(boss, gameContext);
+                            nY = this.y; break;
+                        }
+                    }
+                }
+            }
+
+
+            this.x = nX; this.y = nY;
+
+            this.baseRadius = this.initialBaseRadius + this.bonusBaseRadius;
+            let effectiveScoreForSizing = Math.max(0, score - this.scoreOffsetForSizing);
+
+            if (currentGrowthFactor > 0) this.scoreBasedSize = effectiveScoreForSizing * currentGrowthFactor;
+            this.radius = this.baseRadius + this.scoreBasedSize;
+            this.radius = Math.max(MIN_PLAYER_BASE_RADIUS, this.radius);
+
+            this.x = Math.max(this.radius, Math.min(this.x, canvasWidth - this.radius));
+            this.y = Math.max(this.radius, Math.min(this.y, canvasHeight - this.radius));
+
+            if (isAnyPauseActiveCallback && !isAnyPauseActiveCallback()) {
+                if (!this.isFiringOmegaLaser && !this.isChargingAegisCharge && !this.isAegisChargingDash) {
+                    this.aimAngle = Math.atan2(mouseY - this.y, mouseX - this.x);
+                }
+            }
+
+
+            if (!isAnyPauseActiveCallback || !isAnyPauseActiveCallback()) {
+                this.shootCooldownTimer -= dt;
+                if (this.currentPath === 'aegis' && (this.isChargingAegisCharge || this.isAegisChargingDash)) {
+                     this.shootCooldownTimer = GameState.getCurrentShootInterval(); 
+                } else if (this.shootCooldownTimer <= 0 && !this.isFiringOmegaLaser) { 
+                    
+                    let currentShootIntervalModified = GameState.getCurrentShootInterval();
+                    if (this.isSavageHowlAttackSpeedBuffActive && this.currentPath === 'berserker') {
+                        currentShootIntervalModified /= (1 + SAVAGE_HOWL_ATTACK_SPEED_BUFF_PERCENT);
+                    }
+                    this.shootCooldownTimer = currentShootIntervalModified;
+
+
+                    const baseRaySpeedMultiplier = GameState.getCurrentRaySpeedMultiplier();
+                    const rayColors = GameState.getCurrentRayColors();
+                    const selectedColor = rayColors[Math.floor(Math.random() * rayColors.length)];
+
+                    let numRaysToShoot = 1;
+                    if (this.scatterShotLevel > 0) numRaysToShoot += this.scatterShotLevel * 2;
+
+                    for (let i = 0; i < numRaysToShoot; i++) {
+                        let currentAimAngle = this.aimAngle;
+                        if (numRaysToShoot > 1) {
+                            const angleSpread = SCATTER_SHOT_ANGLE_OFFSET * (this.scatterShotLevel +1);
+                            const rayIndexOffset = i - Math.floor(numRaysToShoot / 2);
+                            currentAimAngle += rayIndexOffset * (angleSpread / (numRaysToShoot > 1 ? numRaysToShoot -1 : 1)) * 0.5 ;
+                        }
+
+                        let ray = getPooledRay();
+                        if (ray) {
+                            const spawnOffset = this.radius + RAY_RADIUS + RAY_SPAWN_FORWARD_OFFSET;
+                            const raySpawnX = this.x + Math.cos(currentAimAngle) * spawnOffset;
+                            const raySpawnY = this.y + Math.sin(currentAimAngle) * spawnOffset;
+
+                            ray.reset(
+                                raySpawnX, raySpawnY, selectedColor,
+                                Math.cos(currentAimAngle), Math.sin(currentAimAngle),
+                                baseRaySpeedMultiplier,
+                                this,
+                                GameState.getCurrentRayMaxLifetime(),
+                                false, false, 0, false
+                            );
+                            
+                            if (this.kineticConversionLevel > 0 && this.kineticCharge >= this.kineticChargeConsumption) {
+                                const damageMultiplier = this.consumeKineticChargeForDamageBoost();
+                                ray.momentumDamageBonusValue = (ray.momentumDamageBonusValue || 0) + (damageMultiplier - 1); 
+                                 if (ui && ui.updateKineticChargeUI) {
+                                    let maxPotencyAtFullCharge = this.initialKineticDamageBonus; 
+                                    ui.updateKineticChargeUI(this.kineticCharge, this.kineticChargeConsumption, maxPotencyAtFullCharge, this.kineticConversionLevel > 0);
+                                }
+                            }
+                            if (this.isBloodpactActive && this.currentPath === 'berserker') ray.lifestealPercent = BLOODPACT_LIFESTEAL_PERCENT;
+                            else ray.lifestealPercent = 0;
+
+                            if (allRays && Array.isArray(allRays)) allRays.push(ray);
+                            else console.error("Player.update: allRays is not available or not an array for pushing new ray.");
+                            playSound(shootSound);
+                        }
+                    }
+                }
+            }
+
+
+            if (this.hp > 0 && this.hp < this.maxHp) {
+                this.hpRegenTimer += dt;
+                if (this.hpRegenTimer >= HP_REGEN_INTERVAL) {
+                    this.hpRegenTimer -= HP_REGEN_INTERVAL;
+                    this.gainHealth(this.baseHpRegenAmount + this.hpRegenBonusFromEvolution, updateHealthDisplayCallback);
+                }
+            }
+        }; // End of ASSIGNED update method
+
+        // ***** NEW DEBUG LOGS AFTER EXPLICIT ASSIGNMENT *****
+        console.log("[Player Constructor] AFTER explicit update assignment, typeof this.update:", typeof this.update);
+        if (typeof this.update !== 'function') {
+            console.error("CRITICAL: this.update is STILL NOT a function AFTER explicit assignment in constructor!");
+        }
+        // ***** END NEW DEBUG LOGS *****
     }
 
+    // Make sure the original update(gameContext) { ... } method that was part of the class body is REMOVED or COMMENTED OUT
+    // For example, if you had:
+    // update(gameContext) { /* old logic */ }  <--- DELETE THIS or COMMENT IT OUT
+    // Player.prototype.update = function(gameContext) { /* old logic */ } <--- Also DELETE THIS if it exists
+
+
+    // CLASS METHODS (example, ensure all your other methods are here, not inside constructor)
     reset(canvasWidth, canvasHeight) {
         this.x = canvasWidth ? canvasWidth / 2 : PLAYER_BASE_RADIUS * 5;
         this.y = canvasHeight ? canvasHeight / 2 : PLAYER_BASE_RADIUS * 5;
@@ -232,6 +580,9 @@ export class Player {
         this.hasBerserkersEchoHelm = false;
         this.hasUltimateConfigurationHelm = false;
         this.hasAegisPathHelm = false;
+        this.berserkerPermanentRayDamageMultiplier = 1.0; 
+        this.berserkerRagePercentage = 0; 
+        this.aegisRamCooldownTimer = 0; 
 
         this.activeAbilities = { '1': null, '2': null, '3': null };
         this.visualModifiers = {};
@@ -650,7 +1001,7 @@ export class Player {
         if (visualModifiers.ablativeSublayer) {
             ctx.save(); ctx.clip(); const pS = 10 * displayScale; const pA = 0.08 + Math.abs(Math.sin(ablativeAnimTimer / 800)) * 0.04;
             ctx.lineWidth=1 * displayScale; ctx.strokeStyle=`rgba(160,160,255,${pA})`;
-            for(let i=-radius*2; i<radius*2; i+=pS){ctx.beginPath();ctx.moveTo(i,-radius*2);ctx.lineTo(i+radius*2,radius*2);ctx.stroke();ctx.beginPath();ctx.moveTo(-radius*2,i);ctx.lineTo(radius*2,i+radius*2);ctx.stroke();}
+            for(let i=-radius*2; i<radius*2; i+=pS){ctx.beginPath();ctx.moveTo(i,-radius*2);ctx.lineTo(i+radius*2,radius*2);ctx.stroke();ctx.beginPath();ctx.moveTo(-this.radius*2,i);ctx.lineTo(this.radius*2,i+this.radius*2);ctx.stroke();}
             ctx.restore();
         }
 
@@ -692,391 +1043,34 @@ export class Player {
         ctx.restore(); 
     }
 
-    update(gameContext) {
-        const { dt, keys, mouseX, mouseY, canvasWidth, canvasHeight, targets, activeBosses,
-                currentGrowthFactor,
-                currentEffectiveDefaultGrowthFactor,
-                updateHealthDisplayCallback, updateAbilityCooldownCallback,
-                isAnyPauseActiveCallback, decoysArray, bossDefeatEffectsArray, allRays,
-                screenShakeParams, activeBuffNotificationsArray, score,
-                evolutionChoices,
-                ui, CONSTANTS: gameConstants, 
-                endGameCallback, updateScoreCallback
-              } = gameContext;
-
-
-        this.timeSinceLastHit += dt;
-        this.aegisAnimTimer += dt;
-
-        if (this.teleporting && this.teleportEffectTimer > 0) {
-            this.teleportEffectTimer -= dt;
-            if (this.teleportEffectTimer <= 0) {
-                this.teleporting = false; this.teleportEffectTimer = 0;
-            }
-        }
-        
-        if (this.currentPath === 'aegis' && this.isChargingAegisCharge) {
-            const chargeProgress = Math.min(1, this.aegisChargeCurrentChargeTime / AEGIS_CHARGE_MAX_CHARGE_TIME);
-            const maxSpinSpeed = Math.PI / 15; 
-            const currentSpinSpeed = chargeProgress * maxSpinSpeed;
-            this.currentChargeRotation += currentSpinSpeed * (dt / (1000/60)); 
-            this.currentChargeRotation %= (Math.PI * 2);
-        } else if (this.currentPath === 'aegis' && !this.isChargingAegisCharge && !this.isAegisChargingDash) {
-             if (this.currentChargeRotation !== 0) {
-                this.currentChargeRotation *= 0.9; 
-                if (Math.abs(this.currentChargeRotation) < 0.01) this.currentChargeRotation = 0;
-            }
-        } else if (this.currentPath !== 'aegis' && this.currentChargeRotation !== 0) {
-            this.currentChargeRotation = 0; 
-        }
-
-
-        let numericAbilityUIUpdateNeeded = false;
-        for (const slot in this.activeAbilities) {
-             if (this.activeAbilities[slot]) {
-                let effectiveCooldownMultiplier = 1.0 - this.globalCooldownReduction;
-                effectiveCooldownMultiplier = Math.max(0.1, effectiveCooldownMultiplier);
-
-                if (this.activeAbilities[slot].cooldownTimer > 0) {
-                    this.activeAbilities[slot].cooldownTimer -= dt / effectiveCooldownMultiplier;
-                    numericAbilityUIUpdateNeeded = true;
-                    if (this.activeAbilities[slot].cooldownTimer <= 0) {
-                        this.activeAbilities[slot].cooldownTimer = 0;
-                        this.activeAbilities[slot].justBecameReady = true;
-                    } else {
-                        this.activeAbilities[slot].justBecameReady = false;
-                    }
-                } else if (this.activeAbilities[slot].cooldownTimer <= 0 && !this.activeAbilities[slot].justBecameReady) {
-                     this.activeAbilities[slot].justBecameReady = true;
-                     numericAbilityUIUpdateNeeded = true;
-                }
-            }
-        }
-
-        let mouseAbilityUIUpdateNeeded = false;
-        const updateGenericMouseAbility = (abilityActiveProp, abilityTimerProp, abilityCooldownTimerProp, abilityCooldownConst, abilityDurationConst = 0) => {
-            let effectiveCooldownMultiplier = 1.0 - this.globalCooldownReduction;
-            effectiveCooldownMultiplier = Math.max(0.1, effectiveCooldownMultiplier);
-
-            if (this[abilityActiveProp]) {
-                this[abilityTimerProp] -= dt;
-                mouseAbilityUIUpdateNeeded = true;
-                if (this[abilityTimerProp] <= 0) {
-                    this[abilityActiveProp] = false; 
-                    let cd = abilityCooldownConst * (1.0 - this.globalCooldownReduction);
-                    this[abilityCooldownTimerProp] = Math.max(abilityCooldownConst * 0.1, cd);
-                    return true; 
-                }
-            } else if (this[abilityCooldownTimerProp] > 0) {
-                this[abilityCooldownTimerProp] -= dt / effectiveCooldownMultiplier;
-                mouseAbilityUIUpdateNeeded = true;
-                if (this[abilityCooldownTimerProp] < 0) this[abilityCooldownTimerProp] = 0;
-            }
-            return false;
-        };
-
-        if (this.currentPath === 'mage') {
-            if (this.hasOmegaLaser) {
-                if (this.isFiringOmegaLaser) {
-                    if (isAnyPauseActiveCallback && !isAnyPauseActiveCallback()) this.omegaLaserAngle = Math.atan2(mouseY - this.y, mouseX - this.x);
-                    this.omegaLaserTimer -= dt; this.omegaLaserCurrentTickTimer -= dt; mouseAbilityUIUpdateNeeded = true;
-                    if (this.omegaLaserCurrentTickTimer <= 0) { this.dealOmegaLaserDamage(targets, activeBosses, { updateScoreCallback }); this.omegaLaserCurrentTickTimer = gameConstants.OMEGA_LASER_TICK_INTERVAL; }
-                    if (this.omegaLaserTimer <= 0) {
-                        this.isFiringOmegaLaser = false; stopSound(omegaLaserSound);
-                        let cd = gameConstants.OMEGA_LASER_COOLDOWN * (1.0 - this.globalCooldownReduction); this.omegaLaserCooldownTimer = Math.max(gameConstants.OMEGA_LASER_COOLDOWN * 0.1, cd);
-                        this.currentOmegaLaserKineticBoost = 1.0;
-                    }
-                } else if (this.omegaLaserCooldownTimer > 0) { let ecm = Math.max(0.1, 1.0 - this.globalCooldownReduction); this.omegaLaserCooldownTimer -= dt/ecm; mouseAbilityUIUpdateNeeded = true; if(this.omegaLaserCooldownTimer < 0) this.omegaLaserCooldownTimer=0;}
-            }
-            if (this.hasShieldOvercharge) updateGenericMouseAbility('isShieldOvercharging', 'shieldOverchargeTimer', 'shieldOverchargeCooldownTimer', gameConstants.SHIELD_OVERCHARGE_COOLDOWN, gameConstants.SHIELD_OVERCHARGE_DURATION);
-            
-            if (this.kineticConversionLevel > 0) { 
-                this.magePathTimeElapsed += dt;
-                this.kineticConversionScaleTimer += dt;
-                if (this.kineticConversionScaleTimer >= this.kineticConversionScaleInterval) {
-                    this.initialKineticDamageBonus *= this.kineticConversionScalingFactor;
-                    this.baseKineticChargeRate *= this.kineticConversionScalingFactor;
-                    this.kineticConversionScaleTimer -= this.kineticConversionScaleInterval; 
-                    if(activeBuffNotificationsArray) activeBuffNotificationsArray.push({ text: `Kinetic Power Amplified!`, timer: BUFF_NOTIFICATION_DURATION });
-                    playSound(audioUpgradeSound); 
-                }
-            }
-
-        } else if (this.currentPath === 'aegis') {
-            if (this.hasAegisCharge) {
-                if(this.isChargingAegisCharge) {
-                     this.aegisChargeCurrentChargeTime += dt;
-                     if (this.aegisChargeCurrentChargeTime > AEGIS_CHARGE_MAX_CHARGE_TIME) {
-                        this.aegisChargeCurrentChargeTime = AEGIS_CHARGE_MAX_CHARGE_TIME; 
-                     }
-                }
-                if(this.isAegisChargingDash) {
-                    this.aegisChargeDashTimer -= dt;
-                    const dashSpeed = this.originalPlayerSpeed * gameConstants.AEGIS_CHARGE_DASH_SPEED_FACTOR;
-                    const angle = Math.atan2(this.aegisChargeDashTargetY - this.y, this.aegisChargeDashTargetX - this.x);
-                    const dxDash = Math.cos(angle) * dashSpeed;
-                    const dyDash = Math.sin(angle) * dashSpeed;
-                    this.x += dxDash * (dt / (1000/60)); this.y += dyDash * (dt / (1000/60));
-                    if (Math.hypot(this.x - this.aegisChargeDashTargetX, this.y - this.aegisChargeDashTargetY) < dashSpeed * 0.5 || this.aegisChargeDashTimer <= 0) { 
-                        this.isAegisChargingDash = false; this.aegisChargeDashTimer = 0;
-                        this.currentChargeRotation = 0; 
-                        this.dealAegisChargeImpactDamage(activeBosses, targets, {updateScoreCallback}); 
-                        let cd = gameConstants.AEGIS_CHARGE_COOLDOWN * (1.0 - this.globalCooldownReduction); this.aegisChargeCooldownTimer = Math.max(gameConstants.AEGIS_CHARGE_COOLDOWN * 0.1, cd);
-                    }
-                     mouseAbilityUIUpdateNeeded = true;
-                } else if (this.aegisChargeCooldownTimer > 0) { let ecm = Math.max(0.1, 1.0 - this.globalCooldownReduction); this.aegisChargeCooldownTimer -= dt/ecm; mouseAbilityUIUpdateNeeded = true; if(this.aegisChargeCooldownTimer < 0) this.aegisChargeCooldownTimer=0;}
-            }
-            if (this.hasSeismicSlam && this.seismicSlamCooldownTimer > 0) {let ecm = Math.max(0.1, 1.0 - this.globalCooldownReduction); this.seismicSlamCooldownTimer -= dt/ecm; mouseAbilityUIUpdateNeeded = true; if(this.seismicSlamCooldownTimer < 0) this.seismicSlamCooldownTimer=0;}
-        } else if (this.currentPath === 'berserker') {
-            if (this.hasBloodpact) updateGenericMouseAbility('isBloodpactActive', 'bloodpactTimer', 'bloodpactCooldownTimer', gameConstants.BLOODPACT_COOLDOWN, gameConstants.BLOODPACT_DURATION);
-            if (this.hasSavageHowl) {
-                 if (this.savageHowlAttackSpeedBuffTimer > 0) { this.savageHowlAttackSpeedBuffTimer -= dt; mouseAbilityUIUpdateNeeded = true; if (this.savageHowlAttackSpeedBuffTimer <= 0) this.isSavageHowlAttackSpeedBuffActive = false;}
-                 if (this.savageHowlCooldownTimer > 0) {let ecm = Math.max(0.1, 1.0 - this.globalCooldownReduction); this.savageHowlCooldownTimer -= dt/ecm; mouseAbilityUIUpdateNeeded = true; if(this.savageHowlCooldownTimer < 0) this.savageHowlCooldownTimer=0;}
-            }
-        }
-
-
-        const forceUIUpdate = gameContext && gameContext.forceAbilityUIUpdate;
-        if (numericAbilityUIUpdateNeeded || mouseAbilityUIUpdateNeeded || forceUIUpdate) {
-            if (updateAbilityCooldownCallback) updateAbilityCooldownCallback(this);
-            if(forceUIUpdate && gameContext) gameContext.forceAbilityUIUpdate = false;
-        }
-
-
-        this.x += this.velX; this.y += this.velY;
-        this.velX *= 0.95; this.velY *= 0.95;
-        if (Math.abs(this.velX) < 0.1) this.velX = 0;
-        if (Math.abs(this.velY) < 0.1) this.velY = 0;
-
-        let dxMovement = 0, dyMovement = 0;
-        if (!this.isAegisChargingDash) { 
-            if (keys.ArrowUp || keys.w) dyMovement -= 1;
-            if (keys.ArrowDown || keys.s) dyMovement += 1;
-            if (keys.ArrowLeft || keys.a) dxMovement -= 1;
-            if (keys.ArrowRight || keys.d) dxMovement += 1;
-        }
-
-
-        let actualCurrentSpeed = this.originalPlayerSpeed;
-        if (this.isFiringOmegaLaser && this.currentPath === 'mage') actualCurrentSpeed = this.originalPlayerSpeed / 2;
-        else {
-            let speedMultiplier = 1.0;
-            if (this.hasBerserkersEchoHelm) {
-                const missingHpPercentage = (this.maxHp - this.hp) / this.maxHp;
-                const tenPercentIncrements = Math.floor(missingHpPercentage * 10);
-                if (tenPercentIncrements > 0) speedMultiplier *= (1 + (tenPercentIncrements * BERSERKERS_ECHO_SPEED_PER_10_HP));
-            }
-            actualCurrentSpeed *= speedMultiplier;
-        }
-        this.currentSpeed = actualCurrentSpeed;
-
-
-        let playerIsActuallyMoving = false;
-        if (dxMovement !== 0 || dyMovement !== 0) {
-            playerIsActuallyMoving = true;
-            if (dxMovement !== 0 && dyMovement !== 0) {
-                const m = Math.sqrt(2);
-                dxMovement = (dxMovement / m) * this.currentSpeed;
-                dyMovement = (dyMovement / m) * this.currentSpeed;
-            } else {
-                dxMovement *= this.currentSpeed;
-                dyMovement *= this.currentSpeed;
-            }
-        }
-
-        if (this.kineticConversionLevel > 0) { 
-            if (playerIsActuallyMoving) {
-                this.kineticCharge = Math.min(100, this.kineticCharge + this.baseKineticChargeRate * (dt / 1000));
-            }
-        }
-
-
-        if (ui && ui.updateKineticChargeUI) {
-            let maxPotencyAtFullCharge = 0;
-            if (this.kineticConversionLevel > 0) maxPotencyAtFullCharge = this.initialKineticDamageBonus; 
-            ui.updateKineticChargeUI(this.kineticCharge, this.kineticChargeConsumption, maxPotencyAtFullCharge, this.kineticConversionLevel > 0);
-        }
-
-
-        let nX = this.x + dxMovement; let nY = this.y + dyMovement;
-        if(targets && targets.length > 0){
-            for (const t of targets) { if (checkCollision({ x: nX, y: this.y, radius: this.radius }, t)) { nX = this.x; break; } }
-            for (const t of targets) { if (checkCollision({ x: this.x, y: nY, radius: this.radius }, t)) { nY = this.y; break; } }
-        }
-        if (activeBosses && activeBosses.length > 0) {
-            if (!(this.teleporting && this.teleportEffectTimer > 0)) {
-                for (const boss of activeBosses) {
-                    if (checkCollision({ x: nX, y: this.y, radius: this.radius }, boss)) {
-                        if (this.hasAegisPathHelm && this.currentPath === 'aegis') this.handleAegisCollisionWithBoss(boss, gameContext);
-                        nX = this.x; break;
-                    }
-                }
-                for (const boss of activeBosses) {
-                    if (checkCollision({ x: this.x, y: nY, radius: this.radius }, boss)) {
-                         if (this.hasAegisPathHelm && this.currentPath === 'aegis') this.handleAegisCollisionWithBoss(boss, gameContext);
-                        nY = this.y; break;
-                    }
-                }
-            }
-        }
-
-
-        this.x = nX; this.y = nY;
-
-        this.baseRadius = this.initialBaseRadius + this.bonusBaseRadius;
-        let effectiveScoreForSizing = Math.max(0, score - this.scoreOffsetForSizing);
-
-        if (currentGrowthFactor > 0) this.scoreBasedSize = effectiveScoreForSizing * currentGrowthFactor;
-        this.radius = this.baseRadius + this.scoreBasedSize;
-        this.radius = Math.max(MIN_PLAYER_BASE_RADIUS, this.radius);
-
-        this.x = Math.max(this.radius, Math.min(this.x, canvasWidth - this.radius));
-        this.y = Math.max(this.radius, Math.min(this.y, canvasHeight - this.radius));
-
-        if (isAnyPauseActiveCallback && !isAnyPauseActiveCallback()) {
-            if (!this.isFiringOmegaLaser && !this.isChargingAegisCharge && !this.isAegisChargingDash) {
-                this.aimAngle = Math.atan2(mouseY - this.y, mouseX - this.x);
-            }
-        }
-
-
-        if (!isAnyPauseActiveCallback || !isAnyPauseActiveCallback()) {
-            this.shootCooldownTimer -= dt;
-            if (this.currentPath === 'aegis' && (this.isChargingAegisCharge || this.isAegisChargingDash)) {
-                 this.shootCooldownTimer = GameState.getCurrentShootInterval(); 
-            } else if (this.shootCooldownTimer <= 0 && !this.isFiringOmegaLaser) { 
-                
-                let currentShootIntervalModified = GameState.getCurrentShootInterval();
-                if (this.isSavageHowlAttackSpeedBuffActive && this.currentPath === 'berserker') {
-                    currentShootIntervalModified /= (1 + SAVAGE_HOWL_ATTACK_SPEED_BUFF_PERCENT);
-                }
-                this.shootCooldownTimer = currentShootIntervalModified;
-
-
-                const baseRaySpeedMultiplier = GameState.getCurrentRaySpeedMultiplier();
-                const rayColors = GameState.getCurrentRayColors();
-                const selectedColor = rayColors[Math.floor(Math.random() * rayColors.length)];
-
-                let numRaysToShoot = 1;
-                if (this.scatterShotLevel > 0) numRaysToShoot += this.scatterShotLevel * 2;
-
-                for (let i = 0; i < numRaysToShoot; i++) {
-                    let currentAimAngle = this.aimAngle;
-                    if (numRaysToShoot > 1) {
-                        const angleSpread = SCATTER_SHOT_ANGLE_OFFSET * (this.scatterShotLevel +1);
-                        const rayIndexOffset = i - Math.floor(numRaysToShoot / 2);
-                        currentAimAngle += rayIndexOffset * (angleSpread / (numRaysToShoot > 1 ? numRaysToShoot -1 : 1)) * 0.5 ;
-                    }
-
-                    let ray = getPooledRay();
-                    if (ray) {
-                        const spawnOffset = this.radius + RAY_RADIUS + RAY_SPAWN_FORWARD_OFFSET;
-                        const raySpawnX = this.x + Math.cos(currentAimAngle) * spawnOffset;
-                        const raySpawnY = this.y + Math.sin(currentAimAngle) * spawnOffset;
-
-                        ray.reset(
-                            raySpawnX, raySpawnY, selectedColor,
-                            Math.cos(currentAimAngle), Math.sin(currentAimAngle),
-                            baseRaySpeedMultiplier,
-                            this,
-                            GameState.getCurrentRayMaxLifetime(),
-                            false, false, 0, false
-                        );
-
-                        if (this.kineticConversionLevel > 0 && this.kineticCharge >= this.kineticChargeConsumption) {
-                            const damageMultiplier = this.consumeKineticChargeForDamageBoost();
-                            ray.momentumDamageBonusValue = (ray.momentumDamageBonusValue || 0) + (damageMultiplier - 1); 
-                             if (ui && ui.updateKineticChargeUI) {
-                                let maxPotencyAtFullCharge = this.initialKineticDamageBonus; 
-                                ui.updateKineticChargeUI(this.kineticCharge, this.kineticChargeConsumption, maxPotencyAtFullCharge, this.kineticConversionLevel > 0);
-                            }
-                        }
-                        if (this.isBloodpactActive && this.currentPath === 'berserker') ray.lifestealPercent = BLOODPACT_LIFESTEAL_PERCENT;
-                        else ray.lifestealPercent = 0;
-
-                        if (allRays && Array.isArray(allRays)) allRays.push(ray);
-                        else console.error("Player.update: allRays is not available or not an array for pushing new ray.");
-                        playSound(shootSound);
-                    }
-                }
-            }
-        }
-
-
-        if (this.hp > 0 && this.hp < this.maxHp) {
-            this.hpRegenTimer += dt;
-            if (this.hpRegenTimer >= HP_REGEN_INTERVAL) {
-                this.hpRegenTimer -= HP_REGEN_INTERVAL;
-                this.gainHealth(this.baseHpRegenAmount + this.hpRegenBonusFromEvolution, updateHealthDisplayCallback);
-            }
-        }
-    }
-
-    handleAegisCollisionWithBoss(boss, gameContext) {
-        if (!this.hasAegisPathHelm || !boss || boss.health <= 0 || this.currentPath !== 'aegis') return;
-
-        if (boss.lastHitByAegisTimer && (Date.now() - boss.lastHitByAegisTimer < 200) ) return;
-        
-        let collisionDamage = AEGIS_PATH_BASE_COLLISION_DAMAGE;
-        collisionDamage += (this.maxHp * AEGIS_PATH_MAX_HP_SCALING_FACTOR);
-        collisionDamage += (this.radius * AEGIS_PATH_RADIUS_SCALING_FACTOR);
-        collisionDamage = Math.round(collisionDamage);
-
-        if (typeof boss.takeDamage === 'function') {
-            const damageApplied = boss.takeDamage(collisionDamage, null, this, { isAegisCollision: true });
-            if (damageApplied > 0) { 
-                playSound(audioBossHitSound); 
-                this.totalDamageDealt += damageApplied; 
-                boss.lastHitByAegisTimer = Date.now();
-                 if (gameContext.screenShakeParams) {
-                    gameContext.screenShakeParams.isScreenShaking = true;
-                    gameContext.screenShakeParams.screenShakeTimer = 200;
-                    gameContext.screenShakeParams.currentShakeMagnitude = 4;
-                    gameContext.screenShakeParams.currentShakeType = 'playerHit';
-                 }
-            }
-        }
-
-        if (typeof boss.x !== 'undefined' && typeof boss.y !== 'undefined') {
-            const angleToBoss = Math.atan2(boss.y - this.y, boss.x - this.x);
-            const knockbackForce = AEGIS_PATH_BOSS_KNOCKBACK_FORCE;
-            if (typeof boss.recoilVelX === 'number' && typeof boss.recoilVelY === 'number') {
-                boss.recoilVelX += Math.cos(angleToBoss) * knockbackForce;
-                boss.recoilVelY += Math.sin(angleToBoss) * knockbackForce;
-                if (typeof boss.playerCollisionStunTimer === 'number' && typeof boss.PLAYER_COLLISION_STUN_DURATION === 'number') {
-                    boss.playerCollisionStunTimer = Math.max(boss.playerCollisionStunTimer, boss.PLAYER_COLLISION_STUN_DURATION * 0.3);
-                    if(typeof boss.speed === 'number') boss.speed = 0;
-                }
-            } else {
-                boss.x += Math.cos(angleToBoss) * knockbackForce * 0.1;
-                boss.y += Math.sin(angleToBoss) * knockbackForce * 0.1;
-            }
-        }
-
-        const angleFromBoss = Math.atan2(this.y - boss.y, this.x - boss.x);
-        this.velX += Math.cos(angleFromBoss) * AEGIS_PATH_BOSS_KNOCKBACK_FORCE * AEGIS_PATH_PLAYER_SELF_KNOCKBACK_FACTOR;
-        this.velY += Math.sin(angleFromBoss) * AEGIS_PATH_BOSS_KNOCKBACK_FORCE * AEGIS_PATH_PLAYER_SELF_KNOCKBACK_FACTOR;
-    }
-
-
     takeDamage(hittingRayOrAmount, gameContext, damageContext) {
+        const postPopupTimerFromCtx = gameContext.postPopupImmunityTimer || 0;
+        const postDamageTimerFromCtx = gameContext.postDamageImmunityTimer || 0; 
+
+        // console.log(`[Player.takeDamage PRE-IMMUNITY] Path: ${this.currentPath}, PostDamageTimer: ${postDamageTimerFromCtx}`); 
+
+        let hittingRayObjectProperties = "Not a ray object or no properties"; 
+        if (typeof hittingRayOrAmount === 'object' && hittingRayOrAmount !== null) {
+            hittingRayObjectProperties = `Source: ${hittingRayOrAmount.sourceAbility || (hittingRayOrAmount.isBossProjectile ? 'Boss' : (hittingRayOrAmount.isPlayerAbilityRay ? 'PlayerAbility' : 'PlayerNormal'))}, Color: ${hittingRayOrAmount.color}, BaseDmgVal: ${hittingRayOrAmount.damageValue}`;
+        }
+        // console.log(`[Player.takeDamage ENTERED] Hitting Object Details: ${hittingRayObjectProperties}`); 
+
         let effectiveDamageTakenMultiplier = this.damageTakenMultiplier;
         if (this.isAegisChargingDash && this.currentPath === 'aegis') {
             effectiveDamageTakenMultiplier *= (1 - AEGIS_CHARGE_DR_DURING_DASH);
         }
 
         if (this.hasAegisPathHelm && this.currentPath === 'aegis' &&
+            this.aegisRamCooldownTimer <= 0 && 
             typeof hittingRayOrAmount === 'object' &&
             hittingRayOrAmount !== null &&
-            hittingRayOrAmount.constructor && hittingRayOrAmount.constructor.name !== 'Ray' &&
-            typeof hittingRayOrAmount.tier === 'number' &&
-            typeof hittingRayOrAmount.dx === 'undefined')
+            hittingRayOrAmount.constructor && hittingRayOrAmount.constructor.name !== 'Ray' && 
+            typeof hittingRayOrAmount.tier === 'number' && 
+            typeof hittingRayOrAmount.dx === 'undefined') 
         {
+            // console.log("[Player.takeDamage] Aegis ram successful, 0 damage taken by player.");
             return 0; 
         }
-
-        const postPopupTimerFromCtx = gameContext.postPopupImmunityTimer || 0;
-        const postDamageTimerFromCtx = gameContext.postDamageImmunityTimer || 0;
 
         if (this.isShieldOvercharging && this.currentPath === 'mage') { 
             if (typeof hittingRayOrAmount === 'object' && hittingRayOrAmount !== null) {
@@ -1085,6 +1079,7 @@ export class Player {
                 if (!isOwnFreshRay) { hittingRay.isActive = false; this.gainHealth(SHIELD_OVERCHARGE_HEAL_PER_RAY, gameContext.updateHealthDisplayCallback); }
                 else { hittingRay.isActive = false; }
             }
+            // console.log("[Player.takeDamage] Shield Overcharge active, 0 damage taken.");
             return 0;
         }
 
@@ -1094,6 +1089,7 @@ export class Player {
                 const hittingRay = hittingRayOrAmount;
                 if (!hittingRay.isBossProjectile && !hittingRay.isCorruptedByGravityWell && !hittingRay.isCorruptedByPlayerWell) hittingRay.isActive = false;
             }
+            // console.log(`[Player.takeDamage] Immunity active (Popup: ${postPopupTimerFromCtx}, Damage: ${postDamageTimerFromCtx}, Teleport: ${this.teleporting}), 0 damage taken.`);
             return 0;
         }
 
@@ -1102,21 +1098,27 @@ export class Player {
 
         if (typeof hittingRayOrAmount === 'object' && hittingRayOrAmount !== null) {
             hittingRayObject = hittingRayOrAmount;
-            damageToTake = hittingRayObject.damageValue !== undefined ? hittingRayObject.damageValue : RAY_DAMAGE_TO_PLAYER;
+            damageToTake = hittingRayObject.damageValue !== undefined ? hittingRayObject.damageValue : RAY_DAMAGE_TO_PLAYER; 
         } else if (typeof hittingRayOrAmount === 'number') {
-            damageToTake = hittingRayOrAmount;
+            damageToTake = hittingRayOrAmount; 
         } else {
-            damageToTake = RAY_DAMAGE_TO_PLAYER;
+            damageToTake = RAY_DAMAGE_TO_PLAYER; 
         }
+        
         damageToTake *= effectiveDamageTakenMultiplier; 
 
         if (hittingRayObject && hittingRayObject.isBossProjectile && this.visualModifiers.ablativeSublayer) {
             damageToTake *= (1 - (this.bossDamageReduction || 0));
         }
+        
         damageToTake = Math.max(1, Math.round(damageToTake));
+        // console.log(`[Player.takeDamage FINAL] Final rounded damageToTake: ${damageToTake}, Player HP Before: ${this.hp}`);
+
         this.hp -= damageToTake;
         if (this.hp < 0) this.hp = 0;
         if (gameContext.updateHealthDisplayCallback) gameContext.updateHealthDisplayCallback(this.hp, this.maxHp);
+        // console.log(`[Player.takeDamage POST] Player HP After: ${this.hp}`);
+
 
         const { screenShakeParams } = damageContext;
         if (screenShakeParams) {
@@ -1127,7 +1129,7 @@ export class Player {
         }
         playSound(playerHitSound);
         if (this.hp <= 0) { if (gameContext.endGameCallback) gameContext.endGameCallback(); }
-        return damageToTake;
+        return damageToTake; 
     }
 
     applyLifesteal(damageDealt, updateHealthDisplayCallback) {
@@ -1405,7 +1407,6 @@ export class Player {
                 abilityContext.screenShakeParams.currentShakeType = 'bonus';
             }
 
-            // Apply Fear to bosses and their minions
             if (abilityContext.activeBosses) {
                 abilityContext.activeBosses.forEach(boss => {
                     if (Math.hypot(this.x - boss.x, this.y - boss.y) < SAVAGE_HOWL_FEAR_RADIUS + boss.radius) {
@@ -1444,7 +1445,7 @@ export class Player {
         if (this.currentPath === 'mage') damagePerTickForCalc *= 2; 
         damagePerTickForCalc *= this.currentOmegaLaserKineticBoost;
         if (this.abilityCritChance > 0 && Math.random() < this.abilityCritChance) damagePerTickForCalc *= this.abilityCritDamageMultiplier;
-        const finalDamagePerTick = Math.round(Math.max(1, damagePerTickForCalc));
+        const finalDamagePerTick = Math.round(Math.max(1, finalDamagePerTick));
 
         if (targetsArray) {
             for (let i = targetsArray.length - 1; i >= 0; i--) {
@@ -1498,4 +1499,4 @@ export class Player {
         this.aegisChargeCurrentChargeTime = 0;
     }
 
-}
+} 

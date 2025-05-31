@@ -60,3 +60,8 @@ export const statsBossTiersDiv = document.getElementById('statsBossTiers');
 export const kineticChargeUIElement = document.getElementById('kineticChargeUI');
 export const kineticChargeBarFillElement = document.getElementById('kineticChargeBarFill');
 export const kineticChargeTextElement = document.getElementById('kineticChargeText');
+
+// Berserker Rage UI Elements (NEW)
+export const berserkerRageUIElement = document.getElementById('berserkerRageUI');
+export const berserkerRageBarFillElement = document.getElementById('berserkerRageBarFill');
+export const berserkerRageTextElement = document.getElementById('berserkerRageText');

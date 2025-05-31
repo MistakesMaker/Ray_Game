@@ -1,6 +1,9 @@
 // js/mirrorShieldBoss.js
 import { BossNPC } from './bossBase.js';
-import { PLAYER_BOUNCE_FORCE_FROM_BOSS, BASE_RAY_SPEED, REFLECTED_RAY_SPEED_MULTIPLIER, REFLECTED_RAY_COLOR, REFLECTED_RAY_LIFETIME_AFTER_REFLECTION } from './constants.js';
+import { 
+    PLAYER_BOUNCE_FORCE_FROM_BOSS, BASE_RAY_SPEED, REFLECTED_RAY_SPEED_MULTIPLIER, 
+    REFLECTED_RAY_COLOR, REFLECTED_RAY_LIFETIME_AFTER_REFLECTION, RAY_DAMAGE_TO_PLAYER // Import RAY_DAMAGE_TO_PLAYER
+} from './constants.js';
 import { checkCollision } from './utils.js';
 
 export class MirrorShieldBoss extends BossNPC { 
@@ -121,26 +124,38 @@ export class MirrorShieldBoss extends BossNPC {
             const playerIsCurrentlyShieldOvercharging = isPlayerShieldOvercharging; 
             const playerIsDamageImmuneFromRecentHit = (postDamageImmunityTimer !== undefined && postDamageImmunityTimer > 0);
 
-            const playerCanTakeDamage = !playerIsDamageImmuneFromRecentHit &&
-                                        !playerIsTeleporting &&
-                                        !playerIsCurrentlyShieldOvercharging;
+            const canPlayerInteract = !playerIsTeleporting && !playerIsCurrentlyShieldOvercharging;
             
-            if (playerCanTakeDamage && this.playerCollisionStunTimer <= 0 && !this.isFeared) { 
-                if(gameContext) gameContext.playerCollidedWithBoss = this; 
+            if (canPlayerInteract) {
+                // Check if player is Aegis AND Aegis Ram is OFF cooldown
+                if (playerInstance.hasAegisPathHelm && playerInstance.aegisRamCooldownTimer <= 0) {
+                    if (gameContext && gameContext.playerCollidedWithBoss !== undefined) {
+                        // Signal to gameLogic that an Aegis ram-ready collision occurred.
+                        gameContext.playerCollidedWithBoss = this; 
+                    }
+                } else {
+                    // Player is NOT Aegis OR Aegis Ram IS ON COOLDOWN
+                    // Standard collision damage & knockback logic for the player
+                    if (!playerIsDamageImmuneFromRecentHit && this.playerCollisionStunTimer <= 0 && !this.isFeared) { 
+                        if(gameContext && gameContext.playerCollidedWithBoss !== undefined) {
+                            gameContext.playerCollidedWithBoss = this; 
+                        }
 
-                const dist = Math.sqrt((this.x - playerInstance.x) ** 2 + (this.y - playerInstance.y) ** 2);
-                const overlap = (this.radius + playerInstance.radius) - dist;
+                        const dist = Math.sqrt((this.x - playerInstance.x) ** 2 + (this.y - playerInstance.y) ** 2);
+                        const overlap = (this.radius + playerInstance.radius) - dist;
 
-                if (overlap > 0) {
-                    const pushAngleBoss = Math.atan2(this.y - playerInstance.y, this.x - playerInstance.x);
-                    const immediatePush = overlap * 0.3;
-                    this.x += Math.cos(pushAngleBoss) * immediatePush;
-                    this.y += Math.sin(pushAngleBoss) * immediatePush;
+                        if (overlap > 0) {
+                            const pushAngleBoss = Math.atan2(this.y - playerInstance.y, this.x - playerInstance.x);
+                            const immediatePush = overlap * 0.3;
+                            this.x += Math.cos(pushAngleBoss) * immediatePush;
+                            this.y += Math.sin(pushAngleBoss) * immediatePush;
 
-                    const recoilForce = PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.3; 
-                    this.recoilVelX = Math.cos(pushAngleBoss) * recoilForce;
-                    this.recoilVelY = Math.sin(pushAngleBoss) * recoilForce;
-                    this.playerCollisionStunTimer = this.PLAYER_COLLISION_STUN_DURATION_MIRROR;
+                            const recoilForce = PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.3; 
+                            this.recoilVelX = Math.cos(pushAngleBoss) * recoilForce;
+                            this.recoilVelY = Math.sin(pushAngleBoss) * recoilForce;
+                            this.playerCollisionStunTimer = this.PLAYER_COLLISION_STUN_DURATION_MIRROR;
+                        }
+                    }
                 }
             }
         }
@@ -182,6 +197,7 @@ export class MirrorShieldBoss extends BossNPC {
                 ray.initialSpeedMultiplier = REFLECTED_RAY_SPEED_MULTIPLIER; 
                 ray.color = REFLECTED_RAY_COLOR;
                 ray.isBossProjectile = true; 
+                ray.damageValue = RAY_DAMAGE_TO_PLAYER; // IMPORTANT: Reset damage to standard for reflected rays
                 ray.spawnGraceTimer = 50; 
                 ray.maxLifetime = REFLECTED_RAY_LIFETIME_AFTER_REFLECTION;
                 ray.lifeTimer = ray.maxLifetime;

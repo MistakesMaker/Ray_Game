@@ -283,11 +283,11 @@ export const AEGIS_CHARGE_MIN_DAMAGE = 20;
 export const AEGIS_CHARGE_MAX_DAMAGE_SCALE_PER_SECOND_CHARGED = 0.25; // e.g., 0.5 means +50% max damage per second charged
 export const AEGIS_CHARGE_AOE_RADIUS = 60;
 export const AEGIS_CHARGE_DR_DURING_DASH = 0.50; // 50% damage reduction
-export const AEGIS_CHARGE_COOLDOWN = 12000; // ms
+export const AEGIS_CHARGE_COOLDOWN = 15000; // ms
 export const AEGIS_CHARGE_DASH_SPEED_FACTOR = 8; // Multiplier of base player speed
 
 // RMB: Seismic Slam
-export const SEISMIC_SLAM_DAMAGE_BASE = 30;
+export const SEISMIC_SLAM_DAMAGE_BASE = 10;
 export const SEISMIC_SLAM_DAMAGE_MAXHP_SCALE = 0.05; // 5% of MaxHP added to damage
 export const SEISMIC_SLAM_DAMAGE_RADIUS_SCALE = 0.1; // 0.5 damage per unit of player radius
 export const SEISMIC_SLAM_AOE_RADIUS = 350;

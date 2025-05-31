@@ -240,7 +240,7 @@ export class GravityWellBoss extends BossNPC {
                             const tangentWeight = 0.95;
                             ray.dx = (Math.cos(initTangentialAngle) * tangentWeight + Math.cos(angleToCenter) * (1-tangentWeight));
                             ray.dy = (Math.sin(initTangentialAngle) * tangentWeight + Math.sin(angleToCenter) * (1-tangentWeight));
-                            const norm = Math.sqrt(ray.dx**2 + ray.dy**2) || 1;
+                            const norm = Math.sqrt(ray.dx ** 2 + ray.dy ** 2) || 1;
                             ray.dx = ray.dx / norm * ray.speed;
                             ray.dy = ray.dy / norm * ray.speed;
                         }
@@ -255,23 +255,35 @@ export class GravityWellBoss extends BossNPC {
         if (this.activeDetonationEffect) { this.activeDetonationEffect.timer -= dt; if (this.activeDetonationEffect.timer <= 0) this.activeDetonationEffect = null; }
 
         if (checkCollision(this, playerInstance)) {
-             const playerCanTakeDamage = (postDamageImmunityTimer === undefined || postDamageImmunityTimer <= 0) &&
-                                        !(playerInstance.teleporting && playerInstance.teleportEffectTimer > 0) &&
-                                        !isPlayerShieldOvercharging;
-            if (playerCanTakeDamage && this.playerCollisionStunTimer <=0 && !this.isFeared) { 
-                 if(gameContext) gameContext.playerCollidedWithBoss = this;
-                const dist = Math.sqrt((this.x - playerInstance.x) ** 2 + (this.y - playerInstance.y) ** 2);
-                const overlap = (this.radius + playerInstance.radius) - dist;
-                if (overlap > 0) {
-                    const pushAngleBoss = Math.atan2(this.y - playerInstance.y, this.x - playerInstance.x);
-                    const pushAmount = overlap * 0.6;
-                    this.x += Math.cos(pushAngleBoss) * pushAmount * normalizedDtFactor;
-                    this.y += Math.sin(pushAngleBoss) * pushAmount * normalizedDtFactor;
-                    const recoilForce = PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.4;
-                    this.recoilVelX = Math.cos(pushAngleBoss) * recoilForce;
-                    this.recoilVelY = Math.sin(pushAngleBoss) * recoilForce;
-                    this.playerCollisionStunTimer = this.PLAYER_COLLISION_STUN_DURATION;
-                    this.speed = 0;
+            const playerIsTeleporting = (playerInstance.teleporting && playerInstance.teleportEffectTimer > 0);
+            const playerIsCurrentlyShieldOvercharging = isPlayerShieldOvercharging;
+            const playerIsDamageImmuneFromRecentHit = (postDamageImmunityTimer !== undefined && postDamageImmunityTimer > 0);
+            const canPlayerInteract = !playerIsTeleporting && !playerIsCurrentlyShieldOvercharging;
+
+            if (canPlayerInteract) {
+                if (playerInstance.hasAegisPathHelm && playerInstance.aegisRamCooldownTimer <= 0) {
+                    if (gameContext && gameContext.playerCollidedWithBoss !== undefined) {
+                        gameContext.playerCollidedWithBoss = this;
+                    }
+                } else {
+                    if (!playerIsDamageImmuneFromRecentHit && this.playerCollisionStunTimer <= 0 && !this.isFeared) {
+                        if (gameContext && gameContext.playerCollidedWithBoss !== undefined) {
+                            gameContext.playerCollidedWithBoss = this;
+                        }
+                        const dist = Math.sqrt((this.x - playerInstance.x) ** 2 + (this.y - playerInstance.y) ** 2);
+                        const overlap = (this.radius + playerInstance.radius) - dist;
+                        if (overlap > 0) {
+                            const pushAngleBoss = Math.atan2(this.y - playerInstance.y, this.x - playerInstance.x);
+                            const pushAmount = overlap * 0.6;
+                            this.x += Math.cos(pushAngleBoss) * pushAmount * normalizedDtFactor;
+                            this.y += Math.sin(pushAngleBoss) * pushAmount * normalizedDtFactor;
+                            const recoilForce = PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.4;
+                            this.recoilVelX = Math.cos(pushAngleBoss) * recoilForce;
+                            this.recoilVelY = Math.sin(pushAngleBoss) * recoilForce;
+                            this.playerCollisionStunTimer = this.PLAYER_COLLISION_STUN_DURATION;
+                            this.speed = 0;
+                        }
+                    }
                 }
             }
         }

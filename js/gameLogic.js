@@ -6,7 +6,7 @@ import * as UIManager from './uiManager.js';
 import * as EvolutionManager from './evolutionManager.js';
 import * as LootManager from './lootManager.js';
 import { EntitySpawner } from './entitySpawner.js';
-import { Player } from './player.js';
+import { Player } from './player.js'; // Assuming Player class is correctly defined here
 import { Ray, PlayerGravityWell } from './ray.js';
 import { Target, Heart, BonusPoint, LootDrop } from './entities.js';
 import { BossManager } from './bossManager.js';
@@ -30,7 +30,8 @@ import {
 
 
 // --- Game Entities & State (managed by this module) ---
-let player = null;
+let player = null; 
+// ... other state variables ...
 let rays = [];
 let targets = [];
 let hearts = [];
@@ -67,7 +68,7 @@ let _mainCallbacks = {
     handleFullHealthHeartPickup: null, 
 };
 
-export function getScreenShakeParams() {
+export function getScreenShakeParams() { 
     return {
         isScreenShaking,
         screenShakeTimer,
@@ -78,9 +79,8 @@ export function getScreenShakeParams() {
     };
 }
 
-export function getAbilityContextForPlayerLogic() {
+export function getAbilityContextForPlayerLogic() { 
     if (!player || !_inputState || !_canvas) {
-        console.warn("getAbilityContextForPlayerLogic called before essential components (player, inputState, canvas) are initialized in gameLogic.");
         return {
             isAnyPauseActiveCallback: GameState.isAnyPauseActive,
             CONSTANTS: CONSTANTS,
@@ -100,16 +100,20 @@ export function getAbilityContextForPlayerLogic() {
         canvasWidth: _canvas.width,
         canvasHeight: _canvas.height,
         allRays: rays,
-        activeBosses: bossManager ? bossManager.activeBosses : [], // Added for EMP context
+        activeBosses: bossManager ? bossManager.activeBosses : [], 
         screenShakeParams: getScreenShakeParams(),
         CONSTANTS: CONSTANTS,
         activeBuffNotificationsArray: activeBuffNotifications,
         evolutionChoices: EvolutionManager.getEvolutionMasterList(),
-        ui: { updateKineticChargeUI: UIManager.updateKineticChargeUI }
+        ui: { 
+            updateKineticChargeUI: UIManager.updateKineticChargeUI,
+            updateBerserkerRageUI: UIManager.updateBerserkerRageUI 
+        }
     };
 }
 
 export function initializeGameLogic(canvasElement, inputStateRef, mainCallbacksObj, initialPlayerSpeed) {
+   // console.log("[GameLogic] initializeGameLogic START");
     _canvas = canvasElement;
     _ctx = _canvas.getContext('2d');
     _inputState = inputStateRef;
@@ -117,7 +121,21 @@ export function initializeGameLogic(canvasElement, inputStateRef, mainCallbacksO
 
     activeBuffNotifications = [];
 
-    player = new Player(_canvas.width / 2, _canvas.height / 2, initialPlayerSpeed);
+  //  console.log("[GameLogic] About to create Player instance.");
+    try {
+        player = new Player(_canvas.width / 2, _canvas.height / 2, initialPlayerSpeed); 
+    //  console.log("[GameLogic] Player INSTANCE CREATED:", player);
+    //  console.log("[GameLogic] typeof player.draw AFTER CREATION:", typeof player.draw);
+    //  console.log("[GameLogic] typeof player.update AFTER CREATION:", typeof player.update);
+        if (!(player instanceof Player)) {
+            console.error("CRITICAL: player is NOT an instanceof Player immediately after new Player()!");
+        }
+    } catch (e) {
+        console.error("CRITICAL ERROR creating Player instance:", e);
+        player = null; // Ensure player is null if creation failed
+    }
+
+
     LootManager.initializeLootPools(player, UIManager.updateBuffIndicator);
 
     setRayConstructorForPool(Ray);
@@ -131,7 +149,8 @@ export function initializeGameLogic(canvasElement, inputStateRef, mainCallbacksO
         }
     };
     entitySpawner = new EntitySpawner(spawnerCallbacks);
-    entitySpawner.updateCanvasDimensions(_canvas.width, _canvas.height);
+    if (_canvas) entitySpawner.updateCanvasDimensions(_canvas.width, _canvas.height);
+
 
     const bossManagerAudioContext = {
         playSound,
@@ -145,39 +164,25 @@ export function initializeGameLogic(canvasElement, inputStateRef, mainCallbacksO
     rays = []; targets = []; hearts = []; bonusPoints = [];
     lootDrops = []; decoys = []; bossDefeatEffects = [];
 
-    console.log("GameLogic Initialized. Player created.");
+ //   console.log("[GameLogic] initializeGameLogic END");
 }
 
 export function resetGameLogicState() {
+    // console.log("[GameLogic] resetGameLogicState called. Current player:", player, "typeof player.reset:", typeof player?.reset);
     if (player && typeof player.reset === 'function') {
         player.reset(_canvas ? _canvas.width : window.innerWidth, _canvas ? _canvas.height : window.innerHeight);
-    } else if (player) {
-        player.hp = player.maxHp;
+    } else if (player) { 
+    //    console.warn("[GameLogic reset] Player object exists but reset method is missing. Performing basic property reset.");
+        player.hp = player.maxHp || CONSTANTS.PLAYER_MAX_HP;
         player.x = _canvas ? _canvas.width / 2 : window.innerWidth / 2;
         player.y = _canvas ? _canvas.height / 2 : window.innerHeight / 2;
-        player.immuneColorsList = [];
-        player.activeAbilities = {'1':null, '2':null, '3':null};
-        player.scoreOffsetForSizing = 0;
-        player.scoreBasedSize = 0;
-        player.radius = player.initialBaseRadius + player.bonusBaseRadius;
-        player.kineticCharge = 0;
-        player.isFiringOmegaLaser = false;
-        player.isShieldOvercharging = false;
-        player.shieldOverchargeTimer = 0;
-        player.omegaLaserTimer = 0;
-        player.shieldOverchargeCooldownTimer = 0;
-        player.omegaLaserCooldownTimer = 0;
-        player.timesHit = 0;
-        player.totalDamageDealt = 0;
-        player.isHarmonized = false;
-        player.evolutionReRollsRemaining = CONSTANTS.MAX_EVOLUTION_REROLLS;
-        player.blockedEvolutionIds = [];
-        player.evolutionBlocksRemaining = CONSTANTS.MAX_EVOLUTION_BLOCKS;
-        player.evolutionFreezesRemaining = CONSTANTS.MAX_EVOLUTION_FREEZES_PER_RUN;
-        player.frozenEvolutionChoice = null;
-        player.isFreezeModeActive = false;
-        player.hasUsedFreezeForCurrentOffers = false;
+        // Only assign if these properties exist, to avoid errors if player is truly corrupted
+        if('immuneColorsList' in player) player.immuneColorsList = [];
+        if('activeAbilities' in player) player.activeAbilities = {'1':null, '2':null, '3':null};
+    } else {
+        console.warn("[GameLogic reset] Player is null, cannot reset properties.");
     }
+
     if (bossManager) bossManager.reset();
     if (entitySpawner) entitySpawner.reset();
 
@@ -191,11 +196,14 @@ export function resetGameLogicState() {
     currentShakeType = null;
     hitShakeDx = 0;
     hitShakeDy = 0;
-
-    console.log("GameLogic State Reset.");
 }
 
-export function getPlayerInstance() { return player; }
+export function getPlayerInstance() { 
+    if (player && !(player instanceof Player)) {
+        console.error("CRITICAL GETTER: gameLogic.player is an object BUT NOT an instanceof Player!", player);
+    }
+    return player; 
+}
 export function getActiveBuffNotificationsArray() { return activeBuffNotifications; }
 export function getRays() { return rays; }
 export function getDecoys() { return decoys; }
@@ -212,7 +220,7 @@ export function updateCanvasDimensionsLogic(width, height) {
     if (entitySpawner && typeof entitySpawner.updateCanvasDimensions === 'function') {
         entitySpawner.updateCanvasDimensions(width, height);
     }
-    const currentPlayer = getPlayerInstance();
+    const currentPlayer = getPlayerInstance(); 
     if (currentPlayer && GameState.isGameRunning()) {
          currentPlayer.x = Math.max(currentPlayer.radius, Math.min(currentPlayer.x, width - currentPlayer.radius));
          currentPlayer.y = Math.max(currentPlayer.radius, Math.min(currentPlayer.y, height - currentPlayer.radius));
@@ -221,8 +229,18 @@ export function updateCanvasDimensionsLogic(width, height) {
 
 
 export function updateGame(deltaTime) {
+    // console.log("[updateGame START] player:", player, "typeof player.update:", typeof player?.update);
     if (GameState.isGameOver()) return;
     if (!_canvas || !_inputState) return;
+    if (!player) { // If player is null for some reason, don't proceed with game logic
+        // console.warn("[updateGame] Player is null. Skipping update.");
+        return;
+    }
+    if (typeof player.update !== 'function') {
+        console.error("[updateGame] CRITICAL: player.update is NOT a function here!", player);
+        return; // Cannot proceed
+    }
+
 
     if (deltaTime <= 0 || deltaTime > 500) deltaTime = 1000 / 60;
 
@@ -267,7 +285,7 @@ export function updateGame(deltaTime) {
                 isGameOver: GameState.isGameOver,
                 isAnyPauseActive: GameState.isAnyPauseActive,
                 isBossSequenceActive: bossManager ? bossManager.isBossSequenceActive.bind(bossManager) : () => false,
-                player: player,
+                player: player, 
                 heartsArray: hearts,
                 bonusPointsArray: bonusPoints,
                 canvasWidth: _canvas.width,
@@ -279,7 +297,7 @@ export function updateGame(deltaTime) {
         for (let i = lootDrops.length - 1; i >= 0; i--) {
             const loot = lootDrops[i]; loot.update(deltaTime);
             if (loot.remove) { lootDrops.splice(i, 1); continue; }
-            if (player && checkCollision(player, loot)) {
+            if (player && checkCollision(player, loot)) { 
                 const choices = loot.upgradeChoices;
                 lootDrops.splice(i, 1);
                 playSound(audioLootPickupSound);
@@ -295,7 +313,7 @@ export function updateGame(deltaTime) {
         if (bossManager && !GameState.isGameOver()) {
             bossManager.trySpawnBoss(GameState.getScore());
             if (_mainCallbacks.getGameContextForBossManager) {
-                bossManager.update(player, _mainCallbacks.getGameContextForBossManager(LootManager));
+                bossManager.update(player, _mainCallbacks.getGameContextForBossManager(LootManager)); 
             }
         }
 
@@ -303,7 +321,7 @@ export function updateGame(deltaTime) {
         for (let i = decoys.length - 1; i >= 0; i--) {
             const well = decoys[i];
             if(well && well instanceof PlayerGravityWell) {
-                const wellUpdateContext = { dt: deltaTime, allRays: rays, activeBosses: bossManager ? bossManager.activeBosses : [], player };
+                const wellUpdateContext = { dt: deltaTime, allRays: rays, activeBosses: bossManager ? bossManager.activeBosses : [], player }; 
                 well.update(wellUpdateContext);
                 if (well.isPendingDetonation && well.isActive) wellsToDetonate.push(well);
                 if (!well.isActive && !well.isPendingDetonation) { if(player && player.activeMiniWell === well) player.activeMiniWell = null; decoys.splice(i, 1);}
@@ -311,46 +329,62 @@ export function updateGame(deltaTime) {
         }
         wellsToDetonate.forEach(well => {
             if (well && well.isActive) {
-                well.detonate({ targetX: _inputState.mouseX, targetY: _inputState.mouseY, player: player });
+                well.detonate({ targetX: _inputState.mouseX, targetY: _inputState.mouseY, player: player }); 
             }
         });
         for (let i = decoys.length - 1; i >= 0; i--) { if(decoys[i] && !decoys[i].isActive) { if(player && player.activeMiniWell === decoys[i]) player.activeMiniWell = null; decoys.splice(i, 1);}}
 
         const currentEvolutionThreshold = (_mainCallbacks.getLastEvolutionScore ? _mainCallbacks.getLastEvolutionScore() : 0) +
-                                          (CONSTANTS.EVOLUTION_SCORE_INTERVAL * (player ? player.evolutionIntervalModifier : 1.0));
-        if (player && GameState.getScore() >= currentEvolutionThreshold && !GameState.isEvolutionPendingAfterBoss()) {
+                                          (CONSTANTS.EVOLUTION_SCORE_INTERVAL * (player ? player.evolutionIntervalModifier : 1.0)); 
+        if (player && GameState.getScore() >= currentEvolutionThreshold && !GameState.isEvolutionPendingAfterBoss()) { 
             if (bossManager && (bossManager.isBossSequenceActive() || bossManager.isBossWarningActiveProp()) ) GameState.setEvolutionPendingAfterBoss(true);
             else if (lootDrops.length > 0) GameState.setEvolutionPendingAfterBoss(true);
             else if (_mainCallbacks.triggerEvolutionInternal) _mainCallbacks.triggerEvolutionInternal();
         }
         for (let i = activeBuffNotifications.length - 1; i >= 0; i--) {const n = activeBuffNotifications[i];n.timer -= deltaTime;if (n.timer <= 0) activeBuffNotifications.splice(i, 1);}
 
-        if (player) {
-            const playerUpdateContext = {
-                dt: deltaTime,
-                keys: _inputState.keys,
-                mouseX: _inputState.mouseX, 
-                mouseY: _inputState.mouseY, 
-                canvasWidth: _canvas.width, canvasHeight: _canvas.height,
-                targets: targets, activeBosses: bossManager ? bossManager.activeBosses : [],
-                currentGrowthFactor: GameState.getCurrentPlayerRadiusGrowthFactor(),
-                currentEffectiveDefaultGrowthFactor: GameState.getCurrentEffectiveDefaultGrowthFactor(),
-                score: GameState.getScore(),
-                evolutionChoices: EvolutionManager.getEvolutionMasterList(),
-                ui: { updateKineticChargeUI: UIManager.updateKineticChargeUI },
-                updateHealthDisplayCallback: (currentHp, maxHp) => UIManager.updateHealthDisplay(currentHp, maxHp),
-                updateAbilityCooldownCallback: (pInst) => UIManager.updateAbilityCooldownUI(pInst),
-                isAnyPauseActiveCallback: GameState.isAnyPauseActive, 
-                decoysArray: decoys, bossDefeatEffectsArray: bossDefeatEffects, allRays: rays,
-                screenShakeParams: getScreenShakeParams(),
-                activeBuffNotificationsArray: activeBuffNotifications, CONSTANTS,
-                endGameCallback: _mainCallbacks.endGameInternal,
-                updateScoreCallback: (amount) => { GameState.incrementScore(amount); UIManager.updateScoreDisplay(GameState.getScore()); if (_mainCallbacks.checkForNewColorUnlock) _mainCallbacks.checkForNewColorUnlock(); },
-                forceAbilityUIUpdate: false
-            };
-            player.update(playerUpdateContext);
+        
+        // 'player' is the module-scoped variable, guaranteed to be an instance if initializeGameLogic succeeded.
+        const playerUpdateContext = {
+            dt: deltaTime,
+            keys: _inputState.keys,
+            mouseX: _inputState.mouseX, 
+            mouseY: _inputState.mouseY, 
+            canvasWidth: _canvas.width, canvasHeight: _canvas.height,
+            targets: targets, activeBosses: bossManager ? bossManager.activeBosses : [],
+            currentGrowthFactor: GameState.getCurrentPlayerRadiusGrowthFactor(),
+            currentEffectiveDefaultGrowthFactor: GameState.getCurrentEffectiveDefaultGrowthFactor(),
+            score: GameState.getScore(),
+            evolutionChoices: EvolutionManager.getEvolutionMasterList(),
+            ui: { 
+                updateKineticChargeUI: UIManager.updateKineticChargeUI, 
+                updateBerserkerRageUI: UIManager.updateBerserkerRageUI  
+            },
+            updateHealthDisplayCallback: (currentHp, maxHp) => UIManager.updateHealthDisplay(currentHp, maxHp),
+            updateAbilityCooldownCallback: (pInst) => UIManager.updateAbilityCooldownUI(pInst),
+            isAnyPauseActiveCallback: GameState.isAnyPauseActive, 
+            decoysArray: decoys, bossDefeatEffectsArray: bossDefeatEffects, allRays: rays,
+            screenShakeParams: getScreenShakeParams(),
+            activeBuffNotificationsArray: activeBuffNotifications, CONSTANTS,
+            endGameCallback: _mainCallbacks.endGameInternal,
+            updateScoreCallback: (amount) => { GameState.incrementScore(amount); UIManager.updateScoreDisplay(GameState.getScore()); if (_mainCallbacks.checkForNewColorUnlock) _mainCallbacks.checkForNewColorUnlock(); },
+            forceAbilityUIUpdate: false
+        };
+        player.update(playerUpdateContext); 
+
+        if (player.currentPath === 'berserker') {
+            UIManager.updateBerserkerRageUI(player.berserkerRagePercentage, player);
+        } else {
+            UIManager.updateBerserkerRageUI(0, player); 
         }
 
+        if (player.kineticConversionLevel > 0) {
+            let maxPotencyAtFullCharge = player.initialKineticDamageBonus;
+            UIManager.updateKineticChargeUI(player.kineticCharge, player.kineticChargeConsumption, maxPotencyAtFullCharge, true);
+        } else {
+             UIManager.updateKineticChargeUI(0,100,0, false); 
+        }
+        
         for (let i = rays.length - 1; i >= 0; i--) {
             const r = rays[i];
             if (r.isActive) {
@@ -393,9 +427,12 @@ export function updateGame(deltaTime) {
                             const missingHpPercentage = (player.maxHp - player.hp) / player.maxHp;
                             const tenPercentIncrements = Math.floor(missingHpPercentage * 10);
                             if (tenPercentIncrements > 0) {
-                                const berserkDamageBonus = tenPercentIncrements * CONSTANTS.BERSERKERS_ECHO_SPEED_PER_10_HP;
+                                const berserkDamageBonus = tenPercentIncrements * CONSTANTS.BERSERKERS_ECHO_DAMAGE_PER_10_HP; 
                                 finalDamage *= (1 + berserkDamageBonus);
                             }
+                        }
+                        if (player.currentPath === 'berserker' && !r.isPlayerAbilityRay) { 
+                           finalDamage *= player.berserkerPermanentRayDamageMultiplier;
                         }
                         
                         if (r.isPlayerAbilityRay) { 
@@ -405,11 +442,10 @@ export function updateGame(deltaTime) {
                                  abilityBaseDamage *= player.abilityDamageMultiplier;
                             }
 
-                            if (typeof r.pathDamageMultiplier === 'number' && r.pathDamageMultiplier > 1.0) { // Mage 2x for mini-well
+                            if (typeof r.pathDamageMultiplier === 'number' && r.pathDamageMultiplier > 1.0) { 
                                 abilityBaseDamage *= r.pathDamageMultiplier;
                             }
 
-                            // <<< APPLY KINETIC BOOST FOR MINI-WELL LAUNCHED RAYS >>>
                             if (r.sourceAbility === 'miniGravityWell' && player.currentGravityWellKineticBoost > 1.0) {
                                 abilityBaseDamage *= player.currentGravityWellKineticBoost;
                             }
@@ -564,9 +600,12 @@ export function updateGame(deltaTime) {
                     r.isActive = false; 
                 }
 
-                if (damageDealt > 0) { GameState.setPostDamageImmunityTimer(CONSTANTS.POST_DAMAGE_IMMUNITY_DURATION); }
+                if (damageDealt > 0) { 
+                    GameState.setPostDamageImmunityTimer(CONSTANTS.POST_DAMAGE_IMMUNITY_DURATION); 
+                    // console.log(`[GameLogic] Damage dealt: ${damageDealt}. PostDamageImmunityTimer SET to: ${GameState.getPostDamageImmunityTimer()}`); 
+                }
              }
-             if(!r.isActive) {
+             if(!r.isActive) { 
                 returnRayToPool(r);
                 rays.splice(i,1);
              }
@@ -671,15 +710,22 @@ export function drawGame() {
        _ctx.beginPath(); _ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2);
        _ctx.fillStyle = e.color ? e.color.replace('opacity', (e.opacity * 0.6).toString()) : `rgba(255, 255, 180, ${e.opacity * 0.6})`; _ctx.fill();
    }
-    if(player && GameState.isGameRunning() && !GameState.isGameOver()){
+    
+ //   console.log("[drawGame] Attempting to draw player. Player object:", player, "Is GameRunning:", GameState.isGameRunning(), "Is GameOver:", GameState.isGameOver(), "typeof player.draw:", typeof player?.draw); 
+    if(player && typeof player.draw === 'function' && GameState.isGameRunning() && !GameState.isGameOver()){ 
         const playerDrawContext = {
             isCountingDownToResume: GameState.getIsCountingDownToResume(),
             postPopupImmunityTimer: GameState.getPostPopupImmunityTimer(),
             postDamageImmunityTimer: GameState.getPostDamageImmunityTimer(),
             CONSTANTS
         };
-        player.draw(_ctx, playerDrawContext);
+        player.draw(_ctx, playerDrawContext); 
+    } else if (player && typeof player.draw !== 'function') {
+        console.error("[drawGame] ERROR: player object exists, but player.draw is NOT a function!", player);
+    } else if (!player) {
+        // console.warn("[drawGame] Player object is null or undefined when trying to draw.");
     }
+
     _ctx.restore();
     _ctx.save(); _ctx.textAlign = 'center'; let notificationY = 60;
     const FADE_OUT_ACTUAL = CONSTANTS.BUFF_NOTIFICATION_DURATION - CONSTANTS.BUFF_NOTIFICATION_FADE_OUT_START_TIME;

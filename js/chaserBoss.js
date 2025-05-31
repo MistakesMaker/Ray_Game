@@ -89,11 +89,16 @@ export class ChaserBoss extends BossNPC {
             const canPlayerInteract = !playerIsTeleporting && !playerIsShieldOverchargingCurrently;
 
             if (canPlayerInteract) {
-                if (playerInstance.hasAegisPathHelm) {
+                // Check if player is Aegis AND Aegis Ram is OFF cooldown
+                if (playerInstance.hasAegisPathHelm && playerInstance.aegisRamCooldownTimer <= 0) {
                     if (gameContext && gameContext.playerCollidedWithBoss !== undefined) {
+                        // Signal to gameLogic that an Aegis ram-ready collision occurred.
+                        // gameLogic will call player.handleAegisCollisionWithBoss, which sets the cooldown.
                         gameContext.playerCollidedWithBoss = this; 
                     }
-                } else {
+                } else { 
+                    // Player is NOT Aegis OR Aegis Ram IS ON COOLDOWN
+                    // Standard collision damage & knockback logic for the player
                     if (!playerDamageImmune) { 
                         const collisionAnglePlayer = Math.atan2(playerInstance.y - this.y, playerInstance.x - this.x);
                         playerInstance.velX = Math.cos(collisionAnglePlayer) * PLAYER_BOUNCE_FORCE_FROM_BOSS;
@@ -116,6 +121,7 @@ export class ChaserBoss extends BossNPC {
                             this.x = Math.max(this.radius, Math.min(canvasWidth - this.radius, this.x));
                             this.y = Math.max(this.radius, Math.min(canvasHeight - this.radius, this.y));
                         }
+                        // Signal to gameLogic that a standard (damaging) collision occurred.
                         if (gameContext && gameContext.playerCollidedWithBoss !== undefined) {
                             gameContext.playerCollidedWithBoss = this;
                         }

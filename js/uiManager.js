@@ -1,5 +1,5 @@
 // js/uiManager.js
-import * as CONSTANTS from './constants.js'; // <<< ADD THIS IMPORT
+import * as CONSTANTS from './constants.js';
 import {
     canvas as gameCanvasElement,
     scoreDisplayElem, healthDisplayElem, highScoreListDisplay, startScreenHighScoresDiv,
@@ -17,6 +17,7 @@ import {
     lootOptionsContainer, abilityCooldownUI, evolutionTooltip,
     pausePlayerStatsPanel,
     kineticChargeUIElement, kineticChargeBarFillElement, kineticChargeTextElement,
+    berserkerRageUIElement, berserkerRageBarFillElement, berserkerRageTextElement, 
     uiHighScoreContainer,
     rerollEvolutionButton, rerollInfoSpan,
     blockInfoSpan, toggleBlockModeButton,
@@ -407,6 +408,44 @@ export function updateKineticChargeUI(currentCharge, maxCharge, currentMaxPotenc
         } else kineticChargeTextElement.textContent = '';
     }
 }
+
+export function updateBerserkerRageUI(ragePercentage, playerInstance) {
+    if (!berserkerRageUIElement || !berserkerRageBarFillElement || !berserkerRageTextElement || !playerInstance) return;
+
+    if (playerInstance.currentPath === 'berserker') {
+        berserkerRageUIElement.style.display = 'flex';
+    } else {
+        berserkerRageUIElement.style.display = 'none';
+        return;
+    }
+
+    // Max possible rage bonus from low HP based on BERSERKERS_ECHO_DAMAGE_PER_10_HP
+    // (e.g., if it's 0.09, max bonus is 0.09 * 10 = 0.9 or 90%)
+    const maxPossibleRageBonusPercentage = CONSTANTS.BERSERKERS_ECHO_DAMAGE_PER_10_HP * 10 * 100; 
+    
+    // Calculate fill percentage relative to the *max possible* bonus, not just the current ragePercentage.
+    // If maxPossibleRageBonusPercentage is 0 (e.g. if constant is 0), avoid division by zero.
+    let fillPercentage = 0;
+    if (maxPossibleRageBonusPercentage > 0) {
+        fillPercentage = Math.min(100, (ragePercentage / maxPossibleRageBonusPercentage) * 100);
+    }
+    
+    berserkerRageBarFillElement.style.width = `${fillPercentage}%`;
+
+    let barColor;
+    // Color transition based on the actual ragePercentage value
+    if (ragePercentage > maxPossibleRageBonusPercentage * 0.66) { // High rage
+        barColor = 'rgba(220, 20, 20, 0.9)'; // Red
+    } else if (ragePercentage > maxPossibleRageBonusPercentage * 0.33) { // Medium rage
+        barColor = 'rgba(255, 140, 0, 0.9)'; // Orange
+    } else { // Low rage (or 0)
+        barColor = 'rgba(255, 220, 50, 0.9)'; // Yellow
+    }
+    berserkerRageBarFillElement.style.backgroundColor = barColor;
+
+    berserkerRageTextElement.textContent = `Rage: +${ragePercentage.toFixed(0)}% Dmg`;
+}
+
 
 export function showScreen(screenElementToShow) {
     ALL_SCREENS_FOR_SHOW_SCREEN.forEach((screen) => {

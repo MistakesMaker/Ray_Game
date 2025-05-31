@@ -9,6 +9,7 @@ import { initGameLoop, startGameLoop, stopGameLoop } from './gameLoop.js';
 import * as EvolutionManager from './evolutionManager.js';
 import * as LootManager from './lootManager.js';
 import { createFinalStatsSnapshot } from './playerDataManager.js';
+import { Player } from './player.js'; // <--------------------------------- ADDED THIS IMPORT
 import {
     initializeGameLogic as importedInitializeGameLogic,
     resetGameLogicState as importedResetGameLogicState,
@@ -88,9 +89,23 @@ let getAbilityContextForPlayerFuncFromGameLogic = null;
 let gameLogicGetScreenShakeParamsFunc = null;
 let gameLogicUpdateCanvasDimensionsFunc = null;
 
+function checkPlayerIntegrity(label) {
+    const p = gameLogicGetPlayerFunc ? gameLogicGetPlayerFunc() : null;
+    if (p) {
+        // console.log(`[MainJS CheckPlayer - ${label}] typeof p.draw: ${typeof p.draw}, typeof p.update: ${typeof p.update}, p instanceof Player: ${p instanceof Player}`);
+        if (!(p instanceof Player) || typeof p.draw !== 'function' || typeof p.update !== 'function') { // Check update too
+        //    console.error(`CRITICAL CORRUPTION DETECTED at ${label}. Player:`, p, `Is instance of Player: ${p instanceof Player}`);
+            // debugger; 
+        }
+    } else {
+        // console.log(`[MainJS CheckPlayer - ${label}] Player is null/undefined.`);
+    }
+}
+
 
 function setCanvasDimensions() {
     if (!gameCanvasElement) return;
+    // checkPlayerIntegrity("setCanvasDimensions - START"); // Temporarily comment out for startup
 
     gameCanvasElement.width = window.innerWidth;
     gameCanvasElement.height = window.innerHeight;
@@ -98,19 +113,35 @@ function setCanvasDimensions() {
     if (initializeGameLogicFunc && typeof gameLogicUpdateCanvasDimensionsFunc === 'function') {
          gameLogicUpdateCanvasDimensionsFunc(gameCanvasElement.width, gameCanvasElement.height);
     }
+    // checkPlayerIntegrity("setCanvasDimensions - After updateCanvasDimensionsLogic");
+
 
     inputState.mouseX = gameCanvasElement.width / 2;
     inputState.mouseY = gameCanvasElement.height / 2;
 
     const currentPlayer = gameLogicGetPlayerFunc ? gameLogicGetPlayerFunc() : null;
-    if(currentPlayer && GameState.isGameRunning()){
-        currentPlayer.x=Math.max(currentPlayer.radius,Math.min(currentPlayer.x,gameCanvasElement.width-currentPlayer.radius));
-        currentPlayer.y=Math.max(currentPlayer.radius,Math.min(currentPlayer.y,gameCanvasElement.height-currentPlayer.radius));
+    if(currentPlayer && GameState.isGameRunning()){ 
+        if (typeof currentPlayer.x === 'number' && typeof currentPlayer.y === 'number' && typeof currentPlayer.radius === 'number') {
+             currentPlayer.x=Math.max(currentPlayer.radius,Math.min(currentPlayer.x,gameCanvasElement.width-currentPlayer.radius));
+             currentPlayer.y=Math.max(currentPlayer.radius,Math.min(currentPlayer.y,gameCanvasElement.height-currentPlayer.radius));
+        } else {
+            // console.warn("[setCanvasDimensions] currentPlayer missing x,y, or radius for boundary check during setCanvasDimensions.");
+        }
     }
+    // checkPlayerIntegrity("setCanvasDimensions - After player boundary check");
+
 
     if(gameLogicDrawFunc && GameState.isGameRunning() && !GameState.isGameOver() && !GameState.isAnyPauseActive()) {
-        gameLogicDrawFunc();
+        // Check player integrity just before calling drawGame if it's going to draw the player
+        const pForDraw = gameLogicGetPlayerFunc ? gameLogicGetPlayerFunc() : null;
+        if (pForDraw && typeof pForDraw.draw !== 'function') {
+        //    console.error("PRE-DRAW CHECK FAILED in setCanvasDimensions: player.draw is not a function", pForDraw);
+        } else {
+            gameLogicDrawFunc();
+        }
     }
+    // checkPlayerIntegrity("setCanvasDimensions - After gameLogicDrawFunc (if called)");
+
 
     if ((GameState.isGamePausedByEsc() || GameState.isGameOver() || (UIManager.getCurrentActiveScreen() === detailedHighScoresScreen)) && uiPausePlayerStatsPanel && uiPausePlayerStatsPanel.style.display === 'block') {
         if (uiPausePlayerStatsPanel.parentElement === document.body && UIManager.getCurrentActiveScreen() !== detailedHighScoresScreen && uiHighScoreContainer && uiHighScoreContainer.offsetParent !== null ) {
@@ -119,6 +150,7 @@ function setCanvasDimensions() {
             uiPausePlayerStatsPanel.style.top = '20px';
         }
     }
+    // checkPlayerIntegrity("setCanvasDimensions - END");
 }
 
 
@@ -168,8 +200,6 @@ function evolutionCycleConcludedCallback(uiSelectedChoice) {
 }
 
 function lootSelectionConcludedCallback(chosenUpgrade, playerInstance, dependencies) {
-    // console.log("[MainJS LootSelect CBK] Start. Chosen Upgrade:", chosenUpgrade ? chosenUpgrade.name : "None", "Player Aegis Flag:", playerInstance ? playerInstance.hasAegisPathHelm : "N/A Player");
-
     if (!playerInstance) {
         GameState.setGamePausedForLootChoice(false);
         orchestrateScreenChange(null);
@@ -180,37 +210,28 @@ function lootSelectionConcludedCallback(chosenUpgrade, playerInstance, dependenc
     GameState.setPostPopupImmunityTimer(CONSTANTS.POST_POPUP_IMMUNITY_DURATION * 0.75);
 
     orchestrateScreenChange(null);
-    // console.log("[MainJS LootSelect CBK] After orchestrateScreenChange(null). Player Aegis Flag:", playerInstance.hasAegisPathHelm);
 
     UIManager.updateActiveBuffIndicator(playerInstance, GameState.getPostPopupImmunityTimer(), GameState.getPostDamageImmunityTimer());
     UIManager.updateAbilityCooldownUI(playerInstance);
 
     const currentBossManager = gameLogicGetBossManagerFunc ? gameLogicGetBossManagerFunc() : null;
     if (GameState.isEvolutionPendingAfterBoss()) {
-        // console.log("[MainJS LootSelect CBK] Evolution is pending after boss.");
         const currentPlayerForEvo = gameLogicGetPlayerFunc();
         const currentEvoThreshold = lastEvolutionScore + (CONSTANTS.EVOLUTION_SCORE_INTERVAL * (currentPlayerForEvo ? currentPlayerForEvo.evolutionIntervalModifier : 1.0));
         if (currentPlayerForEvo && GameState.getScore() >= currentEvoThreshold) {
-            // console.log("[MainJS LootSelect CBK] Triggering evolution. Player Aegis Flag before evo trigger:", currentPlayerForEvo.hasAegisPathHelm);
             triggerEvolutionInternal(true);
         } else {
             GameState.setEvolutionPendingAfterBoss(false);
-            // console.log("[MainJS LootSelect CBK] Evolution not triggered, pending flag cleared.");
         }
     } else {
         if (currentBossManager && currentBossManager.isBossInQueue() && !currentBossManager.isBossWarningActiveProp() && !GameState.isAnyPauseActive()) {
-            // console.log("[MainJS LootSelect CBK] Processing boss spawn queue.");
             currentBossManager.processBossSpawnQueue(getGameContextForBossManager(LootManager));
         }
     }
-    // console.log("[MainJS LootSelect CBK] End. Player Aegis Flag:", playerInstance.hasAegisPathHelm);
 }
 
 function pathSelectionConcludedCallback(chosenPathBuff, playerInstance, dependencies) {
-    // console.log("[MainJS PathSelect CBK] Start. Chosen Path:", chosenPathBuff ? chosenPathBuff.name : "None", "Player Aegis Flag:", playerInstance ? playerInstance.hasAegisPathHelm : "N/A Player");
-
     if (!playerInstance) {
-        // console.error("[MainJS PathSelect CBK] No player instance!");
         GameState.setGamePausedForLootChoice(false);
         orchestrateScreenChange(null);
         return;
@@ -220,9 +241,7 @@ function pathSelectionConcludedCallback(chosenPathBuff, playerInstance, dependen
     if (chosenPathBuff && dependencies && activeBuffs) {
         activeBuffs.push({ text: `${chosenPathBuff.name} Chosen!`, timer: CONSTANTS.BUFF_NOTIFICATION_DURATION });
     }
-    // console.log("[MainJS PathSelect CBK] Player Aegis Flag AFTER activeBuffs (should be set by LootManager):", playerInstance.hasAegisPathHelm);
     lootSelectionConcludedCallback(chosenPathBuff, playerInstance, dependencies);
-    // console.log("[MainJS PathSelect CBK] End. Player Aegis Flag:", playerInstance.hasAegisPathHelm);
 }
 
 
@@ -377,14 +396,6 @@ function updateShootIntervalAndGameState() {
 }
 
 function orchestrateScreenChange(screenToShow) {
-    // const playerInstance = gameLogicGetPlayerFunc ? gameLogicGetPlayerFunc() : null;
-    // console.log(
-    //     "[MainJS Orchestrate] Changing to screen:", screenToShow ? screenToShow.id : "Game Screen",
-    //     ". Current Player Aegis Flag:", playerInstance ? playerInstance.hasAegisPathHelm : "N/A Player",
-    //     "Game Running:", GameState.isGameRunning(),
-    //     "Game Over:", GameState.isGameOver(),
-    //     "Any Pause Active:", GameState.isAnyPauseActive()
-    // );
     currentActiveScreenMain = screenToShow;
     let shouldStopCoreGameLoop = false;
 
@@ -394,18 +405,15 @@ function orchestrateScreenChange(screenToShow) {
     else if (screenToShow === pauseScreen) GameState.setGamePausedByEsc(true);
     else if (screenToShow === startScreen || screenToShow === settingsScreen || screenToShow === gameOverScreen || screenToShow === detailedHighScoresScreen) {
         shouldStopCoreGameLoop = true;
-    } else if (screenToShow === null) { // Game screen
-        // console.log("[MainJS Orchestrate] Unpausing popups for Game Screen.");
+    } else if (screenToShow === null) { 
         GameState.setGamePausedForEvolution(false); GameState.setGamePausedForFreeUpgrade(false);
         GameState.setGamePausedForLootChoice(false);
     }
 
     if (shouldStopCoreGameLoop && GameState.isGameRunning() && !GameState.isGameOver()) {
-        // console.log("[MainJS Orchestrate] Stopping game loop.");
         stopGameLoop();
     }
     else if (!shouldStopCoreGameLoop && GameState.isGameRunning() && !GameState.isGameOver() && gameLogicUpdateFunc && gameLogicDrawFunc) {
-        // console.log("[MainJS Orchestrate] Ensuring game loop is running for game screen/popups.");
         startGameLoop(gameLogicUpdateFunc, gameLogicDrawFunc);
     }
 
@@ -415,12 +423,18 @@ function orchestrateScreenChange(screenToShow) {
 
 
 function initGame() {
-    // console.log("[MainJS] initGame called. Resetting core game state.");
+    // console.log("[MainJS initGame] Function START");
+    // checkPlayerIntegrity("initGame - Top");
+
     GameState.resetCoreGameState();
+    // checkPlayerIntegrity("initGame - After GameState.resetCoreGameState");
+
     EvolutionManager.initializeEvolutionMasterList();
     EvolutionManager.resetEvolutionLevels();
     currentPlayerNameForHighScores = "CHAMPION";
     currentRunId = Date.now();
+    // checkPlayerIntegrity("initGame - After EvoManager inits");
+
 
     const mainCallbacksForLogic = {
         endGameInternal: endGameInternal,
@@ -431,43 +445,55 @@ function initGame() {
         getGameContextForBossManager: (lootMgrRef) => getGameContextForBossManager(lootMgrRef || LootManager),
         updateLastEvolutionScore: (score) => { lastEvolutionScore = score; },
         getLastEvolutionScore: () => lastEvolutionScore,
-        getAbilityContextForPlayer: getAbilityContextForPlayerFuncFromGameLogic,
+        getAbilityContextForPlayer: getAbilityContextForPlayerFuncFromGameLogic, // This should be the exported function from gameLogic
         updateShootInterval: updateShootIntervalAndGameState,
         handleFullHealthHeartPickup: handleFullHealthHeartPickupInternal,
     };
 
     if (initializeGameLogicFunc) {
-        // console.log("[MainJS] Calling initializeGameLogicFunc.");
         initializeGameLogicFunc(gameCanvasElement, inputState, mainCallbacksForLogic, CONSTANTS.PLAYER_SPEED_BASE);
-    } else { console.error("FATAL: gameLogic.js's initializeGameLogicFunc is not available!"); return; }
-
+        // checkPlayerIntegrity("initGame - Right AFTER initializeGameLogicFunc call");
+    } else { 
+      //  console.error("FATAL: gameLogic.js's initializeGameLogicFunc is not available!"); return; 
+    }
 
     GameState.setGameRunning(true);
+    // checkPlayerIntegrity("initGame - After GameState.setGameRunning(true)");
+
     UIManager.updateScoreDisplay(GameState.getScore());
     lastEvolutionScore = 0;
     wasLastEvolutionScoreBased = true;
 
     initFreeUpgradeChoicesInternal();
+    // checkPlayerIntegrity("initGame - After initFreeUpgradeChoicesInternal");
 
-    const currentPlayer = gameLogicGetPlayerFunc();
+
+    const currentPlayer = gameLogicGetPlayerFunc(); 
     if (currentPlayer) {
-        // console.log("[MainJS initGame] Player instance exists after init. Aegis Flag:", currentPlayer.hasAegisPathHelm);
         UIManager.updateHealthDisplay(currentPlayer.hp, currentPlayer.maxHp);
         UIManager.updateBuffIndicator(currentPlayer.immuneColorsList);
         UIManager.updateKineticChargeUI(currentPlayer.kineticCharge, currentPlayer.kineticChargeConsumption,
             currentPlayer.initialKineticDamageBonus + (Math.max(0, currentPlayer.kineticConversionLevel - 1) * currentPlayer.effectiveKineticAdditionalDamageBonusPerLevel),
             currentPlayer.kineticConversionLevel > 0
         );
+         UIManager.updateBerserkerRageUI(currentPlayer.berserkerRagePercentage, currentPlayer);
         UIManager.updateAbilityCooldownUI(currentPlayer);
+        UIManager.updateActiveBuffIndicator(currentPlayer, GameState.getPostPopupImmunityTimer(), GameState.getPostDamageImmunityTimer());
     }
     UIManager.updateSurvivalBonusIndicator(GameState.getSurvivalUpgrades(), CONSTANTS.MAX_SURVIVAL_UPGRADES);
-    UIManager.updateActiveBuffIndicator(currentPlayer, GameState.getPostPopupImmunityTimer(), GameState.getPostDamageImmunityTimer());
+    // checkPlayerIntegrity("initGame - After UIManager updates");
+
 
     if (uiPausePlayerStatsPanel) uiPausePlayerStatsPanel.style.display = 'none';
 
-    setCanvasDimensions();
-    orchestrateScreenChange(null);
+    setCanvasDimensions(); 
+    // checkPlayerIntegrity("initGame - After setCanvasDimensions");
+
+    orchestrateScreenChange(null); 
+    // checkPlayerIntegrity("initGame - After orchestrateScreenChange(null)");
+
     UIManager.updateAllHighScoreDisplays(getHighScores());
+    // console.log("[MainJS initGame] Function END");
 }
 
 
@@ -578,7 +604,6 @@ function togglePauseMenu() {
 
     const currentPlayer = gameLogicGetPlayerFunc();
     if (!currentPlayer && !GameState.isGamePausedByEsc()) {
-        // console.warn("togglePauseMenu: No player instance found, cannot pause.");
         return;
     }
 
@@ -595,12 +620,10 @@ function togglePauseMenu() {
         prepareAndShowPauseStats("Paused");
         orchestrateScreenChange(pauseScreen);
         if(uiPausePlayerStatsPanel) {
-            if (uiPausePlayerStatsPanel.parentElement !== document.body && UIManager.getCurrentActiveScreen() !== detailedHighScoresScreen) {
-                document.body.appendChild(uiPausePlayerStatsPanel);
-            }
+            if (uiPausePlayerStatsPanel.parentElement !== document.body && UIManager.getCurrentActiveScreen() !== detailedHighScoresScreen) document.body.appendChild(uiPausePlayerStatsPanel);
             if (UIManager.getCurrentActiveScreen() === pauseScreen) {
-                if (uiHighScoreContainer && uiHighScoreContainer.offsetParent !== null) { const r = uiHighScoreContainer.getBoundingClientRect(); uiPausePlayerStatsPanel.style.top = (r.bottom + 10) + 'px';
-                } else uiPausePlayerStatsPanel.style.top = '20px';
+                if (uiHighScoreContainer && uiHighScoreContainer.offsetParent !== null) { const r = uiHighScoreContainer.getBoundingClientRect(); uiPausePlayerStatsPanel.style.top = (r.bottom + 10) + 'px';}
+                else uiPausePlayerStatsPanel.style.top = '20px';
                 uiPausePlayerStatsPanel.style.display = 'block';
             }
         }
@@ -632,7 +655,6 @@ function startResumeCountdownInternal() {
 
 function prepareAndShowPauseStats(contextualTitle) {
     const currentPlayer = gameLogicGetPlayerFunc();
-    // console.log("[MainJS prepareAndShowPauseStats] Player Aegis Flag:", currentPlayer ? currentPlayer.hasAegisPathHelm : "N/A Player");
     const currentBossManager = gameLogicGetBossManagerFunc ? gameLogicGetBossManagerFunc() : null;
     const statsSnapshot = createFinalStatsSnapshot(currentPlayer, currentBossManager ? currentBossManager.bossTiers : {}, LootManager.getBossLootPoolReference(), LootManager);
     UIManager.updatePauseScreenStatsDisplay(statsSnapshot, contextualTitle);
@@ -669,7 +691,6 @@ function applyMusicPlayStateWrapper() {
 }
 
 function showStartScreenWithUpdatesInternal() {
-    // console.log("[MainJS] showStartScreenWithUpdatesInternal called.");
     GameState.setGameRunning(false); GameState.setGameOver(false); GameState.setGamePausedByEsc(false); GameState.setIsCountingDownToResume(false);
     GameState.setGamePausedForEvolution(false); GameState.setGamePausedForFreeUpgrade(false); GameState.setGamePausedForLootChoice(false);
     GameState.setEvolutionPendingAfterBoss(false); GameState.setFirstBossDefeatedThisRun(false);
@@ -677,7 +698,6 @@ function showStartScreenWithUpdatesInternal() {
     const currentPlayer = gameLogicGetPlayerFunc();
     if (currentPlayer && currentPlayer.isFiringOmegaLaser) stopSound(omegaLaserSound);
     if (resetGameLogicStateFunc) {
-        // console.log("[MainJS] Calling resetGameLogicStateFunc from showStartScreen.");
         resetGameLogicStateFunc();
     }
     if (uiPausePlayerStatsPanel) {
@@ -779,8 +799,8 @@ const gameContextForEventListeners = {
             const cp = gameLogicGetPlayerFunc();
             if (cp && !cp.isShieldOvercharging && (!cp.teleporting || cp.teleportEffectTimer <= 0) && GameState.getPostDamageImmunityTimer() <= 0) {
                 let damageAmount = bossThatHit.tier * 5;
-                if (cp.hasAegisPathHelm) {
-                     damageAmount = 0;
+                if (cp.hasAegisPathHelm && cp.aegisRamCooldownTimer <=0) { 
+                     damageAmount = 0; 
                 }
 
                 if (damageAmount > 0) {
@@ -878,7 +898,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         gameLogicUpdateCanvasDimensionsFunc = gameLogicModule.updateCanvasDimensionsLogic;
 
     } catch (e) {
-        console.error("Failed to load gameLogic.js:", e);
+      //  console.error("Failed to load gameLogic.js:", e);
         document.body.innerHTML = `<div style="color: white; text-align: center; padding-top: 50px;"><h1>Error Loading Game</h1><p>Could not load critical game components. Please check the console for details.</p></div>`;
         return;
     }

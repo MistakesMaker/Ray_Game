@@ -61,7 +61,7 @@ export function initializeLootPools(playerInstance, updateBuffIndicatorCallback)
             id: 'berserkersEcho', 
             type: 'path_buff',
             name: 'Path of Fury',
-            description: `Per 10% missing Max HP: +${CONSTANTS.BERSERKERS_ECHO_DAMAGE_PER_10_HP*100}% normal ray damage & +${CONSTANTS.BERSERKERS_ECHO_SPEED_PER_10_HP*100}% speed. Grants Berserker's Helm. LMB: Activate Bloodpact for ray lifesteal. RMB: Savage Howl to fear enemies and boost attack speed.`,
+            description: `Grants a permanent 1.5x damage multiplier to your normal rays. Per 10% missing Max HP: +${CONSTANTS.BERSERKERS_ECHO_DAMAGE_PER_10_HP*100}% normal ray damage & +${CONSTANTS.BERSERKERS_ECHO_SPEED_PER_10_HP*100}% speed. Grants Berserker's Helm. LMB: Activate Bloodpact for ray lifesteal. RMB: Savage Howl to fear enemies and boost attack speed.`,
             grants_LMB: 'bloodpact',
             grants_RMB: 'savageHowl'
         },
@@ -193,6 +193,8 @@ function confirmPathSelection(chosenPathBuff, playerInstance) {
     playerInstance.hasSeismicSlam = false;
     playerInstance.hasBloodpact = false;
     playerInstance.hasSavageHowl = false;
+    
+    playerInstance.berserkerPermanentRayDamageMultiplier = 1.0; // Reset permanent multiplier
 
     // Reset Kinetic Conversion before setting for Mage
     playerInstance.kineticConversionLevel = 0;
@@ -210,6 +212,7 @@ function confirmPathSelection(chosenPathBuff, playerInstance) {
     } else if (chosenPathBuff.id === 'berserkersEcho') {
         playerInstance.currentPath = 'berserker';
         playerInstance.hasBerserkersEchoHelm = true;
+        playerInstance.berserkerPermanentRayDamageMultiplier = 1.5; // Apply permanent multiplier
         if (chosenPathBuff.grants_LMB === 'bloodpact') playerInstance.hasBloodpact = true;
         if (chosenPathBuff.grants_RMB === 'savageHowl') playerInstance.hasSavageHowl = true;
     } else if (chosenPathBuff.id === 'ultimateConfiguration') {
