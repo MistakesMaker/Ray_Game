@@ -633,6 +633,140 @@
             margin-top: 15px;
             flex-shrink: 0;
         }
+
+        /* --- Achievements Screen Styling --- */
+        #achievementsScreen {
+            flex-direction: column;
+            align-items: center;
+            width: 90%;
+            max-width: 800px; /* Slightly smaller than high scores */
+            height: 90vh;
+            padding-top: 15px;
+            padding-bottom: 15px;
+            box-sizing: border-box;
+        }
+        #achievementsScreen h2 {
+            margin-bottom: 10px;
+            flex-shrink: 0;
+            color: #ffcc66; /* Achievement theme color */
+            text-shadow: 0 0 8px #ffcc66, 0 0 15px #ffaa00;
+        }
+        #achievementTierSelectorContainer {
+            margin-bottom: 12px;
+            display: flex;
+            gap: 8px; /* Smaller gap */
+            align-items: center;
+            flex-shrink: 0;
+            flex-wrap: wrap; /* Allow tier buttons to wrap */
+            justify-content: center;
+        }
+        #achievementTierSelectorContainer button {
+            padding: 6px 12px; /* Smaller buttons */
+            font-size: 14px;
+            background-color: #2a2a5a;
+            color: #ddeeff;
+            border: 1px solid #445577;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+        #achievementTierSelectorContainer button:hover {
+            background-color: #3a3a7a;
+        }
+        #achievementTierSelectorContainer button.selected-tier {
+            background-color: #4a4a9a;
+            border-color: #77aaff;
+            font-weight: bold;
+            box-shadow: 0 0 8px rgba(120, 170, 255, 0.5);
+        }
+        #achievementsListContainer {
+            width: 100%;
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 10px;
+            border: 1px solid #445577;
+            background-color: rgba(20,20,40,0.7);
+            border-radius: 8px;
+            box-sizing: border-box;
+            scrollbar-width: thin;
+            scrollbar-color: #ffcc66 #2c2c3e; /* Achievement theme scrollbar */
+        }
+        #achievementsListContainer::-webkit-scrollbar { width: 8px; }
+        #achievementsListContainer::-webkit-scrollbar-track { background: #2c2c3e; border-radius: 4px;}
+        #achievementsListContainer::-webkit-scrollbar-thumb { background-color: #ffcc66; border-radius: 4px; border: 2px solid #2c2c3e;}
+
+        .achievement-entry {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            margin-bottom: 8px;
+            background-color: #2a2a5a;
+            border-radius: 6px;
+            border-left: 5px solid #505070; /* Default border for locked */
+        }
+        .achievement-entry.unlocked {
+            background-color: #353565; /* Slightly lighter for unlocked */
+            border-left-color: #ffcc66; /* Gold border for unlocked */
+        }
+        .achievement-icon {
+            width: 48px; height: 48px;
+            margin-right: 15px;
+            background-color: #1a1a3a; /* Placeholder background */
+            border: 1px solid #445577;
+            border-radius: 4px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px; /* For text placeholder if no image */
+            color: #777;
+            flex-shrink: 0;
+            /* Later: background-image: url(...); background-size: cover; */
+        }
+        .achievement-entry.unlocked .achievement-icon {
+            border-color: #ffcc66;
+            background-color: #4a4a7a; /* Darker gold-ish for icon bg */
+            color: #ffdd88; /* Lighter gold for text placeholder */
+        }
+        .achievement-details {
+            flex-grow: 1;
+            text-align: left;
+        }
+        .achievement-details h4 {
+            margin: 0 0 3px 0;
+            font-size: 16px;
+            color: #ddeeff;
+        }
+        .achievement-entry.unlocked .achievement-details h4 {
+            color: #ffdd88; /* Gold title for unlocked */
+        }
+        .achievement-details p {
+            margin: 0;
+            font-size: 13px;
+            color: #aabbcc;
+            line-height: 1.4;
+        }
+        .achievement-entry.unlocked .achievement-details p {
+            color: #c0c0dd;
+        }
+        .achievement-tier-badge {
+            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            background-color: rgba(0,0,0,0.3);
+            color: #aaa;
+            margin-left: 8px;
+            font-weight: normal;
+        }
+        /* Tier-specific colors for badge */
+        .achievement-tier-badge.easy { color: #8f8; }
+        .achievement-tier-badge.medium { color: #88f; }
+        .achievement-tier-badge.hard { color: #f88; }
+        .achievement-tier-badge.master { color: #f8f; }
+        .achievement-tier-badge.grandmaster { color: #ffc800; }
+
+        #achievementsScreen button#backToMainMenuFromAchievementsButton {
+            margin-top: 15px;
+            flex-shrink: 0;
+        }
+        /* --- End Achievements Screen Styling --- */
     </style>
 </head>
 <body>
@@ -655,6 +789,7 @@
         <button id="startGameButton">Start Game</button>
         <button id="settingsButton">Settings</button>
         <button id="viewHighScoresButton">High Scores</button>
+        <button id="viewAchievementsButton">Achievements</button> <!-- NEW BUTTON -->
         <div id="startScreenHighScores" style="margin-top:20px; font-size: 0.9em;"></div>
     </div>
 
@@ -681,7 +816,7 @@
     <div id="pausePlayerStatsPanel">
         <!-- Overall Panel Title Removed -->
         
-        <h4 class="stats-header" id="runStatsHeader">📊 Run Information</h4> 
+        <h4 class="stats-header" id="runStatsHeader">📊 Run Information</h4>
         <div id="statsRun" class="stats-section"></div>
 
         <h4 class="stats-header" id="playerCoreStatsHeader">👤 Player Stats</h4>
@@ -695,7 +830,7 @@
         <ul id="statsGearList" class="stats-section" style="list-style-type: none; padding: 0; margin: 0;"></ul>
         
         <h4 class="stats-header" id="abilitiesHeader">💡 Abilities</h4>
-        <div id="statsAbilities" class="stats-section"></div> 
+        <div id="statsAbilities" class="stats-section"></div>
         
         <h4 class="stats-header" id="bossHeader">💀 Boss Encounters</h4>
         <div id="statsBossTiers" class="stats-section"></div>
@@ -751,6 +886,19 @@
         </div>
         <button id="backToMainMenuFromScoresButton">Back to Main Menu</button>
     </div>
+
+    <!-- NEW Achievements Screen -->
+    <div id="achievementsScreen" class="messageScreenBase" style="display: none;">
+        <h2>🏆 Trophy Room 🏆</h2>
+        <div id="achievementTierSelectorContainer">
+            <!-- Tier buttons will be populated by JavaScript -->
+        </div>
+        <div id="achievementsListContainer">
+            <!-- Achievements will be populated by JavaScript -->
+        </div>
+        <button id="backToMainMenuFromAchievementsButton">Back to Main Menu</button>
+    </div>
+
 
     <div id="kineticChargeUI">
         <div id="kineticChargeBarFill"></div>

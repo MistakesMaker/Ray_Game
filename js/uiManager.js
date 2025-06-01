@@ -12,19 +12,22 @@ import {
     countdownOverlay as importedCountdownOverlay,
     lootChoiceScreen as importedLootChoiceScreen,
     detailedHighScoresScreen as importedDetailedHighScoresScreen,
+    achievementsScreen as importedAchievementsScreen, // New
+    achievementTierSelectorContainer as importedAchievementTierSelectorContainer, // New
+    achievementsListContainer as importedAchievementsListContainer, // New
     evolutionOptionsContainer,
     closeFreeUpgradeButton, freeUpgradeOptionContainer,
     lootOptionsContainer, abilityCooldownUI, evolutionTooltip,
     pausePlayerStatsPanel,
     kineticChargeUIElement, kineticChargeBarFillElement, kineticChargeTextElement,
-    berserkerRageUIElement, berserkerRageBarFillElement, berserkerRageTextElement, 
+    berserkerRageUIElement, berserkerRageBarFillElement, berserkerRageTextElement,
     uiHighScoreContainer,
     rerollEvolutionButton, rerollInfoSpan,
     blockInfoSpan, toggleBlockModeButton,
     toggleFreezeModeButton, freezeInfoSpan,
     detailedScoresList,
-    statsImmunitiesContainer,
-    statsBossTiersDiv,
+    statsImmunitiesContainer, // Used in updatePauseScreenStatsDisplay
+    statsBossTiersDiv, // Used in updatePauseScreenStatsDisplay
     buffIndicatorContainer, survivalBonusIndicator, activeBuffIndicator,
     highScoreCategorySelect,
     playerPreviewCanvas,
@@ -33,6 +36,7 @@ import {
 } from './ui.js';
 import { getReadableColorName as getReadableColorNameFromUtils } from './utils.js';
 import { Player } from './player.js';
+import { achievementTiers } from './achievementsData.js'; // Import achievementTiers
 
 // --- UI State ---
 let localPreviousScreenForSettings = null;
@@ -50,7 +54,8 @@ let globalPreviewMouseListenerAttached = false;
 const ALL_SCREENS_FOR_SHOW_SCREEN = [
     importedStartScreen, importedSettingsScreen, importedGameOverScreen,
     importedEvolutionScreen, importedFreeUpgradeScreen, importedPauseScreen,
-    importedCountdownOverlay, importedLootChoiceScreen, importedDetailedHighScoresScreen
+    importedCountdownOverlay, importedLootChoiceScreen, importedDetailedHighScoresScreen,
+    importedAchievementsScreen // Added new screen
 ];
 
 export function formatMillisecondsToTime(ms) {
@@ -147,9 +152,9 @@ export function updateActiveBuffIndicator(playerInstance, currentPostPopupImmuni
     let textParts = []; let maxImmunityTime = 0;
     if (currentPostPopupImmunityTimerVal > 0) maxImmunityTime = Math.max(maxImmunityTime, currentPostPopupImmunityTimerVal);
     if (currentPostDamageImmunityTimerVal > 0) maxImmunityTime = Math.max(maxImmunityTime, currentPostDamageImmunityTimerVal);
-    
+
     if (playerInstance.teleporting && playerInstance.teleportEffectTimer > 0) textParts.push(`Teleporting (${(playerInstance.teleportEffectTimer / 1000).toFixed(1)}s)`);
-    
+
     if (playerInstance.currentPath === 'mage') {
         if (playerInstance.isShieldOvercharging) textParts.push(`Overcharge (${(playerInstance.shieldOverchargeTimer / 1000).toFixed(1)}s)`);
     } else if (playerInstance.currentPath === 'aegis') {
@@ -159,13 +164,13 @@ export function updateActiveBuffIndicator(playerInstance, currentPostPopupImmuni
         if (playerInstance.isBloodpactActive) textParts.push(`Bloodpact (${(playerInstance.bloodpactTimer / 1000).toFixed(1)}s)`);
         if (playerInstance.isSavageHowlAttackSpeedBuffActive) textParts.push(`Frenzy (${(playerInstance.savageHowlAttackSpeedBuffTimer / 1000).toFixed(1)}s)`);
     }
-    
+
     if (maxImmunityTime > 0 && !(playerInstance.teleporting && playerInstance.teleportEffectTimer > 0) && !playerInstance.isShieldOvercharging && !(playerInstance.isAegisChargingDash && playerInstance.currentPath === 'aegis')) {
          textParts.push(`Shield (${Math.ceil(maxImmunityTime / 1000)}s)`);
     }
 
     if (playerInstance.isHarmonized && playerInstance.hasPerfectHarmonyHelm) textParts.push("Harmony!");
-    
+
     activeBuffIndicator.textContent = textParts.join(' ').trim();
 }
 
@@ -223,52 +228,52 @@ export function updateAbilityCooldownUI(playerInstance) {
 
     if (playerInstance.currentPath === 'mage') {
         lmbDesc = { type: 'mouse', id: 'omegaLaser_LMB_Mage', keybindText: 'LMB', iconText: '🔥', name: 'Omega Laser',
-                    check: () => playerInstance.hasOmegaLaser, 
-                    isCharging: () => playerInstance.isFiringOmegaLaser, 
-                    timer: () => playerInstance.omegaLaserTimer, 
+                    check: () => playerInstance.hasOmegaLaser,
+                    isCharging: () => playerInstance.isFiringOmegaLaser,
+                    timer: () => playerInstance.omegaLaserTimer,
                     maxTime: () => CONSTANTS.OMEGA_LASER_DURATION,
-                    cooldownTimer: () => playerInstance.omegaLaserCooldownTimer, 
+                    cooldownTimer: () => playerInstance.omegaLaserCooldownTimer,
                     cooldownMax: () => CONSTANTS.OMEGA_LASER_COOLDOWN };
         rmbDesc = { type: 'mouse', id: 'shieldOvercharge_RMB_Mage', keybindText: 'RMB', iconText: '🛡️', name: 'Shield Overcharge',
-                    check: () => playerInstance.hasShieldOvercharge, 
-                    isCharging: () => playerInstance.isShieldOvercharging, 
-                    timer: () => playerInstance.shieldOverchargeTimer, 
+                    check: () => playerInstance.hasShieldOvercharge,
+                    isCharging: () => playerInstance.isShieldOvercharging,
+                    timer: () => playerInstance.shieldOverchargeTimer,
                     maxTime: () => CONSTANTS.SHIELD_OVERCHARGE_DURATION,
-                    cooldownTimer: () => playerInstance.shieldOverchargeCooldownTimer, 
+                    cooldownTimer: () => playerInstance.shieldOverchargeCooldownTimer,
                     cooldownMax: () => CONSTANTS.SHIELD_OVERCHARGE_COOLDOWN };
     } else if (playerInstance.currentPath === 'aegis') {
         lmbDesc = { type: 'mouse', id: 'aegisCharge_LMB_Aegis', keybindText: 'LMB', iconText: '💨', name: 'Aegis Charge',
-                    check: () => playerInstance.hasAegisCharge, 
-                    isCharging: () => playerInstance.isChargingAegisCharge || playerInstance.isAegisChargingDash, 
-                    timer: () => playerInstance.isAegisChargingDash ? playerInstance.aegisChargeDashTimer : (CONSTANTS.AEGIS_CHARGE_MAX_CHARGE_TIME - playerInstance.aegisChargeCurrentChargeTime), 
-                    maxTime: () => CONSTANTS.AEGIS_CHARGE_MAX_CHARGE_TIME, 
-                    cooldownTimer: () => playerInstance.aegisChargeCooldownTimer, 
+                    check: () => playerInstance.hasAegisCharge,
+                    isCharging: () => playerInstance.isChargingAegisCharge || playerInstance.isAegisChargingDash,
+                    timer: () => playerInstance.isAegisChargingDash ? playerInstance.aegisChargeDashTimer : (CONSTANTS.AEGIS_CHARGE_MAX_CHARGE_TIME - playerInstance.aegisChargeCurrentChargeTime),
+                    maxTime: () => CONSTANTS.AEGIS_CHARGE_MAX_CHARGE_TIME,
+                    cooldownTimer: () => playerInstance.aegisChargeCooldownTimer,
                     cooldownMax: () => CONSTANTS.AEGIS_CHARGE_COOLDOWN };
         rmbDesc = { type: 'mouse', id: 'seismicSlam_RMB_Aegis', keybindText: 'RMB', iconText: '🌍', name: 'Seismic Slam',
-                    check: () => playerInstance.hasSeismicSlam, 
+                    check: () => playerInstance.hasSeismicSlam,
                     isCharging: () => false, timer: () => 0, maxTime: () => 0,
-                    cooldownTimer: () => playerInstance.seismicSlamCooldownTimer, 
+                    cooldownTimer: () => playerInstance.seismicSlamCooldownTimer,
                     cooldownMax: () => CONSTANTS.SEISMIC_SLAM_COOLDOWN };
     } else if (playerInstance.currentPath === 'berserker') {
         lmbDesc = { type: 'mouse', id: 'bloodpact_LMB_Berserker', keybindText: 'LMB', iconText: '🩸', name: 'Bloodpact',
-                    check: () => playerInstance.hasBloodpact, 
-                    isCharging: () => playerInstance.isBloodpactActive, 
-                    timer: () => playerInstance.bloodpactTimer, 
-                    maxTime: () => CONSTANTS.BLOODPACT_DURATION, 
-                    cooldownTimer: () => playerInstance.bloodpactCooldownTimer, 
+                    check: () => playerInstance.hasBloodpact,
+                    isCharging: () => playerInstance.isBloodpactActive,
+                    timer: () => playerInstance.bloodpactTimer,
+                    maxTime: () => CONSTANTS.BLOODPACT_DURATION,
+                    cooldownTimer: () => playerInstance.bloodpactCooldownTimer,
                     cooldownMax: () => CONSTANTS.BLOODPACT_COOLDOWN };
         rmbDesc = { type: 'mouse', id: 'savageHowl_RMB_Berserker', keybindText: 'RMB', iconText: '🗣️', name: 'Savage Howl',
-                    check: () => playerInstance.hasSavageHowl, 
-                    isCharging: () => playerInstance.isSavageHowlAttackSpeedBuffActive, 
-                    timer: () => playerInstance.savageHowlAttackSpeedBuffTimer, 
+                    check: () => playerInstance.hasSavageHowl,
+                    isCharging: () => playerInstance.isSavageHowlAttackSpeedBuffActive,
+                    timer: () => playerInstance.savageHowlAttackSpeedBuffTimer,
                     maxTime: () => CONSTANTS.SAVAGE_HOWL_ATTACK_SPEED_BUFF_DURATION,
-                    cooldownTimer: () => playerInstance.savageHowlCooldownTimer, 
+                    cooldownTimer: () => playerInstance.savageHowlCooldownTimer,
                     cooldownMax: () => CONSTANTS.SAVAGE_HOWL_COOLDOWN };
     }
 
 
     const abilityDisplayOrder = [
-        lmbDesc, rmbDesc, 
+        lmbDesc, rmbDesc,
         { type: 'slot', slot: '1', idPrefix: 'empBurst',        defaultIcon: '💥', fixedName: 'EMP Burst' },
         { type: 'slot', slot: '2', idPrefix: 'miniGravityWell', defaultIcon: '🔮', fixedName: 'Mini Gravity Well' },
         { type: 'slot', slot: '3', idPrefix: 'teleport',        defaultIcon: '🌀', fixedName: 'Teleport' }
@@ -276,8 +281,8 @@ export function updateAbilityCooldownUI(playerInstance) {
 
     abilityDisplayOrder.forEach(desc => {
         const slotDiv = document.createElement('div'); slotDiv.classList.add('ability-slot');
-        slotDiv.id = `ability-slot-${desc.id || desc.slot}`; 
-        
+        slotDiv.id = `ability-slot-${desc.id || desc.slot}`;
+
         let isUnlocked = false, isReady = false, isChargingOrActive = false;
         let maxTimer = 0, displayCooldownTimerValue = 0, currentAbilityName = desc.name || desc.fixedName || "Ability";
 
@@ -286,49 +291,49 @@ export function updateAbilityCooldownUI(playerInstance) {
             if (isUnlocked) {
                 currentAbilityName = desc.name;
                 isChargingOrActive = desc.isCharging();
-                if (isChargingOrActive) { 
-                    displayCooldownTimerValue = desc.timer(); 
-                    maxTimer = desc.maxTime(); 
+                if (isChargingOrActive) {
+                    displayCooldownTimerValue = desc.timer();
+                    maxTimer = desc.maxTime();
                 }
-                else if (desc.cooldownTimer() > 0) { 
-                    displayCooldownTimerValue = desc.cooldownTimer(); 
-                    maxTimer = desc.cooldownMax(); 
+                else if (desc.cooldownTimer() > 0) {
+                    displayCooldownTimerValue = desc.cooldownTimer();
+                    maxTimer = desc.cooldownMax();
                 }
                 else { isReady = true; }
             }
         } else if (desc.type === 'slot') {
             const ability = playerInstance.activeAbilities[desc.slot];
             if (ability) {
-                isUnlocked = true; 
+                isUnlocked = true;
                 currentAbilityName = desc.fixedName;
                 maxTimer = ability.cooldownDuration;
-                if (playerInstance.currentPath === 'mage') maxTimer *= 1.5; 
+                if (playerInstance.currentPath === 'mage') maxTimer *= 1.5;
 
                 if (ability.id === 'miniGravityWell' && playerInstance.activeMiniWell && playerInstance.activeMiniWell.isActive) {
-                    isChargingOrActive = true; 
-                    displayCooldownTimerValue = playerInstance.activeMiniWell.lifeTimer; 
+                    isChargingOrActive = true;
+                    displayCooldownTimerValue = playerInstance.activeMiniWell.lifeTimer;
                     maxTimer = playerInstance.activeMiniWell.maxLife;
-                } else if (ability.cooldownTimer > 0) { 
-                    displayCooldownTimerValue = ability.cooldownTimer; 
+                } else if (ability.cooldownTimer > 0) {
+                    displayCooldownTimerValue = ability.cooldownTimer;
                 }
                 else { isReady = true; }
             }
         }
 
-        const keybindSpan = document.createElement('span'); keybindSpan.classList.add('keybind'); 
+        const keybindSpan = document.createElement('span'); keybindSpan.classList.add('keybind');
         keybindSpan.textContent = desc.keybindText || desc.slot;
-        
-        const iconDivElem = document.createElement('div'); iconDivElem.classList.add('icon'); 
+
+        const iconDivElem = document.createElement('div'); iconDivElem.classList.add('icon');
         iconDivElem.textContent = desc.iconText || desc.defaultIcon || '?';
-        
+
         const cooldownOverlayDiv = document.createElement('div'); cooldownOverlayDiv.classList.add('cooldown-overlay');
         const cooldownTimerSpan = document.createElement('span'); cooldownTimerSpan.classList.add('cooldown-timer');
-        
-        slotDiv.appendChild(keybindSpan); 
-        slotDiv.appendChild(iconDivElem); 
-        slotDiv.appendChild(cooldownOverlayDiv); 
+
+        slotDiv.appendChild(keybindSpan);
+        slotDiv.appendChild(iconDivElem);
+        slotDiv.appendChild(cooldownOverlayDiv);
         slotDiv.appendChild(cooldownTimerSpan);
-        
+
         const abilityNameSpan = document.createElement('span');
         abilityNameSpan.classList.add('ability-name');
         abilityNameSpan.textContent = currentAbilityName;
@@ -336,21 +341,21 @@ export function updateAbilityCooldownUI(playerInstance) {
 
 
         if (!isUnlocked) {
-            slotDiv.classList.add('locked'); 
+            slotDiv.classList.add('locked');
             iconDivElem.style.opacity = '0.3';
-            const lockIconDiv = document.createElement('div'); 
-            lockIconDiv.classList.add('icon', 'lock-icon-overlay'); 
+            const lockIconDiv = document.createElement('div');
+            lockIconDiv.classList.add('icon', 'lock-icon-overlay');
             lockIconDiv.textContent = '🔒';
-            slotDiv.appendChild(lockIconDiv); 
-            cooldownOverlayDiv.style.height = '100%'; 
+            slotDiv.appendChild(lockIconDiv);
+            cooldownOverlayDiv.style.height = '100%';
             cooldownOverlayDiv.style.backgroundColor = 'rgba(50,50,50,0.8)';
         } else if (isChargingOrActive) {
             slotDiv.classList.add('charging');
-            if (maxTimer > 0 && displayCooldownTimerValue >= 0) { 
-                cooldownOverlayDiv.style.height = `${Math.max(0, (1 - (displayCooldownTimerValue / maxTimer)) * 100)}%`; 
-                cooldownTimerSpan.textContent = (displayCooldownTimerValue / 1000).toFixed(1) + 's'; 
-            } else if (maxTimer > 0 && displayCooldownTimerValue < 0) { 
-                cooldownOverlayDiv.style.height = '100%'; 
+            if (maxTimer > 0 && displayCooldownTimerValue >= 0) {
+                cooldownOverlayDiv.style.height = `${Math.max(0, (1 - (displayCooldownTimerValue / maxTimer)) * 100)}%`;
+                cooldownTimerSpan.textContent = (displayCooldownTimerValue / 1000).toFixed(1) + 's';
+            } else if (maxTimer > 0 && displayCooldownTimerValue < 0) {
+                cooldownOverlayDiv.style.height = '100%';
                 cooldownTimerSpan.textContent = '0.0s';
             }
             if (desc.id === 'aegisCharge_LMB_Aegis' && playerInstance.isChargingAegisCharge && !playerInstance.isAegisChargingDash) {
@@ -362,14 +367,14 @@ export function updateAbilityCooldownUI(playerInstance) {
 
         } else if (!isReady && displayCooldownTimerValue > 0) {
             slotDiv.classList.add('on-cooldown');
-            if (maxTimer > 0) { 
-                const cooldownPercent = (displayCooldownTimerValue / maxTimer) * 100; 
-                cooldownOverlayDiv.style.height = `${Math.min(100, Math.max(0, cooldownPercent))}%`; 
-                cooldownTimerSpan.textContent = (displayCooldownTimerValue / 1000).toFixed(1) + 's'; 
+            if (maxTimer > 0) {
+                const cooldownPercent = (displayCooldownTimerValue / maxTimer) * 100;
+                cooldownOverlayDiv.style.height = `${Math.min(100, Math.max(0, cooldownPercent))}%`;
+                cooldownTimerSpan.textContent = (displayCooldownTimerValue / 1000).toFixed(1) + 's';
             }
-        } else if (isReady) { 
-            slotDiv.classList.add('ready'); 
-            cooldownOverlayDiv.style.height = '0%'; 
+        } else if (isReady) {
+            slotDiv.classList.add('ready');
+            cooldownOverlayDiv.style.height = '0%';
         }
         abilityCooldownUI.appendChild(slotDiv);
     });
@@ -415,7 +420,7 @@ export function updateBerserkerRageUI(ragePercentage, playerInstance) {
         berserkerRageUIElement.style.display = 'none';
         return;
     }
-    const maxPossibleRageBonusPercentage = CONSTANTS.BERSERKERS_ECHO_DAMAGE_PER_10_HP * 10 * 100; 
+    const maxPossibleRageBonusPercentage = CONSTANTS.BERSERKERS_ECHO_DAMAGE_PER_10_HP * 10 * 100;
     let fillPercentage = 0;
     if (maxPossibleRageBonusPercentage > 0) {
         fillPercentage = Math.min(100, (ragePercentage / maxPossibleRageBonusPercentage) * 100);
@@ -463,7 +468,8 @@ export function showScreen(screenElementToShow) {
                                      screenElementToShow === importedFreeUpgradeScreen ||
                                      screenElementToShow === importedLootChoiceScreen ||
                                      screenElementToShow === importedCountdownOverlay ||
-                                     (screenElementToShow === importedSettingsScreen && localPreviousScreenForSettings === importedPauseScreen);
+                                     (screenElementToShow === importedSettingsScreen && localPreviousScreenForSettings === importedPauseScreen) ||
+                                     (screenElementToShow === importedAchievementsScreen); // Show canvas behind achievements
             gameCanvasElement.style.display = showCanvasBehind ? 'block' : 'none';
         }
     }
@@ -544,7 +550,7 @@ export function populateEvolutionOptionsUI(
     }
     if (toggleFreezeModeButton && freezeInfoSpan) {
         toggleFreezeModeButton.disabled = (playerInstance.evolutionFreezesRemaining <= 0 && !playerInstance.isFreezeModeActive && !playerInstance.frozenEvolutionChoice) || playerInstance.isBlockModeActive;
-        
+
         toggleFreezeModeButton.classList.remove('freeze-mode-active', 'has-frozen-choice');
         if (playerInstance.isFreezeModeActive) {
             toggleFreezeModeButton.textContent = "Freeze Active (Cancel F)";
@@ -556,7 +562,6 @@ export function populateEvolutionOptionsUI(
                     toggleFreezeModeButton.classList.add('has-frozen-choice');
                 } else {
                     toggleFreezeModeButton.textContent = `Enable Freeze (F)`;
-                    // No 'has-frozen-choice' class for carried-over, not-yet-active freeze
                 }
             } else {
                 toggleFreezeModeButton.textContent = `Enable Freeze (F)`;
@@ -633,7 +638,7 @@ export function populateEvolutionOptionsUI(
         const baseEvoForMaxCheck = uiChoiceData.originalEvolution;
         const isMaxed = baseEvoForMaxCheck.isMaxed ? baseEvoForMaxCheck.isMaxed(playerInstance) : false;
         const isAlreadyBlockedByPlayer = playerInstance.blockedEvolutionIds && playerInstance.blockedEvolutionIds.includes(uiChoiceData.baseId);
-        
+
         if (playerInstance.frozenEvolutionChoice && playerInstance.frozenEvolutionChoice.choiceData.baseId === uiChoiceData.baseId && playerInstance.hasUsedFreezeForCurrentOffers) {
             optionDiv.classList.add('actually-frozen');
         }
@@ -866,24 +871,126 @@ export function displayDetailedHighScoresScreenUI(allHighScoresObject, onEntryCl
     }
 }
 
+
+export function displayAchievementsScreenUI(allAchievementsWithStatus, onBackCallback) {
+    if (!importedAchievementsScreen || !importedAchievementTierSelectorContainer || !importedAchievementsListContainer) {
+        console.error("Achievements screen elements not found!");
+        return;
+    }
+
+    importedAchievementTierSelectorContainer.innerHTML = '';
+    importedAchievementsListContainer.innerHTML = '';
+
+    const tiers = Object.values(achievementTiers); // Get all tier names like ["Easy", "Medium", ...]
+
+    const renderAchievementsForTier = (selectedTier) => {
+        importedAchievementsListContainer.innerHTML = '';
+        const filteredAchievements = allAchievementsWithStatus.filter(ach => ach.tier === selectedTier);
+
+        if (filteredAchievements.length === 0) {
+            const p = document.createElement('p');
+            p.textContent = "No achievements in this tier yet.";
+            p.style.color = "#aaa";
+            importedAchievementsListContainer.appendChild(p);
+            return;
+        }
+
+        filteredAchievements.sort((a,b) => { // Sort by unlocked first, then by name
+            if (a.isUnlocked && !b.isUnlocked) return -1;
+            if (!a.isUnlocked && b.isUnlocked) return 1;
+            return a.name.localeCompare(b.name);
+        });
+
+        filteredAchievements.forEach(ach => {
+            const entryDiv = document.createElement('div');
+            entryDiv.classList.add('achievement-entry');
+            if (ach.isUnlocked) {
+                entryDiv.classList.add('unlocked');
+            }
+
+            const iconDiv = document.createElement('div');
+            iconDiv.classList.add('achievement-icon');
+            if (ach.isUnlocked) {
+                iconDiv.textContent = '✔️'; // Simple check for unlocked
+                iconDiv.style.color = '#ffcc66';
+            } else {
+                iconDiv.textContent = '❓'; // Question mark for locked
+            }
+            // TODO: Later, set background image from ach.iconPath if available
+
+            const detailsDiv = document.createElement('div');
+            detailsDiv.classList.add('achievement-details');
+
+            const nameH4 = document.createElement('h4');
+            nameH4.textContent = ach.name;
+
+            const tierBadge = document.createElement('span');
+            tierBadge.classList.add('achievement-tier-badge', ach.tier.toLowerCase());
+            tierBadge.textContent = ach.tier;
+            nameH4.appendChild(tierBadge);
+
+
+            const descP = document.createElement('p');
+            descP.textContent = ach.description;
+
+            detailsDiv.appendChild(nameH4);
+            detailsDiv.appendChild(descP);
+
+            entryDiv.appendChild(iconDiv);
+            entryDiv.appendChild(detailsDiv);
+            importedAchievementsListContainer.appendChild(entryDiv);
+        });
+    };
+
+    tiers.forEach(tierName => {
+        const tierButton = document.createElement('button');
+        tierButton.textContent = tierName;
+        tierButton.dataset.tier = tierName;
+        tierButton.onclick = (e) => {
+            const currentSelected = importedAchievementTierSelectorContainer.querySelector('.selected-tier');
+            if (currentSelected) currentSelected.classList.remove('selected-tier');
+            e.target.classList.add('selected-tier');
+            renderAchievementsForTier(tierName);
+            localStorage.setItem('achievementLastTier', tierName);
+        };
+        importedAchievementTierSelectorContainer.appendChild(tierButton);
+    });
+
+    const lastSelectedTier = localStorage.getItem('achievementLastTier') || achievementTiers.EASY;
+    const defaultButton = importedAchievementTierSelectorContainer.querySelector(`button[data-tier="${lastSelectedTier}"]`) || importedAchievementTierSelectorContainer.firstChild;
+    if (defaultButton) {
+        defaultButton.classList.add('selected-tier');
+        renderAchievementsForTier(defaultButton.dataset.tier);
+    }
+
+
+    const backButton = document.getElementById('backToMainMenuFromAchievementsButton');
+    if (backButton) {
+        // Re-bind to avoid multiple listeners if this function is called again
+        const newBackButton = backButton.cloneNode(true);
+        backButton.parentNode.replaceChild(newBackButton, backButton);
+        newBackButton.onclick = onBackCallback;
+    }
+}
+
+
 export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText) {
     const statsRunDiv = document.getElementById('statsRun');
     const statsPlayerCoreDiv = document.getElementById('statsPlayerCore');
     const statsGearUl = document.getElementById('statsGearList');
     const statsAbilitiesCombinedDiv = document.getElementById('statsAbilities');
 
-    const panelTitleElement = pausePlayerStatsPanel.querySelector('.stats-header');
-    if(panelTitleElement && panelTitleText && pausePlayerStatsPanel.parentElement === statsPanelWrapper) {
-        panelTitleElement.textContent = panelTitleText;
-    } else if (panelTitleElement) {
-        if (pausePlayerStatsPanel.parentElement === document.body) {
-             panelTitleElement.textContent = panelTitleText || "📊 Run Information";
-        }
+    // Title logic for pause screen vs detailed high scores
+    const runStatsHeader = document.getElementById('runStatsHeader');
+    if (pausePlayerStatsPanel.parentElement === statsPanelWrapper && panelTitleText) { // We are in detailed high scores mode
+        if (runStatsHeader) runStatsHeader.textContent = panelTitleText; // Change title
+    } else if (runStatsHeader) { // Default pause screen title
+        runStatsHeader.textContent = "📊 Run Information";
     }
 
 
     if (!statsRunDiv || !statsPlayerCoreDiv || !statsGearUl || !statsImmunitiesContainer || !statsAbilitiesCombinedDiv || !statsBossTiersDiv) {
-        if (pausePlayerStatsPanel) pausePlayerStatsPanel.innerHTML = "<p>Error loading stats sections (new structure).</p>";
+        if (pausePlayerStatsPanel) pausePlayerStatsPanel.innerHTML = "<p>Error loading stats sections.</p>";
         return;
     }
 
@@ -1066,7 +1173,7 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText) {
         if (abilitiesHeaderElement && abilitiesHeaderElement.parentNode) {
             abilitiesHeaderElement.parentNode.insertBefore(blockedHeader, abilitiesHeaderElement);
             abilitiesHeaderElement.parentNode.insertBefore(blockedListUl, abilitiesHeaderElement);
-        } else if (statsImmunitiesContainer.parentNode) {
+        } else if (statsImmunitiesContainer.parentNode) { // Fallback if abilities header itself is missing
             statsImmunitiesContainer.parentNode.appendChild(blockedHeader);
             statsImmunitiesContainer.parentNode.appendChild(blockedListUl);
         }

@@ -40,20 +40,26 @@ export const pausePlayerStatsPanel = document.getElementById('pausePlayerStatsPa
 export const detailedHighScoresScreen = document.getElementById('detailedHighScoresScreen');
 export const highScoreCategorySelect = document.getElementById('highScoreCategorySelect');
 export const detailedScoresList = document.getElementById('detailedScoresList');
-// export const detailedStatsDisplayContainer = document.getElementById('detailedStatsDisplayContainer'); // This ID is the overall flex container now
 
-// --- NEW: Player Preview and Stats Wrapper Elements for Detailed High Scores ---
+// Player Preview and Stats Wrapper Elements for Detailed High Scores
 export const playerPreviewCanvas = document.getElementById('playerPreviewCanvas');
 export const playerPreviewPlaceholder = document.getElementById('playerPreviewPlaceholder');
-export const statsPanelWrapper = document.getElementById('statsPanelWrapper'); // The div that will contain pausePlayerStatsPanel
+export const statsPanelWrapper = document.getElementById('statsPanelWrapper');
+
+// Achievements Screen Elements (NEW)
+export const achievementsScreen = document.getElementById('achievementsScreen');
+export const achievementTierSelectorContainer = document.getElementById('achievementTierSelectorContainer');
+export const achievementsListContainer = document.getElementById('achievementsListContainer');
+export const backToMainMenuFromAchievementsButton = document.getElementById('backToMainMenuFromAchievementsButton');
+
 
 // Elements for Pause/Game Over Stats Panel (still needed for content population)
-export const statsPanelTitle = document.getElementById('statsPanelTitle');
-export const statsCoreDiv = document.getElementById('statsCore');
-export const statsUpgradesUl = document.getElementById('statsUpgradesList');
+export const statsPanelTitle = document.getElementById('statsPanelTitle'); // Note: This might be less used if titles are dynamic
+export const statsCoreDiv = document.getElementById('statsCore'); // This ID is not in the HTML
+export const statsUpgradesUl = document.getElementById('statsUpgradesList'); // This ID is not in the HTML
 export const statsImmunitiesContainer = document.getElementById('statsImmunitiesContainer');
 export const statsAbilitiesDiv = document.getElementById('statsAbilities');
-export const statsMouseAbilitiesDiv = document.getElementById('statsMouseAbilities');
+export const statsMouseAbilitiesDiv = document.getElementById('statsMouseAbilities'); // This ID is not in the HTML
 export const statsBossTiersDiv = document.getElementById('statsBossTiers');
 
 // Kinetic Charge UI Elements
@@ -61,7 +67,7 @@ export const kineticChargeUIElement = document.getElementById('kineticChargeUI')
 export const kineticChargeBarFillElement = document.getElementById('kineticChargeBarFill');
 export const kineticChargeTextElement = document.getElementById('kineticChargeText');
 
-// Berserker Rage UI Elements (NEW)
+// Berserker Rage UI Elements
 export const berserkerRageUIElement = document.getElementById('berserkerRageUI');
 export const berserkerRageBarFillElement = document.getElementById('berserkerRageBarFill');
 export const berserkerRageTextElement = document.getElementById('berserkerRageText');
