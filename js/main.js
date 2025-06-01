@@ -6,7 +6,7 @@ import * as GameState from './gameState.js';
 import * as UIManager from './uiManager.js';
 import { getHighScores, addHighScore, updatePendingTierRecordNames } from './highScoreManager.js';
 import { initGameLoop, startGameLoop, stopGameLoop } from './gameLoop.js';
-import * as EvolutionManager from './evolutionManager.js'; // Import the whole module
+import * as EvolutionManager from './evolutionManager.js';
 import * as LootManager from './lootManager.js';
 import { createFinalStatsSnapshot } from './playerDataManager.js';
 import { Player } from './player.js';
@@ -26,6 +26,7 @@ import {
     getScreenShakeParams as importedGameLogicGetScreenShakeParams,
     updateCanvasDimensionsLogic as importedUpdateCanvasDimensionsLogic
 } from './gameLogic.js';
+import * as AchievementManager from './achievementManager.js';
 
 import {
     canvas as gameCanvasElement,
@@ -54,6 +55,7 @@ import {
     chainReactionSound,
     bossHitSound, omegaLaserSound, shieldOverchargeSound,
     playerWellDeploySound, playerWellDetonateSound, teleportSound, empBurstSound,
+    savageHowlSound // Added savageHowlSound from audio.js
 } from './audio.js';
 import { setupEventListeners } from './eventListeners.js';
 
@@ -72,6 +74,14 @@ const inputState = {
 
 let freeUpgradeChoicesData = [];
 let currentActiveScreenMain = null;
+let eventFlagsForAchievements = {};
+// Store initial counts for evolution screen interactions for achievements
+let initialEvoScreenCharges = {
+    evolutionReRolls: 0,
+    evolutionBlocks: 0,
+    evolutionFreezes: 0
+};
+
 
 // --- Variables to hold imported functions from gameLogic.js ---
 let initializeGameLogicFunc = null;
@@ -114,7 +124,7 @@ function setCanvasDimensions() {
     inputState.mouseY = gameCanvasElement.height / 2;
 
     const currentPlayer = gameLogicGetPlayerFunc ? gameLogicGetPlayerFunc() : null;
-    if(currentPlayer && GameState.isGameRunning()){ 
+    if(currentPlayer && GameState.isGameRunning()){
         if (typeof currentPlayer.x === 'number' && typeof currentPlayer.y === 'number' && typeof currentPlayer.radius === 'number') {
              currentPlayer.x=Math.max(currentPlayer.radius,Math.min(currentPlayer.x,gameCanvasElement.width-currentPlayer.radius));
              currentPlayer.y=Math.max(currentPlayer.radius,Math.min(currentPlayer.y,gameCanvasElement.height-currentPlayer.radius));
@@ -139,6 +149,26 @@ function setCanvasDimensions() {
             uiPausePlayerStatsPanel.style.top = '20px';
         }
     }
+}
+
+function getGameContextForAchievements() {
+    const player = gameLogicGetPlayerFunc ? gameLogicGetPlayerFunc() : null;
+    return {
+        player: player,
+        GameState: GameState,
+        bossManager: gameLogicGetBossManagerFunc ? gameLogicGetBossManagerFunc() : null,
+        activeBuffNotificationsArray: gameLogicGetActiveBuffsFunc ? gameLogicGetActiveBuffsFunc() : [],
+        playSound: playSound,
+        audioSystem: {
+            upgradeSound: audioUpgradeSound
+        },
+        currentRunId: currentRunId,
+        evolutionManager: EvolutionManager,
+        lootManager: LootManager,
+        eventFlags: eventFlagsForAchievements,
+        initialEvoScreenCharges: initialEvoScreenCharges,
+        CONSTANTS: CONSTANTS
+    };
 }
 
 
@@ -181,6 +211,9 @@ function evolutionCycleConcludedCallback(uiSelectedChoice) {
     UIManager.updateActiveBuffIndicator(currentPlayer, GameState.getPostPopupImmunityTimer(), GameState.getPostDamageImmunityTimer());
     UIManager.updateAbilityCooldownUI(currentPlayer);
 
+    AchievementManager.checkAllAchievements(getGameContextForAchievements());
+
+
     const currentBossManager = gameLogicGetBossManagerFunc ? gameLogicGetBossManagerFunc() : null;
     if (currentBossManager && currentBossManager.isBossInQueue() && !currentBossManager.isBossWarningActiveProp() && !GameState.isAnyPauseActive()) {
         currentBossManager.processBossSpawnQueue(getGameContextForBossManager(LootManager));
@@ -201,6 +234,7 @@ function lootSelectionConcludedCallback(chosenUpgrade, playerInstance, dependenc
 
     UIManager.updateActiveBuffIndicator(playerInstance, GameState.getPostPopupImmunityTimer(), GameState.getPostDamageImmunityTimer());
     UIManager.updateAbilityCooldownUI(playerInstance);
+    AchievementManager.checkAllAchievements(getGameContextForAchievements());
 
     const currentBossManager = gameLogicGetBossManagerFunc ? gameLogicGetBossManagerFunc() : null;
     if (GameState.isEvolutionPendingAfterBoss()) {
@@ -229,6 +263,7 @@ function pathSelectionConcludedCallback(chosenPathBuff, playerInstance, dependen
     if (chosenPathBuff && dependencies && activeBuffs) {
         activeBuffs.push({ text: `${chosenPathBuff.name} Chosen!`, timer: CONSTANTS.BUFF_NOTIFICATION_DURATION });
     }
+    AchievementManager.checkAllAchievements(getGameContextForAchievements());
     lootSelectionConcludedCallback(chosenPathBuff, playerInstance, dependencies);
 }
 
@@ -243,6 +278,11 @@ function triggerEvolutionInternal(isScoreBased = true) {
         }
         return;
     }
+
+    initialEvoScreenCharges.evolutionReRolls = currentPlayer.evolutionReRollsRemaining;
+    initialEvoScreenCharges.evolutionBlocks = currentPlayer.evolutionBlocksRemaining;
+    initialEvoScreenCharges.evolutionFreezes = currentPlayer.evolutionFreezesRemaining;
+
 
     wasLastEvolutionScoreBased = isScoreBased;
     GameState.setGamePausedForEvolution(true);
@@ -337,6 +377,7 @@ function handleFreeUpgradeCloseInternal(chosenUpgrade) {
     if(currentPlayer) { currentPlayer.isBlockModeActive = false; currentPlayer.isFreezeModeActive = false;}
     orchestrateScreenChange(null);
     if(currentPlayer) UIManager.updateActiveBuffIndicator(currentPlayer, GameState.getPostPopupImmunityTimer(), GameState.getPostDamageImmunityTimer());
+    AchievementManager.checkAllAchievements(getGameContextForAchievements());
 }
 
 function handleFullHealthHeartPickupInternal(playerInstance) {
@@ -344,6 +385,9 @@ function handleFullHealthHeartPickupInternal(playerInstance) {
     const activeBuffs = gameLogicGetActiveBuffsFunc ? gameLogicGetActiveBuffsFunc() : [];
     let chosenUpg;
     if (freeUpgradeChoicesData.length === 0) initFreeUpgradeChoicesInternal();
+
+    eventFlagsForAchievements.heart_pickup_full_hp = true;
+    AchievementManager.checkAllAchievements(getGameContextForAchievements());
 
     const avail = freeUpgradeChoicesData.filter(c => !c.isMaxed(playerInstance));
     if (avail.length > 0) {
@@ -372,6 +416,7 @@ function checkForNewColorUnlock() {
         }
         GameState.incrementNextUnlockableColorIndex();
         GameState.setNextColorUnlockScore(GameState.getNextColorUnlockScore() + CONSTANTS.NEW_COLOR_UNLOCK_INTERVAL);
+        AchievementManager.checkAllAchievements(getGameContextForAchievements());
     }
 }
 
@@ -393,7 +438,7 @@ function orchestrateScreenChange(screenToShow) {
     else if (screenToShow === pauseScreen) GameState.setGamePausedByEsc(true);
     else if (screenToShow === startScreen || screenToShow === settingsScreen || screenToShow === gameOverScreen || screenToShow === detailedHighScoresScreen) {
         shouldStopCoreGameLoop = true;
-    } else if (screenToShow === null) { 
+    } else if (screenToShow === null) {
         GameState.setGamePausedForEvolution(false); GameState.setGamePausedForFreeUpgrade(false);
         GameState.setGamePausedForLootChoice(false);
     }
@@ -412,6 +457,10 @@ function orchestrateScreenChange(screenToShow) {
 
 function initGame() {
     GameState.resetCoreGameState();
+    AchievementManager.resetNewAchievementsThisSession();
+    eventFlagsForAchievements = {}; // Reset event flags for the new run
+    initialEvoScreenCharges = { evolutionReRolls: 0, evolutionBlocks: 0, evolutionFreezes: 0 };
+
 
     EvolutionManager.initializeEvolutionMasterList();
     EvolutionManager.resetEvolutionLevels();
@@ -431,11 +480,18 @@ function initGame() {
         getAbilityContextForPlayer: getAbilityContextForPlayerFuncFromGameLogic,
         updateShootInterval: updateShootIntervalAndGameState,
         handleFullHealthHeartPickup: handleFullHealthHeartPickupInternal,
+        signalAchievementEvent: (eventName, eventData = {}) => { // <<< Ensure this is passed
+            eventFlagsForAchievements[eventName] = true;
+            if (eventData && Object.keys(eventData).length > 0) {
+                eventFlagsForAchievements[eventName + "_data"] = eventData;
+            }
+            AchievementManager.checkAllAchievements(getGameContextForAchievements());
+        }
     };
 
     if (initializeGameLogicFunc) {
         initializeGameLogicFunc(gameCanvasElement, inputState, mainCallbacksForLogic, CONSTANTS.PLAYER_SPEED_BASE);
-    } else { 
+    } else {
     }
 
     GameState.setGameRunning(true);
@@ -447,7 +503,7 @@ function initGame() {
     initFreeUpgradeChoicesInternal();
 
 
-    const currentPlayer = gameLogicGetPlayerFunc(); 
+    const currentPlayer = gameLogicGetPlayerFunc();
     if (currentPlayer) {
         UIManager.updateHealthDisplay(currentPlayer.hp, currentPlayer.maxHp);
         UIManager.updateBuffIndicator(currentPlayer.immuneColorsList);
@@ -464,9 +520,10 @@ function initGame() {
 
     if (uiPausePlayerStatsPanel) uiPausePlayerStatsPanel.style.display = 'none';
 
-    setCanvasDimensions(); 
+    setCanvasDimensions();
 
-    orchestrateScreenChange(null); 
+    orchestrateScreenChange(null);
+    AchievementManager.checkAllAchievements(getGameContextForAchievements());
 
     UIManager.updateAllHighScoreDisplays(getHighScores());
 }
@@ -488,6 +545,7 @@ function endGameInternal() {
 
     const currentBossManager = gameLogicGetBossManagerFunc ? gameLogicGetBossManagerFunc() : null;
     const finalStatsSnapshot = createFinalStatsSnapshot(currentPlayer, currentBossManager ? currentBossManager.bossTiers : {}, LootManager.getBossLootPoolReference(), LootManager);
+    AchievementManager.checkAllAchievements(getGameContextForAchievements());
 
 
     prepareAndShowPauseStats("Game Over - Final Stats");
@@ -700,7 +758,8 @@ function getGameContextForBossManager(lootManagerInstance) {
         activeBuffNotificationsArray: gameLogicGetActiveBuffsFunc ? gameLogicGetActiveBuffsFunc() : [],
         callbacks: gameContextForEventListeners.callbacks,
         CONSTANTS, getPooledRay,
-        currentRunId: currentRunId
+        currentRunId: currentRunId,
+        player: gameLogicGetPlayerFunc ? gameLogicGetPlayerFunc() : null // <<< ADDED Player to context for BossManager
     };
 };
 
@@ -750,23 +809,27 @@ const gameContextForEventListeners = {
         showSettingsScreenFromPause: () => { UIManager.setPreviousScreenForSettings(pauseScreen); orchestrateScreenChange(settingsScreen); if (uiPausePlayerStatsPanel) uiPausePlayerStatsPanel.style.display = 'none'; },
         goToMainMenuFromPause: showStartScreenWithUpdatesInternal,
         onWindowResize: setCanvasDimensions,
-        debugSpawnBoss: (tier) => { const bm = gameLogicGetBossManagerFunc ? gameLogicGetBossManagerFunc() : null; if (bm) bm.debugSpawnBoss(tier, 'nexusWeaver'); },
+        debugSpawnBoss: (tier) => {
+            const bm = gameLogicGetBossManagerFunc ? gameLogicGetBossManagerFunc() : null;
+            const cp = gameLogicGetPlayerFunc ? gameLogicGetPlayerFunc() : null;
+            if (bm && cp) bm.debugSpawnBoss(tier, 'nexusWeaver', cp);
+        },
         handleEvolutionReRoll: () => {
             const cp = gameLogicGetPlayerFunc();
-            if (cp && EvolutionManager && GameState.isGamePausedForEvolution()) {
-                EvolutionManager.handleEvolutionReRoll(cp); // Call exported function
+            if (cp && GameState.isGamePausedForEvolution()) {
+                EvolutionManager.handleEvolutionReRoll(cp);
             }
         },
         toggleBlockMode: () => {
             const cp = gameLogicGetPlayerFunc();
-             if (cp && EvolutionManager && GameState.isGamePausedForEvolution()) {
-                EvolutionManager.toggleBlockMode(cp); // Call exported function
+             if (cp && GameState.isGamePausedForEvolution()) {
+                EvolutionManager.toggleBlockMode(cp);
             }
         },
         toggleFreezeMode: () => {
             const cp = gameLogicGetPlayerFunc();
-            if (cp && EvolutionManager && GameState.isGamePausedForEvolution()) {
-                EvolutionManager.toggleFreezeMode(cp); // Call exported function
+            if (cp && GameState.isGamePausedForEvolution()) {
+                EvolutionManager.toggleFreezeMode(cp);
             }
         },
         redrawEvolutionOptions: redrawEvolutionOptionsInternal,
@@ -774,14 +837,14 @@ const gameContextForEventListeners = {
             const cp = gameLogicGetPlayerFunc();
             if (cp && !cp.isShieldOvercharging && (!cp.teleporting || cp.teleportEffectTimer <= 0) && GameState.getPostDamageImmunityTimer() <= 0) {
                 let damageAmount = bossThatHit.tier * 5;
-                if (cp.hasAegisPathHelm && cp.aegisRamCooldownTimer <=0) { 
-                     damageAmount = 0; 
+                if (cp.hasAegisPathHelm && cp.aegisRamCooldownTimer <=0) {
+                     damageAmount = 0;
                 }
 
                 if (damageAmount > 0) {
                     const dmgDealt = cp.takeDamage(
                         damageAmount,
-                        { postPopupImmunityTimer: GameState.getPostPopupImmunityTimer(), postDamageImmunityTimer: GameState.getPostDamageImmunityTimer(), score: GameState.getScore(), updateHealthDisplayCallback:UIManager.updateHealthDisplay, endGameCallback:endGameInternal, updateScoreCallback: (amt) => { GameState.incrementScore(amt); UIManager.updateScoreDisplay(GameState.getScore()); checkForNewColorUnlock(); }, checkForNewColorCallback: checkForNewColorUnlock, activeBuffNotificationsArray: gameLogicGetActiveBuffsFunc ? gameLogicGetActiveBuffsFunc() : [] },
+                        { postPopupImmunityTimer: GameState.getPostPopupImmunityTimer(), postDamageImmunityTimer: GameState.getPostDamageImmunityTimer(), score: GameState.getScore(), updateHealthDisplayCallback:UIManager.updateHealthDisplay, endGameCallback:endGameInternal, updateScoreCallback: (amt) => { GameState.incrementScore(amt); UIManager.updateScoreDisplay(GameState.getScore()); checkForNewColorUnlock(); AchievementManager.checkAllAchievements(getGameContextForAchievements()); }, checkForNewColorCallback: checkForNewColorUnlock, activeBuffNotificationsArray: gameLogicGetActiveBuffsFunc ? gameLogicGetActiveBuffsFunc() : [], CONSTANTS: CONSTANTS, signalAchievementEvent: gameContextForEventListeners.callbacks.signalAchievementEvent },
                         { screenShakeParams: gameLogicGetScreenShakeParamsFunc ? gameLogicGetScreenShakeParamsFunc() : {} }
                     );
                     if (dmgDealt > 0) GameState.setPostDamageImmunityTimer(CONSTANTS.POST_DAMAGE_IMMUNITY_DURATION);
@@ -791,18 +854,18 @@ const gameContextForEventListeners = {
         onPlayerMinionCollision: (minionThatHit) => {
             const cp = gameLogicGetPlayerFunc();
              if (cp && !cp.isShieldOvercharging && (!cp.teleporting || cp.teleportEffectTimer <= 0) && GameState.getPostDamageImmunityTimer() <= 0) {
-                const dmgDealt = cp.takeDamage(minionThatHit.damage, { postPopupImmunityTimer: GameState.getPostPopupImmunityTimer(), postDamageImmunityTimer: GameState.getPostDamageImmunityTimer(), score: GameState.getScore(), updateHealthDisplayCallback:UIManager.updateHealthDisplay, endGameCallback:endGameInternal, updateScoreCallback: (amt) => { GameState.incrementScore(amt); UIManager.updateScoreDisplay(GameState.getScore()); checkForNewColorUnlock(); }, checkForNewColorCallback: checkForNewColorUnlock, activeBuffNotificationsArray: gameLogicGetActiveBuffsFunc ? gameLogicGetActiveBuffsFunc() : [] }, { screenShakeParams: gameLogicGetScreenShakeParamsFunc ? gameLogicGetScreenShakeParamsFunc() : {} });
+                const dmgDealt = cp.takeDamage(minionThatHit.damage, { postPopupImmunityTimer: GameState.getPostPopupImmunityTimer(), postDamageImmunityTimer: GameState.getPostDamageImmunityTimer(), score: GameState.getScore(), updateHealthDisplayCallback:UIManager.updateHealthDisplay, endGameCallback:endGameInternal, updateScoreCallback: (amt) => { GameState.incrementScore(amt); UIManager.updateScoreDisplay(GameState.getScore()); checkForNewColorUnlock(); AchievementManager.checkAllAchievements(getGameContextForAchievements()); }, checkForNewColorCallback: checkForNewColorUnlock, activeBuffNotificationsArray: gameLogicGetActiveBuffsFunc ? gameLogicGetActiveBuffsFunc() : [], CONSTANTS: CONSTANTS, signalAchievementEvent: gameContextForEventListeners.callbacks.signalAchievementEvent }, { screenShakeParams: gameLogicGetScreenShakeParamsFunc ? gameLogicGetScreenShakeParamsFunc() : {} });
                 if (dmgDealt > 0) GameState.setPostDamageImmunityTimer(CONSTANTS.POST_DAMAGE_IMMUNITY_DURATION);
             }
         },
         onPlayerBossAttackCollision: (attackData) => {
             const cp = gameLogicGetPlayerFunc();
              if (cp && !cp.isShieldOvercharging && (!cp.teleporting || cp.teleportEffectTimer <= 0) && GameState.getPostDamageImmunityTimer() <= 0) {
-                const dmgDealt = cp.takeDamage(attackData.damage, { postPopupImmunityTimer: GameState.getPostPopupImmunityTimer(), postDamageImmunityTimer: GameState.getPostDamageImmunityTimer(), score: GameState.getScore(), updateHealthDisplayCallback:UIManager.updateHealthDisplay, endGameCallback:endGameInternal, updateScoreCallback: (amt) => { GameState.incrementScore(amt); UIManager.updateScoreDisplay(GameState.getScore()); checkForNewColorUnlock(); }, checkForNewColorCallback: checkForNewColorUnlock, activeBuffNotificationsArray: gameLogicGetActiveBuffsFunc ? gameLogicGetActiveBuffsFunc() : [] }, { screenShakeParams: gameLogicGetScreenShakeParamsFunc ? gameLogicGetScreenShakeParamsFunc() : {} });
+                const dmgDealt = cp.takeDamage(attackData.damage, { postPopupImmunityTimer: GameState.getPostPopupImmunityTimer(), postDamageImmunityTimer: GameState.getPostDamageImmunityTimer(), score: GameState.getScore(), updateHealthDisplayCallback:UIManager.updateHealthDisplay, endGameCallback:endGameInternal, updateScoreCallback: (amt) => { GameState.incrementScore(amt); UIManager.updateScoreDisplay(GameState.getScore()); checkForNewColorUnlock(); AchievementManager.checkAllAchievements(getGameContextForAchievements()); }, checkForNewColorCallback: checkForNewColorUnlock, activeBuffNotificationsArray: gameLogicGetActiveBuffsFunc ? gameLogicGetActiveBuffsFunc() : [], CONSTANTS: CONSTANTS, signalAchievementEvent: gameContextForEventListeners.callbacks.signalAchievementEvent }, { screenShakeParams: gameLogicGetScreenShakeParamsFunc ? gameLogicGetScreenShakeParamsFunc() : {} });
                 if (dmgDealt > 0) GameState.setPostDamageImmunityTimer(CONSTANTS.POST_DAMAGE_IMMUNITY_DURATION);
             }
         },
-        updateScore: (amount) => { GameState.incrementScore(amount); UIManager.updateScoreDisplay(GameState.getScore()); checkForNewColorUnlock(); },
+        updateScore: (amount) => { GameState.incrementScore(amount); UIManager.updateScoreDisplay(GameState.getScore()); checkForNewColorUnlock(); AchievementManager.checkAllAchievements(getGameContextForAchievements()); },
         applyMusicPlayState: applyMusicPlayStateWrapper,
         checkEvolutionEligibility: (canTriggerWithoutLoot) => {
             const cp = gameLogicGetPlayerFunc();
@@ -825,7 +888,7 @@ const gameContextForEventListeners = {
             }
         },
         hasNexusWeaverTierTimeBeenRecordedThisRun: GameState.hasNexusWeaverTierTimeBeenRecordedThisRun,
-        markNexusWeaverTierTimeRecordedThisRun: GameState.recordNexusWeaverTierTimeThisRun,
+        markNexusWeaverTierTimeRecordedThisRun: GameState.recordNexusWeaverTiersDefeatedThisRun,
         getGameplayTimeElapsed: GameState.getGameplayTimeElapsed,
         createStatsSnapshotForBossKill: (playerInst, currentOverallBossTiers) => {
             return createFinalStatsSnapshot(playerInst, currentOverallBossTiers, LootManager.getBossLootPoolReference(), LootManager);
@@ -839,7 +902,14 @@ const gameContextForEventListeners = {
             UIManager.updateAllHighScoreDisplays(getHighScores());
         },
         playSound: playSound,
-        CONSTANTS: CONSTANTS
+        CONSTANTS: CONSTANTS,
+        signalAchievementEvent: (eventName, eventData = {}) => {
+            eventFlagsForAchievements[eventName] = true;
+            if (eventData && Object.keys(eventData).length > 0) {
+                eventFlagsForAchievements[eventName + "_data"] = eventData;
+            }
+            AchievementManager.checkAllAchievements(getGameContextForAchievements());
+        }
     }
 };
 
@@ -876,6 +946,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.body.innerHTML = `<div style="color: white; text-align: center; padding-top: 50px;"><h1>Error Loading Game</h1><p>Could not load critical game components. Please check the console for details.</p></div>`;
         return;
     }
+    AchievementManager.initializeAchievements();
 
     setupEventListeners(gameCanvasElement, gameContextForEventListeners);
     initGameLoop(GameState.isGameOver, GameState.isGameRunning, GameState.isAnyPauseActive);

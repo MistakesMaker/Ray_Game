@@ -15,6 +15,7 @@ export const PLAYER_RAY_INACCURACY_DURING_SHAKE = 0.2;
 export const PLAYER_BOUNCE_FORCE_FROM_BOSS = 18;
 export const PLAYER_BOUNCE_FORCE_FROM_GRAVITY_BALL = 12;
 export const DEFAULT_PLAYER_RADIUS_GROWTH_FACTOR = 0.025;
+export const CLOSE_SHAVE_HP_THRESHOLD = 10; // <<< NEW CONSTANT
 
 // Ray Constants
 export const RAY_RADIUS = 6;
@@ -114,63 +115,63 @@ export const BOSS_WARNING_DURATION = 2500;
 export const BOSS_SPAWN_START_SCORE = 300;
 export const BOSS_SPAWN_SCORE_INTERVAL = 300;
 export const MAX_TOTAL_ACTIVE_RAYS_BEFORE_BOSS_THROTTLE = 75;
-export const MAX_BOSSES_IN_WAVE_CAP = 1000; // Max bosses that can spawn *within a single wave event*
+export const MAX_BOSSES_IN_WAVE_CAP = 1000; 
 
 // ---- Nexus Weaver Boss Constants ----
 export const NEXUS_WEAVER_BASE_HP = 100;
 export const NEXUS_WEAVER_HP_PER_TIER_FACTOR = 0.45;
 export const NEXUS_WEAVER_RADIUS_BASE = 35;
 export const NEXUS_WEAVER_RADIUS_PER_TIER = 2;
-export const NEXUS_WEAVER_COLOR = '#4B0082'; // Indigo
+export const NEXUS_WEAVER_COLOR = '#4B0082'; 
 export const NEXUS_WEAVER_BASE_SPEED = 0.3;
 export const NEXUS_WEAVER_SPEED_PER_TIER = 0.02;
 export const NEXUS_WEAVER_MAX_MINIONS_BASE = 5;
 export const NEXUS_WEAVER_MAX_MINIONS_PER_TIER = 2;
-export const NEXUS_WEAVER_SPAWN_COOLDOWN_BASE = 5500; // ms
-export const NEXUS_WEAVER_SPAWN_COOLDOWN_REDUCTION_PER_TIER = 200; // ms
-export const NEXUS_WEAVER_SPAWN_TELL_DURATION = 1000; // ms
+export const NEXUS_WEAVER_SPAWN_COOLDOWN_BASE = 5500; 
+export const NEXUS_WEAVER_SPAWN_COOLDOWN_REDUCTION_PER_TIER = 200; 
+export const NEXUS_WEAVER_SPAWN_TELL_DURATION = 1000; 
 // Pulse Nova (Nexus Weaver Attack)
 export const PULSE_NOVA_DAMAGE = 10;
-export const PULSE_NOVA_RADIUS_FACTOR = 4; // Multiplier of boss's current radius
-export const PULSE_NOVA_DURATION = 600; // ms for expansion
-export const PULSE_NOVA_COOLDOWN = 8000; // ms
-export const PULSE_NOVA_CLOSE_RANGE_THRESHOLD_FACTOR = 2.5; // Player closer than boss.radius * this
-export const PULSE_NOVA_CLOSE_RANGE_DURATION_TRIGGER = 2000; // Player must be close for this long
+export const PULSE_NOVA_RADIUS_FACTOR = 4; 
+export const PULSE_NOVA_DURATION = 600; 
+export const PULSE_NOVA_COOLDOWN = 8000; 
+export const PULSE_NOVA_CLOSE_RANGE_THRESHOLD_FACTOR = 2.5; 
+export const PULSE_NOVA_CLOSE_RANGE_DURATION_TRIGGER = 2000; 
 
 // ---- Minion Constants (for Nexus Weaver) ----
 // Drone Minion
 export const DRONE_HP = 30;
-export const DRONE_DAMAGE = 25; // Damage dealt to player on contact
+export const DRONE_DAMAGE = 25; 
 export const DRONE_BASE_SPEED = 3;
 export const DRONE_SPEED_PER_TIER = 0.1;
 export const DRONE_RADIUS = 10;
-export const DRONE_COLOR = '#C71585'; // MediumVioletRed
+export const DRONE_COLOR = '#C71585'; 
 // Lancer Minion
 export const LANCER_HP = 30;
-export const LANCER_DAMAGE = 20; // Damage dealt to player on contact
-export const LANCER_BASE_SPEED = 2; // Roaming speed
+export const LANCER_DAMAGE = 20; 
+export const LANCER_BASE_SPEED = 2; 
 export const LANCER_SPEED_PER_TIER = 0.25;
 export const LANCER_DASH_SPEED_BASE = 6;
 export const LANCER_DASH_SPEED_PER_TIER = 0.25;
 export const LANCER_RADIUS = 11;
-export const LANCER_COLOR = '#8A2BE2'; // BlueViolet
-export const LANCER_AIM_TIME = 800; // ms
-export const LANCER_DASH_DURATION = 600; // ms
-export const LANCER_POST_DASH_COOLDOWN = 1000; // ms
+export const LANCER_COLOR = '#8A2BE2'; 
+export const LANCER_AIM_TIME = 800; 
+export const LANCER_DASH_DURATION = 600; 
+export const LANCER_POST_DASH_COOLDOWN = 1000; 
 // Orbiter Minion
 export const ORBITER_HP = 15;
 export const ORBITER_RADIUS = 12;
-export const ORBITER_COLOR = '#DA70D6'; // Orchid
+export const ORBITER_COLOR = '#DA70D6'; 
 export const ORBITER_ORBIT_DISTANCE_BASE = 120;
 export const ORBITER_ORBIT_DISTANCE_PER_TIER = 15;
-export const ORBITER_ORBIT_SPEED = 0.0015; // Radians per ms
-export const ORBITER_SHOOT_COOLDOWN_BASE = 3500; // ms
-export const ORBITER_SHOOT_COOLDOWN_REDUCTION_PER_TIER = 150; // ms
+export const ORBITER_ORBIT_SPEED = 0.0015; 
+export const ORBITER_SHOOT_COOLDOWN_BASE = 3500; 
+export const ORBITER_SHOOT_COOLDOWN_REDUCTION_PER_TIER = 150; 
 export const ORBITER_PROJECTILE_RADIUS = 5;
-export const ORBITER_PROJECTILE_SPEED = 2.8; // Absolute speed, will be converted to multiplier in main.js
+export const ORBITER_PROJECTILE_SPEED = 2.8; 
 export const ORBITER_PROJECTILE_DAMAGE = 10;
-export const ORBITER_PROJECTILE_COLOR = '#FF00FF'; // Magenta
-export const ORBITER_PROJECTILE_LIFETIME = 2500; // ms
+export const ORBITER_PROJECTILE_COLOR = '#FF00FF'; 
+export const ORBITER_PROJECTILE_LIFETIME = 2500; 
 
 
 // Evolution Upgrade Constants
@@ -186,7 +187,6 @@ export const CHAIN_REACTION_EXPLOSION_DURATION = 300;
 export const CHAIN_REACTION_EXPLOSION_COLOR = 'rgba(255, 165, 0, opacity)';
 export const MAX_HP_PICKUP_BONUS = 15;
 export const HP_PICKUP_BONUS_PER_LEVEL = 10;
-// ---- NEW EVOLUTION INTERACTION CONSTANTS ----
 export const MAX_EVOLUTION_REROLLS = 5;
 export const MAX_EVOLUTION_BLOCKS = 3;
 export const MAX_EVOLUTION_FREEZES_PER_RUN = 3;
@@ -253,61 +253,59 @@ export const RAY_CRIT_CHANCE_TIER_BONUS = { common: 0.02, rare: 0.04, epic: 0.08
 export const RAY_CRIT_DAMAGE_TIER_BONUS = { common: 0.10, rare: 0.15, epic: 0.25, legendary: 0.40 };
 export const ABILITY_CRIT_CHANCE_TIER_BONUS = { common: 0.02, rare: 0.04, epic: 0.08, legendary: 0.15 };
 export const ABILITY_CRIT_DAMAGE_TIER_BONUS = { common: 0.10, rare: 0.15, epic: 0.25, legendary: 0.40 };
-// ---- End Tiered Evolution Values ----
 
 
 // ---- Unique Path Buff Constants ----
-export const PERFECT_HARMONY_NO_DAMAGE_DURATION_THRESHOLD = 5000; // Was Path of Harmony
+export const PERFECT_HARMONY_NO_DAMAGE_DURATION_THRESHOLD = 5000; 
 
 export const BERSERKERS_ECHO_DAMAGE_PER_10_HP = 0.09;
 export const BERSERKERS_ECHO_SPEED_PER_10_HP = 0.03;
 
-// Kinetic Conversion - Base values (player object holds these)
 export const KINETIC_INITIAL_DAMAGE_BONUS = 0.30;
 export const KINETIC_BASE_CHARGE_RATE = 1.0;
 
 // ---- NEW: Aegis Path (Juggernaut) Constants ----
-export const AEGIS_PATH_BASE_COLLISION_DAMAGE = 1; // Flat damage per collision
-export const AEGIS_PATH_MAX_HP_SCALING_FACTOR = 0.1; // Damage = base + (maxHP * factor)
-export const AEGIS_PATH_RADIUS_SCALING_FACTOR = 0.1; // Damage += (radius * factor)
-export const AEGIS_PATH_BOSS_KNOCKBACK_FORCE = 30; // Base knockback force on boss
-export const AEGIS_PATH_PLAYER_SELF_KNOCKBACK_FACTOR = 0.3; // Player gets knocked back a bit too
+export const AEGIS_PATH_BASE_COLLISION_DAMAGE = 1; 
+export const AEGIS_PATH_MAX_HP_SCALING_FACTOR = 0.05; 
+export const AEGIS_PATH_RADIUS_SCALING_FACTOR = 0.1; 
+export const AEGIS_PATH_BOSS_KNOCKBACK_FORCE = 30; 
+export const AEGIS_PATH_PLAYER_SELF_KNOCKBACK_FACTOR = 0.3; 
 // ---- END Unique Path Buff Constants ----
 
 // ---- Path-Specific Mouse Abilities Constants ----
 
 // -- Aegis Path (Tank) --
 // LMB: Aegis Charge
-export const AEGIS_CHARGE_MAX_CHARGE_TIME = 5000; // ms
+export const AEGIS_CHARGE_MAX_CHARGE_TIME = 5000; 
 export const AEGIS_CHARGE_MIN_DAMAGE = 20;
-export const AEGIS_CHARGE_MAX_DAMAGE_SCALE_PER_SECOND_CHARGED = 0.25; // e.g., 0.5 means +50% max damage per second charged
+export const AEGIS_CHARGE_MAX_DAMAGE_SCALE_PER_SECOND_CHARGED = 0.25; 
 export const AEGIS_CHARGE_AOE_RADIUS = 60;
-export const AEGIS_CHARGE_DR_DURING_DASH = 0.50; // 50% damage reduction
-export const AEGIS_CHARGE_COOLDOWN = 15000; // ms
-export const AEGIS_CHARGE_DASH_SPEED_FACTOR = 8; // Multiplier of base player speed
+export const AEGIS_CHARGE_DR_DURING_DASH = 0.50; 
+export const AEGIS_CHARGE_COOLDOWN = 15000; 
+export const AEGIS_CHARGE_DASH_SPEED_FACTOR = 8; 
 
 // RMB: Seismic Slam
 export const SEISMIC_SLAM_DAMAGE_BASE = 10;
-export const SEISMIC_SLAM_DAMAGE_MAXHP_SCALE = 0.05; // 5% of MaxHP added to damage
-export const SEISMIC_SLAM_DAMAGE_RADIUS_SCALE = 0.1; // 0.5 damage per unit of player radius
+export const SEISMIC_SLAM_DAMAGE_MAXHP_SCALE = 0.05; 
+export const SEISMIC_SLAM_DAMAGE_RADIUS_SCALE = 0.1; 
 export const SEISMIC_SLAM_AOE_RADIUS = 350;
 export const SEISMIC_SLAM_KNOCKBACK_FORCE_NON_BOSS = 15;
-export const SEISMIC_SLAM_BOSS_STAGGER_DURATION = 2000; // ms
+export const SEISMIC_SLAM_BOSS_STAGGER_DURATION = 2000; 
 export const SEISMIC_SLAM_BOSS_KNOCKBACK_MINOR = 5;
-export const SEISMIC_SLAM_COOLDOWN = 18000; // ms
+export const SEISMIC_SLAM_COOLDOWN = 18000; 
 
 // -- Berserker's Echo Path (Fury) --
 // LMB: Bloodpact
-export const BLOODPACT_DURATION = 5000; // ms
-export const BLOODPACT_LIFESTEAL_PERCENT = 0.20; // 10% lifesteal on auto-fired rays
-export const BLOODPACT_COOLDOWN = 15000; // ms
+export const BLOODPACT_DURATION = 5000; 
+export const BLOODPACT_LIFESTEAL_PERCENT = 0.20; 
+export const BLOODPACT_COOLDOWN = 15000; 
 
 // RMB: Savage Howl
 export const SAVAGE_HOWL_FEAR_RADIUS = 350;
-export const SAVAGE_HOWL_FEAR_DURATION = 3000; // ms
-export const SAVAGE_HOWL_ATTACK_SPEED_BUFF_PERCENT = 0.30; // 30% faster auto-fire
-export const SAVAGE_HOWL_ATTACK_SPEED_BUFF_DURATION = 7000; // ms
-export const SAVAGE_HOWL_COOLDOWN = 22000; // ms
+export const SAVAGE_HOWL_FEAR_DURATION = 3000; 
+export const SAVAGE_HOWL_ATTACK_SPEED_BUFF_PERCENT = 0.30; 
+export const SAVAGE_HOWL_ATTACK_SPEED_BUFF_DURATION = 7000; 
+export const SAVAGE_HOWL_COOLDOWN = 22000; 
 
 // -- Ultimate Configuration Path (Mage) --
 // LMB: Omega Laser (Existing constants)

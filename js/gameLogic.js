@@ -6,7 +6,7 @@ import * as UIManager from './uiManager.js';
 import * as EvolutionManager from './evolutionManager.js';
 import * as LootManager from './lootManager.js';
 import { EntitySpawner } from './entitySpawner.js';
-import { Player } from './player.js'; // Assuming Player class is correctly defined here
+import { Player } from './player.js'; 
 import { Ray, PlayerGravityWell } from './ray.js';
 import { Target, Heart, BonusPoint, LootDrop } from './entities.js';
 import { BossManager } from './bossManager.js';
@@ -31,7 +31,6 @@ import {
 
 // --- Game Entities & State (managed by this module) ---
 let player = null; 
-// ... other state variables ...
 let rays = [];
 let targets = [];
 let hearts = [];
@@ -66,6 +65,7 @@ let _mainCallbacks = {
     updateLastEvolutionScore: null,
     updateShootInterval: null,
     handleFullHealthHeartPickup: null, 
+    signalAchievementEvent: null, 
 };
 
 export function getScreenShakeParams() { 
@@ -87,7 +87,8 @@ export function getAbilityContextForPlayerLogic() {
             updateAbilityCooldownCallback: () => {}, decoysArray: [], bossDefeatEffectsArray: [],
             mouseX: 0, mouseY: 0, canvasWidth: 0, canvasHeight: 0, allRays: [],
             screenShakeParams: getScreenShakeParams(),
-            activeBuffNotificationsArray: [], evolutionChoices: [], ui: {}
+            activeBuffNotificationsArray: [], evolutionChoices: [], ui: {},
+            getBossManager: () => null // <<< ADDED Default
         };
     }
     return {
@@ -108,12 +109,12 @@ export function getAbilityContextForPlayerLogic() {
         ui: { 
             updateKineticChargeUI: UIManager.updateKineticChargeUI,
             updateBerserkerRageUI: UIManager.updateBerserkerRageUI 
-        }
+        },
+        getBossManager: () => bossManager // <<< ADDED: Pass bossManager instance getter
     };
 }
 
 export function initializeGameLogic(canvasElement, inputStateRef, mainCallbacksObj, initialPlayerSpeed) {
-   // console.log("[GameLogic] initializeGameLogic START");
     _canvas = canvasElement;
     _ctx = _canvas.getContext('2d');
     _inputState = inputStateRef;
@@ -121,18 +122,14 @@ export function initializeGameLogic(canvasElement, inputStateRef, mainCallbacksO
 
     activeBuffNotifications = [];
 
-  //  console.log("[GameLogic] About to create Player instance.");
     try {
         player = new Player(_canvas.width / 2, _canvas.height / 2, initialPlayerSpeed); 
-    //  console.log("[GameLogic] Player INSTANCE CREATED:", player);
-    //  console.log("[GameLogic] typeof player.draw AFTER CREATION:", typeof player.draw);
-    //  console.log("[GameLogic] typeof player.update AFTER CREATION:", typeof player.update);
         if (!(player instanceof Player)) {
             console.error("CRITICAL: player is NOT an instanceof Player immediately after new Player()!");
         }
     } catch (e) {
         console.error("CRITICAL ERROR creating Player instance:", e);
-        player = null; // Ensure player is null if creation failed
+        player = null; 
     }
 
 
@@ -163,20 +160,15 @@ export function initializeGameLogic(canvasElement, inputStateRef, mainCallbacksO
 
     rays = []; targets = []; hearts = []; bonusPoints = [];
     lootDrops = []; decoys = []; bossDefeatEffects = [];
-
- //   console.log("[GameLogic] initializeGameLogic END");
 }
 
 export function resetGameLogicState() {
-    // console.log("[GameLogic] resetGameLogicState called. Current player:", player, "typeof player.reset:", typeof player?.reset);
     if (player && typeof player.reset === 'function') {
         player.reset(_canvas ? _canvas.width : window.innerWidth, _canvas ? _canvas.height : window.innerHeight);
     } else if (player) { 
-    //    console.warn("[GameLogic reset] Player object exists but reset method is missing. Performing basic property reset.");
         player.hp = player.maxHp || CONSTANTS.PLAYER_MAX_HP;
         player.x = _canvas ? _canvas.width / 2 : window.innerWidth / 2;
         player.y = _canvas ? _canvas.height / 2 : window.innerHeight / 2;
-        // Only assign if these properties exist, to avoid errors if player is truly corrupted
         if('immuneColorsList' in player) player.immuneColorsList = [];
         if('activeAbilities' in player) player.activeAbilities = {'1':null, '2':null, '3':null};
     } else {
@@ -229,16 +221,14 @@ export function updateCanvasDimensionsLogic(width, height) {
 
 
 export function updateGame(deltaTime) {
-    // console.log("[updateGame START] player:", player, "typeof player.update:", typeof player?.update);
     if (GameState.isGameOver()) return;
     if (!_canvas || !_inputState) return;
-    if (!player) { // If player is null for some reason, don't proceed with game logic
-        // console.warn("[updateGame] Player is null. Skipping update.");
+    if (!player) { 
         return;
     }
     if (typeof player.update !== 'function') {
         console.error("[updateGame] CRITICAL: player.update is NOT a function here!", player);
-        return; // Cannot proceed
+        return; 
     }
 
 
@@ -274,9 +264,7 @@ export function updateGame(deltaTime) {
         if(GameState.getSurvivalPointsTimer() >= GameState.getCurrentSurvivalPointsInterval()){
             GameState.setSurvivalPointsTimer(GameState.getSurvivalPointsTimer() - GameState.getCurrentSurvivalPointsInterval());
             if(GameState.getSurvivalScoreThisCycle() < CONSTANTS.MAX_SURVIVAL_POINTS_PER_EVOLUTION_CYCLE){
-                GameState.incrementScore(CONSTANTS.SURVIVAL_POINTS_AMOUNT); GameState.incrementSurvivalScoreThisCycle(CONSTANTS.SURVIVAL_POINTS_AMOUNT);
-                UIManager.updateScoreDisplay(GameState.getScore());
-                if (_mainCallbacks.checkForNewColorUnlock) _mainCallbacks.checkForNewColorUnlock();
+                GameState.incrementScore(CONSTANTS.SURVIVAL_POINTS_AMOUNT); UIManager.updateScoreDisplay(GameState.getScore()); if (_mainCallbacks.checkForNewColorUnlock) _mainCallbacks.checkForNewColorUnlock();
             }
         }
 
@@ -344,7 +332,6 @@ export function updateGame(deltaTime) {
         for (let i = activeBuffNotifications.length - 1; i >= 0; i--) {const n = activeBuffNotifications[i];n.timer -= deltaTime;if (n.timer <= 0) activeBuffNotifications.splice(i, 1);}
 
         
-        // 'player' is the module-scoped variable, guaranteed to be an instance if initializeGameLogic succeeded.
         const playerUpdateContext = {
             dt: deltaTime,
             keys: _inputState.keys,
@@ -363,12 +350,14 @@ export function updateGame(deltaTime) {
             updateHealthDisplayCallback: (currentHp, maxHp) => UIManager.updateHealthDisplay(currentHp, maxHp),
             updateAbilityCooldownCallback: (pInst) => UIManager.updateAbilityCooldownUI(pInst),
             isAnyPauseActiveCallback: GameState.isAnyPauseActive, 
+            getBossManager: () => bossManager, // <<< ADDED for player ability usage tracking
             decoysArray: decoys, bossDefeatEffectsArray: bossDefeatEffects, allRays: rays,
             screenShakeParams: getScreenShakeParams(),
             activeBuffNotificationsArray: activeBuffNotifications, CONSTANTS,
             endGameCallback: _mainCallbacks.endGameInternal,
             updateScoreCallback: (amount) => { GameState.incrementScore(amount); UIManager.updateScoreDisplay(GameState.getScore()); if (_mainCallbacks.checkForNewColorUnlock) _mainCallbacks.checkForNewColorUnlock(); },
-            forceAbilityUIUpdate: false
+            forceAbilityUIUpdate: false,
+            signalAchievementEvent: _mainCallbacks.signalAchievementEvent 
         };
         player.update(playerUpdateContext); 
 
@@ -398,13 +387,15 @@ export function updateGame(deltaTime) {
                     },
                     playerPostDamageImmunityTimer: GameState.getPostDamageImmunityTimer(), playerPostPopupImmunityTimer: GameState.getPostPopupImmunityTimer(),
                     screenShakeParams: getScreenShakeParams(),
+                    signalAchievementEvent: _mainCallbacks.signalAchievementEvent, 
                     playerTakeDamageFromRayCallback: (rayThatHitPlayer) => {
                         if (player && rayThatHitPlayer.isGravityWellRay) {
                             const ptdGameCtxForGravityBall = {
                                 postPopupImmunityTimer: GameState.getPostPopupImmunityTimer(), postDamageImmunityTimer: GameState.getPostDamageImmunityTimer(), score: GameState.getScore(),
                                 updateHealthDisplayCallback: (hp, maxHp) => UIManager.updateHealthDisplay(hp, maxHp), endGameCallback: _mainCallbacks.endGameInternal,
                                 updateScoreCallback: (amt) => { GameState.incrementScore(amt); UIManager.updateScoreDisplay(GameState.getScore()); if(_mainCallbacks.checkForNewColorUnlock) _mainCallbacks.checkForNewColorUnlock(); },
-                                checkForNewColorCallback: _mainCallbacks.checkForNewColorUnlock, activeBuffNotificationsArray: activeBuffNotifications
+                                checkForNewColorCallback: _mainCallbacks.checkForNewColorUnlock, activeBuffNotificationsArray: activeBuffNotifications,
+                                signalAchievementEvent: _mainCallbacks.signalAchievementEvent 
                             };
                             const ptdDamageCtxForGravityBall = { screenShakeParams: getScreenShakeParams() };
                             const damageActuallyDealt = player.takeDamage(rayThatHitPlayer, ptdGameCtxForGravityBall, ptdDamageCtxForGravityBall);
@@ -483,6 +474,8 @@ export function updateGame(deltaTime) {
                                 aoeTriggeredOnHit = true;
                             }
                             targets.splice(j,1); GameState.incrementScore(10); UIManager.updateScoreDisplay(GameState.getScore()); if(_mainCallbacks.checkForNewColorUnlock) _mainCallbacks.checkForNewColorUnlock();
+                            if (player) { player.targetsDestroyedThisRun = (player.targetsDestroyedThisRun || 0) + 1; } 
+                            
                             if (!aoeTriggeredOnHit) playSound(audioTargetHitSound);
                             
                             if (player && typeof r.lifestealPercent === 'number' && r.lifestealPercent > 0) { 
@@ -509,6 +502,12 @@ export function updateGame(deltaTime) {
                                 const damageDealtByRayToBoss = currentBoss.takeDamage(currentRayDamage, r, player, bossTakeDmgCtx);
                                 if (damageDealtByRayToBoss > 0) {
                                     damageAppliedToBossValue = damageDealtByRayToBoss;
+                                    if (r.wallBounceCount >= 3 && _mainCallbacks.signalAchievementEvent) { // Check for Ricochet Ace
+                                        _mainCallbacks.signalAchievementEvent("ray_hit_boss_after_bounces", {
+                                            rayBounces: r.wallBounceCount,
+                                            bossType: currentBoss.constructor.name 
+                                        });
+                                    }
                                 }
                                 consumedByShield = !r.isActive || damageAppliedToBossValue > 0;
 
@@ -555,7 +554,7 @@ export function updateGame(deltaTime) {
                     }
                 }
             }
-            if(!r.isActive) {
+            if(!r.isActive) { 
                 if (r.isGravityWellRay && r.gravityWellTarget instanceof GravityWellBoss && r.gravityWellTarget.gravityRay === r) {
                     stopSound(gravityWellChargeSound);
                     r.gravityWellTarget.gravityRay = null;
@@ -563,7 +562,7 @@ export function updateGame(deltaTime) {
                 returnRayToPool(r);
                 rays.splice(i, 1);
             }
-        }
+         }
 
 
          for(let i=rays.length-1;i>=0;i--){
@@ -584,7 +583,8 @@ export function updateGame(deltaTime) {
                     postPopupImmunityTimer: GameState.getPostPopupImmunityTimer(), postDamageImmunityTimer: GameState.getPostDamageImmunityTimer(), score: GameState.getScore(),
                     updateHealthDisplayCallback:(hp,maxHp)=>UIManager.updateHealthDisplay(hp,maxHp), endGameCallback:_mainCallbacks.endGameInternal,
                     updateScoreCallback: (amt) => { GameState.incrementScore(amt); UIManager.updateScoreDisplay(GameState.getScore()); if (_mainCallbacks.checkForNewColorUnlock) _mainCallbacks.checkForNewColorUnlock(); },
-                    checkForNewColorCallback: _mainCallbacks.checkForNewColorUnlock, activeBuffNotificationsArray: activeBuffNotifications
+                    checkForNewColorCallback: _mainCallbacks.checkForNewColorUnlock, activeBuffNotificationsArray: activeBuffNotifications,
+                    signalAchievementEvent: _mainCallbacks.signalAchievementEvent 
                 };
                 const ptdDamageCtxForRay = { screenShakeParams: getScreenShakeParams() };
 
@@ -602,7 +602,6 @@ export function updateGame(deltaTime) {
 
                 if (damageDealt > 0) { 
                     GameState.setPostDamageImmunityTimer(CONSTANTS.POST_DAMAGE_IMMUNITY_DURATION); 
-                    // console.log(`[GameLogic] Damage dealt: ${damageDealt}. PostDamageImmunityTimer SET to: ${GameState.getPostDamageImmunityTimer()}`); 
                 }
              }
              if(!r.isActive) { 
@@ -615,9 +614,12 @@ export function updateGame(deltaTime) {
              for(let i=hearts.length-1;i>=0;i--){
                  const h=hearts[i];
                  if(checkCollision(player,h)){
-                     hearts.splice(i,1); player.gainHealth(CONSTANTS.HP_REGEN_PER_PICKUP + player.hpPickupBonus, (hp,maxHp)=>UIManager.updateHealthDisplay(hp,maxHp)); playSound(heartSound);
-                     if (player.hp === player.maxHp) {
-                        if (_mainCallbacks.handleFullHealthHeartPickup) {
+                     let wasAtFullHp = (player.hp === player.maxHp); 
+                     hearts.splice(i,1); 
+                     player.gainHealth(CONSTANTS.HP_REGEN_PER_PICKUP + player.hpPickupBonus, (hp,maxHp)=>UIManager.updateHealthDisplay(hp,maxHp)); 
+                     playSound(heartSound);
+                     if (wasAtFullHp) { 
+                        if (_mainCallbacks.handleFullHealthHeartPickup) { 
                             _mainCallbacks.handleFullHealthHeartPickup(player);
                         } else { 
                             activeBuffNotifications.push({ text: "Max HP! +10 Score!", timer: CONSTANTS.BUFF_NOTIFICATION_DURATION});
@@ -648,6 +650,7 @@ export function updateGame(deltaTime) {
                     targets.splice(tIdx, 1);
                     GameState.incrementScore(5); 
                     UIManager.updateScoreDisplay(GameState.getScore());
+                    if (player) { player.targetsDestroyedThisRun = (player.targetsDestroyedThisRun || 0) + 1; } 
                 }
             }
             if (bossManager && bossManager.activeBosses) {
@@ -711,7 +714,6 @@ export function drawGame() {
        _ctx.fillStyle = e.color ? e.color.replace('opacity', (e.opacity * 0.6).toString()) : `rgba(255, 255, 180, ${e.opacity * 0.6})`; _ctx.fill();
    }
     
- //   console.log("[drawGame] Attempting to draw player. Player object:", player, "Is GameRunning:", GameState.isGameRunning(), "Is GameOver:", GameState.isGameOver(), "typeof player.draw:", typeof player?.draw); 
     if(player && typeof player.draw === 'function' && GameState.isGameRunning() && !GameState.isGameOver()){ 
         const playerDrawContext = {
             isCountingDownToResume: GameState.getIsCountingDownToResume(),
@@ -723,7 +725,6 @@ export function drawGame() {
     } else if (player && typeof player.draw !== 'function') {
         console.error("[drawGame] ERROR: player object exists, but player.draw is NOT a function!", player);
     } else if (!player) {
-        // console.warn("[drawGame] Player object is null or undefined when trying to draw.");
     }
 
     _ctx.restore();

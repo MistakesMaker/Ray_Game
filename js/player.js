@@ -35,7 +35,8 @@ import {
     SAVAGE_HOWL_FEAR_RADIUS, SAVAGE_HOWL_FEAR_DURATION, SAVAGE_HOWL_ATTACK_SPEED_BUFF_PERCENT,
     SAVAGE_HOWL_ATTACK_SPEED_BUFF_DURATION, SAVAGE_HOWL_COOLDOWN,
     BUFF_NOTIFICATION_DURATION,
-    PLAYER_GRAVITY_WELL_ABSORBED_RAY_COLOR
+    PLAYER_GRAVITY_WELL_ABSORBED_RAY_COLOR,
+    CLOSE_SHAVE_HP_THRESHOLD
 } from './constants.js';
 import * as GameState from './gameState.js';
 import { checkCollision, hexToRgb, lightenColor, isLineSegmentIntersectingCircle, getPooledRay } from './utils.js';
@@ -55,10 +56,10 @@ import { BossNPC } from './bossBase.js';
 const AEGIS_RAM_COOLDOWN = 1000;
 
 // Aegis Charge Visual Constants
-const AEGIS_CHARGE_INDICATOR_RADIUS_OFFSET = 8; 
+const AEGIS_CHARGE_INDICATOR_RADIUS_OFFSET = 8;
 const AEGIS_CHARGE_INDICATOR_LINE_WIDTH = 5;
 const AEGIS_CHARGE_INDICATOR_COLOR_CHARGING = 'rgba(100, 180, 255, 0.7)';
-const AEGIS_CHARGE_INDICATOR_COLOR_FULL = 'rgba(255, 215, 0, 0.9)'; 
+const AEGIS_CHARGE_INDICATOR_COLOR_FULL = 'rgba(255, 215, 0, 0.9)';
 const AEGIS_CHARGE_READY_PULSE_COLOR = 'rgba(100, 180, 255, 0.3)';
 
 
@@ -141,6 +142,7 @@ export class Player {
         this.aegisAnimTimer = Math.random() * 5000;
         this.timesHit = 0;
         this.totalDamageDealt = 0;
+        this.targetsDestroyedThisRun = 0;
         this.originalPlayerSpeed = initialPlayerSpeed;
         this.currentSpeed = initialPlayerSpeed;
 
@@ -163,6 +165,8 @@ export class Player {
         this.shieldOverchargeDuration = SHIELD_OVERCHARGE_DURATION;
         this.shieldOverchargeCooldownTimer = 0;
         this.shieldOverchargeCooldown = SHIELD_OVERCHARGE_COOLDOWN;
+        this.raysAbsorbedThisShieldOvercharge = 0;
+
 
         this.hasAegisCharge = false;
         this.isChargingAegisCharge = false;
@@ -195,16 +199,22 @@ export class Player {
         this.isFreezeModeActive = false;
         this.hasUsedFreezeForCurrentOffers = false;
 
+        this.usedAbilityInCurrentBossFight = false;
+        this.hasTriggeredAegisPassiveBossDamageThisRun = false;
+
+
         this.update = (gameContext) => {
             const { dt, keys, mouseX, mouseY, canvasWidth, canvasHeight, targets, activeBosses,
                     currentGrowthFactor,
                     currentEffectiveDefaultGrowthFactor,
                     updateHealthDisplayCallback, updateAbilityCooldownCallback,
-                    isAnyPauseActiveCallback, decoysArray, bossDefeatEffectsArray, allRays,
+                    isAnyPauseActiveCallback, getBossManager,
+                    decoysArray, bossDefeatEffectsArray, allRays,
                     screenShakeParams, activeBuffNotificationsArray, score,
                     evolutionChoices,
                     ui, CONSTANTS: gameConstants,
-                    endGameCallback, updateScoreCallback
+                    endGameCallback, updateScoreCallback,
+                    signalAchievementEvent
                   } = gameContext;
 
 
@@ -220,6 +230,7 @@ export class Player {
                 this.teleportEffectTimer -= dt;
                 if (this.teleportEffectTimer <= 0) {
                     this.teleporting = false; this.teleportEffectTimer = 0;
+                    // Tele-Frag check done in doTeleport at the moment of arrival
                 }
             }
 
@@ -273,14 +284,14 @@ export class Player {
                         this[abilityActiveProp] = false;
                         let cd = abilityCooldownConst * (1.0 - this.globalCooldownReduction);
                         this[abilityCooldownTimerProp] = Math.max(abilityCooldownConst * 0.1, cd);
-                        return true;
+                        return true; // Indicates ability just finished
                     }
                 } else if (this[abilityCooldownTimerProp] > 0) {
                     this[abilityCooldownTimerProp] -= dt / effectiveCooldownMultiplier;
                     mouseAbilityUIUpdateNeeded = true;
                     if (this[abilityCooldownTimerProp] < 0) this[abilityCooldownTimerProp] = 0;
                 }
-                return false;
+                return false; // Ability did not just finish
             };
 
             if (this.currentPath === 'mage') {
@@ -296,7 +307,16 @@ export class Player {
                         }
                     } else if (this.omegaLaserCooldownTimer > 0) { let ecm = Math.max(0.1, 1.0 - this.globalCooldownReduction); this.omegaLaserCooldownTimer -= dt/ecm; mouseAbilityUIUpdateNeeded = true; if(this.omegaLaserCooldownTimer < 0) this.omegaLaserCooldownTimer=0;}
                 }
-                if (this.hasShieldOvercharge) updateGenericMouseAbility_local('isShieldOvercharging', 'shieldOverchargeTimer', 'shieldOverchargeCooldownTimer', gameConstants.SHIELD_OVERCHARGE_COOLDOWN, gameConstants.SHIELD_OVERCHARGE_DURATION);
+                if (this.hasShieldOvercharge) {
+                    const shieldFinished = updateGenericMouseAbility_local('isShieldOvercharging', 'shieldOverchargeTimer', 'shieldOverchargeCooldownTimer', gameConstants.SHIELD_OVERCHARGE_COOLDOWN, gameConstants.SHIELD_OVERCHARGE_DURATION);
+                    if (shieldFinished && signalAchievementEvent && this.raysAbsorbedThisShieldOvercharge >= 5) { // <<< SHIELD SIPHON CHECK
+                        signalAchievementEvent("shield_siphon_mage");
+                    }
+                    if (shieldFinished || !this.isShieldOvercharging) { // Reset counter if ability ends or is not active
+                        this.raysAbsorbedThisShieldOvercharge = 0;
+                    }
+                }
+
 
                 if (this.kineticConversionLevel > 0) {
                     this.magePathTimeElapsed += dt;
@@ -546,6 +566,10 @@ export class Player {
                         gameContext.screenShakeParams.currentShakeMagnitude = 4;
                         gameContext.screenShakeParams.currentShakeType = 'playerHit';
                      }
+                    if (!this.hasTriggeredAegisPassiveBossDamageThisRun && gameContext.signalAchievementEvent) { // <<< IMPACT INITIATED
+                        gameContext.signalAchievementEvent("aegis_passive_collision_damage_boss");
+                        this.hasTriggeredAegisPassiveBossDamageThisRun = true;
+                    }
                 }
             }
 
@@ -634,10 +658,13 @@ export class Player {
         this.activeMiniWell = null;
         this.timesHit = 0;
         this.totalDamageDealt = 0;
+        this.targetsDestroyedThisRun = 0;
+        this.usedAbilityInCurrentBossFight = false;
         this.currentSpeed = this.originalPlayerSpeed;
 
         this.hasOmegaLaser = false; this.isFiringOmegaLaser = false; this.omegaLaserTimer = 0; this.omegaLaserCooldownTimer = 0;
         this.hasShieldOvercharge = false; this.isShieldOvercharging = false; this.shieldOverchargeTimer = 0; this.shieldOverchargeCooldownTimer = 0;
+        this.raysAbsorbedThisShieldOvercharge = 0;
 
         this.hasAegisCharge = false; this.isChargingAegisCharge = false; this.aegisChargeCurrentChargeTime = 0; this.aegisChargeCooldownTimer = 0;
         this.isAegisChargingDash = false; this.aegisChargeDashTimer = 0;
@@ -654,6 +681,7 @@ export class Player {
         this.frozenEvolutionChoice = null;
         this.isFreezeModeActive = false;
         this.hasUsedFreezeForCurrentOffers = false;
+        this.hasTriggeredAegisPassiveBossDamageThisRun = false; // <<< RESET For Impact Initiated achievement
     }
 
     drawHpBar(ctx) {
@@ -680,7 +708,7 @@ export class Player {
         const { isCountingDownToResume = false,
                 postPopupImmunityTimer: postPopupTimerFromCtx = 0,
                 postDamageImmunityTimer: postDamageTimerFromCtx = 0,
-                CONSTANTS: gameDrawConstants = CONSTANTS 
+                CONSTANTS: gameDrawConstants = CONSTANTS
               } = gameContext;
         const now = Date.now();
         this.naniteAnimTimer = this.naniteAnimTimer || now;
@@ -698,41 +726,35 @@ export class Player {
             ctx.rotate(this.currentChargeRotation);
         }
 
-        ctx.save(); 
+        ctx.save();
         if (this.hasAegisPathHelm) {
-            ctx.fillStyle = "rgba(100, 150, 100, 0.7)"; // Base metallic green
-            ctx.strokeStyle = "rgba(50, 100, 50, 0.9)";   // Darker green outline
-            ctx.lineWidth = 2.0; // Slightly thinner for a sharper look
-        
-            const numSpikes = 7; // More spikes
+            ctx.fillStyle = "rgba(100, 150, 100, 0.7)";
+            ctx.strokeStyle = "rgba(50, 100, 50, 0.9)";
+            ctx.lineWidth = 2.0;
+
+            const numSpikes = 7;
             const spikeAnimSpeed = 0.0015;
-            const baseSpikeLength = this.radius * 0.35; // Longer base
+            const baseSpikeLength = this.radius * 0.35;
             const animSpikeLength = this.radius * 0.10 * Math.sin(this.aegisAnimTimer * spikeAnimSpeed);
-            const spikeBaseWidth = this.radius * 0.15; // Width at the player's body
-        
+            const spikeBaseWidth = this.radius * 0.15;
+
             for (let i = 0; i < numSpikes; i++) {
                 const angle = (i / numSpikes) * Math.PI * 2 + (this.aegisAnimTimer * spikeAnimSpeed * 0.5);
-                
                 ctx.save();
                 ctx.rotate(angle);
-        
-                // Create a gradient for a metallic sheen
                 const gradX = this.radius + baseSpikeLength / 2;
                 const gradient = ctx.createLinearGradient(this.radius, 0, this.radius + baseSpikeLength + animSpikeLength, 0);
-                gradient.addColorStop(0, "rgba(120, 180, 120, 0.8)"); // Lighter green highlight
-                gradient.addColorStop(0.5, "rgba(80, 140, 80, 0.9)");  // Mid green
-                gradient.addColorStop(1, "rgba(40, 90, 40, 0.8)");    // Darker green shadow
+                gradient.addColorStop(0, "rgba(120, 180, 120, 0.8)");
+                gradient.addColorStop(0.5, "rgba(80, 140, 80, 0.9)");
+                gradient.addColorStop(1, "rgba(40, 90, 40, 0.8)");
                 ctx.fillStyle = gradient;
-        
-                // Draw a pointy triangle (spike)
                 ctx.beginPath();
-                ctx.moveTo(this.radius - spikeBaseWidth * 0.2, -spikeBaseWidth / 2); // Inner base point 1
-                ctx.lineTo(this.radius - spikeBaseWidth * 0.2, spikeBaseWidth / 2);  // Inner base point 2
-                ctx.lineTo(this.radius + baseSpikeLength + animSpikeLength, 0);       // Tip of the spike
+                ctx.moveTo(this.radius - spikeBaseWidth * 0.2, -spikeBaseWidth / 2);
+                ctx.lineTo(this.radius - spikeBaseWidth * 0.2, spikeBaseWidth / 2);
+                ctx.lineTo(this.radius + baseSpikeLength + animSpikeLength, 0);
                 ctx.closePath();
                 ctx.fill();
-                ctx.stroke(); // Outline each spike
-        
+                ctx.stroke();
                 ctx.restore();
             }
         } else if (this.hasBerserkersEchoHelm) {
@@ -789,13 +811,13 @@ export class Player {
             ctx.arc(0, -this.radius * 1.5, this.radius * 0.15, 0, Math.PI * 2);
             ctx.fill();
         }
-        ctx.restore(); 
+        ctx.restore();
 
         if (this.currentPath === 'aegis' && this.hasAegisCharge) {
             const indicatorVisualRadius = this.radius + AEGIS_CHARGE_INDICATOR_RADIUS_OFFSET;
             if (this.isChargingAegisCharge) {
                 const chargeProgress = Math.min(1, this.aegisChargeCurrentChargeTime / AEGIS_CHARGE_MAX_CHARGE_TIME);
-                const endAngle = -Math.PI / 2 + (chargeProgress * Math.PI * 2); 
+                const endAngle = -Math.PI / 2 + (chargeProgress * Math.PI * 2);
 
                 ctx.beginPath();
                 ctx.arc(0, 0, indicatorVisualRadius, -Math.PI / 2, endAngle);
@@ -803,17 +825,17 @@ export class Player {
                 ctx.lineWidth = AEGIS_CHARGE_INDICATOR_LINE_WIDTH;
                 ctx.stroke();
 
-                if (chargeProgress >= 1) { 
+                if (chargeProgress >= 1) {
                     ctx.beginPath();
                     ctx.arc(0, 0, indicatorVisualRadius, 0, Math.PI * 2);
-                    ctx.strokeStyle = `rgba(255, 215, 0, ${0.5 + Math.abs(Math.sin(now / 150)) * 0.4})`; 
-                    ctx.lineWidth = AEGIS_CHARGE_INDICATOR_LINE_WIDTH + 2; 
+                    ctx.strokeStyle = `rgba(255, 215, 0, ${0.5 + Math.abs(Math.sin(now / 150)) * 0.4})`;
+                    ctx.lineWidth = AEGIS_CHARGE_INDICATOR_LINE_WIDTH + 2;
                     ctx.stroke();
                 }
-            } else if (this.aegisChargeCooldownTimer <= 0 && !this.isAegisChargingDash) { 
+            } else if (this.aegisChargeCooldownTimer <= 0 && !this.isAegisChargingDash) {
                 ctx.beginPath();
                 ctx.arc(0, 0, indicatorVisualRadius, 0, Math.PI * 2);
-                ctx.strokeStyle = `rgba(100, 180, 255, ${0.15 + Math.abs(Math.sin(now / 300)) * 0.15})`; 
+                ctx.strokeStyle = `rgba(100, 180, 255, ${0.15 + Math.abs(Math.sin(now / 300)) * 0.15})`;
                 ctx.lineWidth = AEGIS_CHARGE_INDICATOR_LINE_WIDTH -1;
                 ctx.stroke();
             }
@@ -961,7 +983,7 @@ export class Player {
             ctx.restore();
         }
 
-        ctx.restore(); 
+        ctx.restore();
     }
 
     static drawFromSnapshot(ctx, snapshotPlayerData, centerX, centerY, aimAngle = 0) {
@@ -987,6 +1009,10 @@ export class Player {
         if (!inferredHelmType && data.displayedUpgrades) {
             if (data.displayedUpgrades.some(u => u.id === 'juggernautPath' || u.name === 'Path of the Juggernaut' || u.id === 'aegisPath' || u.name === "Aegis Path")) {
                  inferredHelmType = 'aegisPath';
+            } else if (data.displayedUpgrades.some(u => u.id === 'berserkersEcho' || u.name === "Path of Fury")) {
+                inferredHelmType = 'berserkersEcho';
+            } else if (data.displayedUpgrades.some(u => u.id === 'ultimateConfiguration' || u.name === "Path of Power")) {
+                inferredHelmType = 'ultimateConfiguration';
             }
         }
 
@@ -1003,33 +1029,33 @@ export class Player {
         ctx.save();
 
         if (inferredHelmType === "aegisPath") {
-            ctx.fillStyle = "rgba(100, 150, 100, 0.7)"; 
-            ctx.strokeStyle = "rgba(50, 100, 50, 0.9)";   
-            ctx.lineWidth = 2.0 * displayScale; 
-        
-            const numSpikes = 7; 
+            ctx.fillStyle = "rgba(100, 150, 100, 0.7)";
+            ctx.strokeStyle = "rgba(50, 100, 50, 0.9)";
+            ctx.lineWidth = 2.0 * displayScale;
+
+            const numSpikes = 7;
             const spikeAnimSpeed = 0.0015;
-            const baseSpikeLength = radius * 0.35; 
+            const baseSpikeLength = radius * 0.35;
             const animSpikeLength = radius * 0.10 * Math.sin(aegisAnimTimer * spikeAnimSpeed);
-            const spikeBaseWidth = radius * 0.15; 
-        
+            const spikeBaseWidth = radius * 0.15;
+
             for (let i = 0; i < numSpikes; i++) {
                 const angle = (i / numSpikes) * Math.PI * 2 + (aegisAnimTimer * spikeAnimSpeed * 0.5);
                 ctx.save();
                 ctx.rotate(angle);
                 const gradX = radius + baseSpikeLength / 2;
                 const gradient = ctx.createLinearGradient(radius, 0, radius + baseSpikeLength + animSpikeLength, 0);
-                gradient.addColorStop(0, "rgba(120, 180, 120, 0.8)"); 
-                gradient.addColorStop(0.5, "rgba(80, 140, 80, 0.9)");  
-                gradient.addColorStop(1, "rgba(40, 90, 40, 0.8)");    
+                gradient.addColorStop(0, "rgba(120, 180, 120, 0.8)");
+                gradient.addColorStop(0.5, "rgba(80, 140, 80, 0.9)");
+                gradient.addColorStop(1, "rgba(40, 90, 40, 0.8)");
                 ctx.fillStyle = gradient;
                 ctx.beginPath();
-                ctx.moveTo(radius - spikeBaseWidth * 0.2, -spikeBaseWidth / 2); 
-                ctx.lineTo(radius - spikeBaseWidth * 0.2, spikeBaseWidth / 2);  
-                ctx.lineTo(radius + baseSpikeLength + animSpikeLength, 0);      
+                ctx.moveTo(radius - spikeBaseWidth * 0.2, -spikeBaseWidth / 2);
+                ctx.lineTo(radius - spikeBaseWidth * 0.2, spikeBaseWidth / 2);
+                ctx.lineTo(radius + baseSpikeLength + animSpikeLength, 0);
                 ctx.closePath();
                 ctx.fill();
-                ctx.stroke(); 
+                ctx.stroke();
                 ctx.restore();
             }
         } else if (inferredHelmType === "berserkersEcho") {
@@ -1145,7 +1171,11 @@ export class Player {
             if (typeof hittingRayOrAmount === 'object' && hittingRayOrAmount !== null) {
                 const hittingRay = hittingRayOrAmount;
                 const isOwnFreshRay = !hittingRay.isBossProjectile && !hittingRay.isCorruptedByGravityWell && !hittingRay.isCorruptedByPlayerWell && hittingRay.spawnGraceTimer > (RAY_SPAWN_GRACE_PERIOD - 100);
-                if (!isOwnFreshRay) { hittingRay.isActive = false; this.gainHealth(SHIELD_OVERCHARGE_HEAL_PER_RAY, gameContext.updateHealthDisplayCallback); }
+                if (!isOwnFreshRay) {
+                    hittingRay.isActive = false;
+                    this.gainHealth(SHIELD_OVERCHARGE_HEAL_PER_RAY, gameContext.updateHealthDisplayCallback);
+                    this.raysAbsorbedThisShieldOvercharge = (this.raysAbsorbedThisShieldOvercharge || 0) + 1; // <<< SHIELD SIPHON TRACKING
+                }
                 else { hittingRay.isActive = false; }
             }
             return 0;
@@ -1183,6 +1213,16 @@ export class Player {
         this.hp -= damageToTake;
         if (this.hp < 0) this.hp = 0;
         if (gameContext.updateHealthDisplayCallback) gameContext.updateHealthDisplayCallback(this.hp, this.maxHp);
+
+        const threshold = (gameContext.CONSTANTS && gameContext.CONSTANTS.CLOSE_SHAVE_HP_THRESHOLD !== undefined)
+                            ? gameContext.CONSTANTS.CLOSE_SHAVE_HP_THRESHOLD
+                            : CLOSE_SHAVE_HP_THRESHOLD;
+
+        if (this.hp > 0 && this.hp < threshold) {
+            if (gameContext.signalAchievementEvent) {
+                gameContext.signalAchievementEvent("player_hp_critical_after_hit", { currentHp: this.hp });
+            }
+        }
 
 
         const { screenShakeParams } = damageContext;
@@ -1254,12 +1294,18 @@ export class Player {
 
 
     activateAbility(slot, abilityContext) {
-        const { isAnyPauseActiveCallback, updateAbilityCooldownCallback, activeBosses } = abilityContext;
+        const { isAnyPauseActiveCallback, updateAbilityCooldownCallback, activeBosses, getBossManager, targets, signalAchievementEvent } = abilityContext;
         if (isAnyPauseActiveCallback && isAnyPauseActiveCallback()) return;
 
         const slotStr = String(slot);
         const ability = this.activeAbilities[slotStr];
         if (!ability) return;
+
+        const currentBossManager = getBossManager ? getBossManager() : null;
+        if (currentBossManager && currentBossManager.isBossSequenceActive()) {
+            this.usedAbilityInCurrentBossFight = true;
+        }
+
 
         let abilityUsedSuccessfully = false;
         let baseCooldownForThisAbility = ability.cooldownDuration;
@@ -1279,7 +1325,10 @@ export class Player {
             }
         } else if (ability.cooldownTimer <= 0) {
             switch (ability.id) {
-                case 'teleport': this.doTeleport(abilityContext.bossDefeatEffectsArray, abilityContext.mouseX, abilityContext.mouseY, abilityContext.canvasWidth, abilityContext.canvasHeight); ability.cooldownTimer = effectiveCooldownToSet; abilityUsedSuccessfully = true; break;
+                case 'teleport':
+                    this.doTeleport(abilityContext.bossDefeatEffectsArray, abilityContext.mouseX, abilityContext.mouseY, abilityContext.canvasWidth, abilityContext.canvasHeight, targets, signalAchievementEvent);
+                    ability.cooldownTimer = effectiveCooldownToSet; abilityUsedSuccessfully = true;
+                    break;
                 case 'empBurst':
                     this.triggerEmpBurst(abilityContext.bossDefeatEffectsArray, abilityContext.allRays, abilityContext.screenShakeParams, abilityContext.canvasWidth, abilityContext.canvasHeight, activeBosses);
                     ability.cooldownTimer = effectiveCooldownToSet; abilityUsedSuccessfully = true;
@@ -1301,7 +1350,7 @@ export class Player {
     }
 
 
-    doTeleport(bossDefeatEffectsArray, mouseX, mouseY, canvasWidth, canvasHeight) {
+    doTeleport(bossDefeatEffectsArray, mouseX, mouseY, canvasWidth, canvasHeight, targetsArray, signalAchievementEventCallback) {
         if (this.teleporting && this.teleportEffectTimer > 0) return;
         const oldX = this.x; const oldY = this.y;
         this.x = mouseX; this.y = mouseY;
@@ -1313,6 +1362,21 @@ export class Player {
             bossDefeatEffectsArray.push({ x: this.x, y: this.y, radius: this.radius * 0.2, maxRadius: this.radius * 1.8, opacity: 0.8, timer: 350, duration: 350, color: 'rgba(200, 200, 255, opacity)', initialRadius: this.radius * 0.2 });
         }
         playSound(teleportSound);
+
+        if (targetsArray && targetsArray.length > 0 && signalAchievementEventCallback) { // <<< TELE-FRAG CHECK
+            let teleFragged = false;
+            for (let i = targetsArray.length - 1; i >= 0; i--) {
+                if (checkCollision(this, targetsArray[i])) {
+                    // Assuming the target will be removed by gameLogic's ray/target collision check
+                    // or if we need to remove it here, then `targetsArray.splice(i, 1);`
+                    teleFragged = true;
+                    break;
+                }
+            }
+            if (teleFragged) {
+                signalAchievementEventCallback("teleport_kill_target");
+            }
+        }
     }
 
     triggerEmpBurst(bossDefeatEffectsArray, allRays, screenShakeParams, canvasWidth, canvasHeight, activeBosses) {
@@ -1324,7 +1388,7 @@ export class Player {
                 if (entity && entity instanceof Ray) {
                     if (!entity.isGravityWellRay &&
                         !entity.isCorruptedByPlayerWell &&
-                        !(entity.sourceAbility === 'miniGravityWell' && entity.color === PLAYER_GRAVITY_WELL_ABSORBED_RAY_COLOR) 
+                        !(entity.sourceAbility === 'miniGravityWell' && entity.color === PLAYER_GRAVITY_WELL_ABSORBED_RAY_COLOR)
                        ) {
                         entity.isActive = false;
                     }
@@ -1338,11 +1402,19 @@ export class Player {
 
 
     activateLMB(abilityContext, isRelease = false) {
+        const currentBossManager = abilityContext.getBossManager ? abilityContext.getBossManager() : null;
+        if (currentBossManager && currentBossManager.isBossSequenceActive()) {
+            this.usedAbilityInCurrentBossFight = true;
+        }
         if (this.currentPath === 'mage') this.activateOmegaLaser_LMB_Mage(abilityContext);
         else if (this.currentPath === 'aegis') this.activateAegisCharge_LMB_Aegis(abilityContext, isRelease);
         else if (this.currentPath === 'berserker') this.activateBloodpact_LMB_Berserker(abilityContext);
     }
     activateRMB(abilityContext) {
+        const currentBossManager = abilityContext.getBossManager ? abilityContext.getBossManager() : null;
+        if (currentBossManager && currentBossManager.isBossSequenceActive()) {
+            this.usedAbilityInCurrentBossFight = true;
+        }
         if (this.currentPath === 'mage') this.activateShieldOvercharge_RMB_Mage(abilityContext);
         else if (this.currentPath === 'aegis') this.activateSeismicSlam_RMB_Aegis(abilityContext);
         else if (this.currentPath === 'berserker') this.activateSavageHowl_RMB_Berserker(abilityContext);
@@ -1361,6 +1433,7 @@ export class Player {
     activateShieldOvercharge_RMB_Mage(abilityContext) {
         if (this.hasShieldOvercharge && !this.isShieldOvercharging && this.shieldOverchargeCooldownTimer <= 0) {
             this.isShieldOvercharging = true; this.shieldOverchargeTimer = SHIELD_OVERCHARGE_DURATION;
+            this.raysAbsorbedThisShieldOvercharge = 0;
             playSound(shieldOverchargeSound);
             if(abilityContext.activeBuffNotificationsArray) abilityContext.activeBuffNotificationsArray.push({ text: `Shield Overcharge Active! Healing!`, timer: SHIELD_OVERCHARGE_DURATION });
             this.procTemporalEcho('shieldOvercharge_RMB_Mage', abilityContext);
@@ -1384,7 +1457,7 @@ export class Player {
                 this.aegisChargeDashTargetY = abilityContext.mouseY;
                 const dist = Math.hypot(this.aegisChargeDashTargetX - this.x, this.aegisChargeDashTargetY - this.y);
                 const dashSpeed = this.originalPlayerSpeed * AEGIS_CHARGE_DASH_SPEED_FACTOR;
-                this.aegisChargeDashTimer = (dist / dashSpeed) * (1000/60) * 2; 
+                this.aegisChargeDashTimer = (dist / dashSpeed) * (1000/60) * 2;
                 this.procTemporalEcho('aegisCharge_LMB_Aegis', abilityContext);
             }
         }

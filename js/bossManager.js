@@ -12,7 +12,7 @@ reflectorSpawnSound as audioReflectorSpawnSoundLocal,
 singularitySpawnSound as audioSingularitySpawnSoundLocal,
 nexusWeaverSpawnSound as audioNexusWeaverSpawnSoundLocal
 } from './audio.js';
-import { PENDING_RECORD_NAME } from './highScoreManager.js'; // <<< IMPORT PENDING_RECORD_NAME
+import { PENDING_RECORD_NAME } from './highScoreManager.js'; 
 
 
 function formatMillisecondsToTimeInternal(ms) {
@@ -27,6 +27,14 @@ function formatMillisecondsToTimeInternal(ms) {
     if (milliseconds.length === 1) milliseconds = "0" + milliseconds;
 
     return minutes + ":" + seconds + "." + milliseconds;
+}
+
+function getBossKeyFromName(bossInstance) {
+    if (bossInstance instanceof ChaserBoss) return "chaser";
+    if (bossInstance instanceof MirrorShieldBoss) return "reflector";
+    if (bossInstance instanceof GravityWellBoss) return "singularity";
+    if (bossInstance instanceof NexusWeaverBoss) return "nexusWeaver";
+    return "unknown";
 }
 
 
@@ -65,7 +73,7 @@ this.standardAvailableBossTypes = [ChaserBoss, MirrorShieldBoss, GravityWellBoss
     this.audioNexusWeaverSpawnSound = (audioContextConfig && audioContextConfig.audioNexusWeaverSpawnSound) ? audioContextConfig.audioNexusWeaverSpawnSound : audioNexusWeaverSpawnSoundLocal;
 }
 
-trySpawnBoss(currentScore) {
+trySpawnBoss(currentScore, playerInstance) { 
         if (this.activeBosses.length > 0 || this.bossSpawnQueue.length > 0 || this.bossWarningActive || this.isWaveInProgress) {
             return;
         }
@@ -129,6 +137,11 @@ trySpawnBoss(currentScore) {
             this.isWaveInProgress = true;
             this.waveRewardTier = firstBossTierOfWave;
             this.bossesDefeatedInCurrentWave = 0;
+            
+            if (playerInstance) { 
+                playerInstance.usedAbilityInCurrentBossFight = false;
+                console.log("[BossManager trySpawnBoss] Reset usedAbilityInCurrentBossFight for new wave."); 
+            }
 
             const firstBossInWaveInfo = this.bossSpawnQueue[0];
             this.nextBossToSpawnInfo = { name: firstBossInWaveInfo.name, tier: firstBossInWaveInfo.tier };
@@ -143,9 +156,14 @@ trySpawnBoss(currentScore) {
     }
 }
 
-processBossSpawnQueue(gameContext) {
+processBossSpawnQueue(gameContext) { 
     if (this.bossSpawnQueue.length > 0 && gameContext && gameContext.isAnyPauseActive && !gameContext.isAnyPauseActive()) {
         const bossInfo = this.bossSpawnQueue.shift();
+
+        if (gameContext.player) { 
+            gameContext.player.usedAbilityInCurrentBossFight = false;
+            console.log("[BossManager processBossSpawnQueue] Reset usedAbilityInCurrentBossFight for boss:", bossInfo.name); 
+        }
 
         this.bossTiers[bossInfo.typeKey] = Math.max(this.bossTiers[bossInfo.typeKey] || 0, bossInfo.tier);
 
@@ -163,7 +181,6 @@ processBossSpawnQueue(gameContext) {
 
 
         if (this.bossSpawnQueue.length > 0 && this.activeBosses.length < this.bossesToSpawnInCurrentWave && this.activeBosses.length < CONSTANTS_IMPORTED.MAX_BOSSES_IN_WAVE_CAP) {
-            // More bosses in queue for this wave
         } else {
             this.nextBossToSpawnInfo = null;
         }
@@ -176,15 +193,17 @@ update(playerInstance, gameContext) {
         return;
     }
 
+    this.trySpawnBoss(gameContext.score, playerInstance); 
+
     if (this.bossWarningActive) {
         this.bossWarningTimer -= gameContext.dt;
         if (this.bossWarningTimer <= 0) {
             this.bossWarningActive = false;
-            this.processBossSpawnQueue(gameContext);
+            this.processBossSpawnQueue({...gameContext, player: playerInstance });
         }
     } else if (this.bossSpawnQueue.length > 0 && this.isWaveInProgress && !this.bossWarningActive && gameContext.isAnyPauseActive && !gameContext.isAnyPauseActive()) {
         if (this.activeBosses.length < CONSTANTS_IMPORTED.MAX_BOSSES_IN_WAVE_CAP) {
-             this.processBossSpawnQueue(gameContext);
+             this.processBossSpawnQueue({...gameContext, player: playerInstance });
         }
     }
 
@@ -209,12 +228,11 @@ update(playerInstance, gameContext) {
 
     for (let i = this.activeBosses.length - 1; i >= 0; i--) {
         const boss = this.activeBosses[i];
-        if (!boss) { // Safety check
+        if (!boss) { 
             console.warn(`[BossManager Update] Found undefined boss at index ${i}. Splicing out.`);
             this.activeBosses.splice(i, 1);
             continue;
         }
-        // console.log(`[BossManager Update] Updating boss: ${boss.constructor.name}, Health: ${boss.health}`); // LOGGING
         boss.update(playerInstance, bossUpdateContext);
 
         if (bossUpdateContext.playerCollidedWithBoss && bossUpdateContext.callbacks && bossUpdateContext.callbacks.onPlayerBossCollision) {
@@ -232,7 +250,6 @@ update(playerInstance, gameContext) {
 
 
         if (boss.health <= 0) {
-            // console.log(`[BossManager Update] Boss ${boss.constructor.name} health <= 0. Calling handleBossDefeat.`); // LOGGING
             this.handleBossDefeat(boss, i, playerInstance, gameContext);
         }
     }
@@ -240,15 +257,13 @@ update(playerInstance, gameContext) {
 
 
 handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
-    // ADD DETAILED LOGGING HERE
     console.log(`[BossManager] handleBossDefeat called for: ${defeatedBoss ? defeatedBoss.constructor.name : 'undefined boss'} at index ${index}. Health: ${defeatedBoss ? defeatedBoss.health : 'N/A'}`);
     const stack = new Error().stack;
-    console.log("[BossManager] Call stack for handleBossDefeat:\n", stack);
+    // console.log("[BossManager] Call stack for handleBossDefeat:\n", stack); // Optional: very verbose
 
 
     if (!defeatedBoss) {
         console.error("[BossManager] handleBossDefeat: defeatedBoss is null or undefined. This should not happen.");
-        // Attempt to clean up the array if index is valid
         if (index >= 0 && index < this.activeBosses.length) {
             console.warn(`[BossManager] Splicing out potentially problematic entry at index ${index} due to null/undefined boss.`);
             this.activeBosses.splice(index, 1);
@@ -259,6 +274,27 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
         console.error("[BossManager] handleBossDefeat: Missing critical gameContext properties (including currentRunId).");
         return;
     }
+
+    console.log(`[BossManager handleBossDefeat] Checking Resourceful Fighter for ${defeatedBoss.constructor.name} T${defeatedBoss.tier}. Player used ability: ${playerInstance ? playerInstance.usedAbilityInCurrentBossFight : 'N/A'}`); 
+    if (playerInstance &&
+        defeatedBoss.tier === 2 &&
+        this.standardAvailableBossTypes.some(type => defeatedBoss instanceof type) && 
+        !playerInstance.usedAbilityInCurrentBossFight &&
+        gameContext.callbacks && gameContext.callbacks.signalAchievementEvent) {
+        
+        const bossKey = getBossKeyFromName(defeatedBoss);
+        console.log(`[BossManager handleBossDefeat] Conditions MET for Resourceful Fighter. Signaling event for ${bossKey} T${defeatedBoss.tier}.`); 
+        gameContext.callbacks.signalAchievementEvent("boss_defeat_no_abilities", {
+            bossTier: defeatedBoss.tier,
+            bossKey: bossKey, 
+            noAbilitiesUsedFromBossManager: true 
+        });
+    }
+    if (playerInstance) { // Reset for the next boss, even if this one didn't qualify or if no achievement was signaled
+        playerInstance.usedAbilityInCurrentBossFight = false;
+        console.log("[BossManager handleBossDefeat] Reset usedAbilityInCurrentBossFight AFTER handling defeat.");
+    }
+
 
     if (defeatedBoss instanceof GravityWellBoss) {
         stopSound(gravityWellChargeSound);
@@ -276,16 +312,13 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
         gameContext.bossDefeatEffectsArray.push({ x: defeatedBoss.x, y: defeatedBoss.y, radius: defeatedBoss.radius * 1.2, opacity: 1, timer: 800, duration: 800, initialRadius: defeatedBoss.radius * 1.2, color: 'rgba(255, 255, 180, opacity)' });
     }
     
-    // Ensure the boss being removed is the one we expect
     if (this.activeBosses[index] === defeatedBoss) {
         this.activeBosses.splice(index, 1);
-        // console.log(`[BossManager] Successfully spliced boss: ${defeatedBoss.constructor.name}. Active bosses remaining: ${this.activeBosses.length}`);
     } else {
         console.warn(`[BossManager] Mismatch during boss removal. Expected ${defeatedBoss.constructor.name} at index ${index}, found ${this.activeBosses[index] ? this.activeBosses[index].constructor.name : 'nothing'}. Searching and removing by reference instead.`);
         const actualIndex = this.activeBosses.indexOf(defeatedBoss);
         if (actualIndex > -1) {
             this.activeBosses.splice(actualIndex, 1);
-            // console.log(`[BossManager] Successfully spliced boss by reference: ${defeatedBoss.constructor.name}. Active bosses remaining: ${this.activeBosses.length}`);
         } else {
             console.error(`[BossManager] CRITICAL: Boss ${defeatedBoss.constructor.name} not found in activeBosses array for removal.`);
         }
@@ -397,7 +430,7 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
             if (!lootGeneratedThisTurn && !evolutionTriggeredByThisDefeat && gameContext.callbacks.pausePickups) {
             }
         } else if (this.bossSpawnQueue.length > 0 && this.activeBosses.length < CONSTANTS_IMPORTED.MAX_BOSSES_IN_WAVE_CAP && !this.bossWarningActive) {
-            this.processBossSpawnQueue(gameContext);
+            this.processBossSpawnQueue({...gameContext, player: playerInstance });
         } else if (this.activeBosses.length === 0 && this.bossSpawnQueue.length === 0 && this.isWaveInProgress) {
             this.isWaveInProgress = false;
              if (gameContext.callbacks.pausePickups) {
@@ -440,7 +473,7 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
 draw(ctx, gameDrawContext) {
     if (!ctx) return;
     this.activeBosses.forEach(boss => {
-        if (boss && typeof boss.draw === 'function') { // Safety check
+        if (boss && typeof boss.draw === 'function') { 
             boss.draw(ctx);
         } else if (boss) {
             console.warn(`[BossManager Draw] Boss object in activeBosses does not have a draw method:`, boss);
@@ -495,7 +528,7 @@ isBossSequenceActive() { return this.activeBosses.length > 0 || this.bossWarning
 isBossWarningActiveProp() { return this.bossWarningActive; }
 isBossInQueue() { return this.bossSpawnQueue.length > 0; }
 
-debugSpawnBoss(tierToSpawn, bossTypeKey = 'nexusWeaver') {
+debugSpawnBoss(tierToSpawn, bossTypeKey = 'nexusWeaver', playerInstance) { 
     let constructorToUse;
     let nameToUse;
     switch(bossTypeKey) {
@@ -517,6 +550,11 @@ debugSpawnBoss(tierToSpawn, bossTypeKey = 'nexusWeaver') {
     this.waveRewardTier = tier;
     this.bossesToSpawnInCurrentWave = 1;
     this.bossesDefeatedInCurrentWave = 0;
+
+    if (playerInstance) { 
+        playerInstance.usedAbilityInCurrentBossFight = false;
+        console.log("[BossManager debugSpawnBoss] Reset usedAbilityInCurrentBossFight for debug boss:", nameToUse); // DEBUG
+    }
 
     const firstBossInWaveInfo = this.bossSpawnQueue[0];
     this.nextBossToSpawnInfo = { name: firstBossInWaveInfo.name, tier: firstBossInWaveInfo.tier };
