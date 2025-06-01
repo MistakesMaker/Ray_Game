@@ -150,7 +150,6 @@ export function updateActiveBuffIndicator(playerInstance, currentPostPopupImmuni
     
     if (playerInstance.teleporting && playerInstance.teleportEffectTimer > 0) textParts.push(`Teleporting (${(playerInstance.teleportEffectTimer / 1000).toFixed(1)}s)`);
     
-    // Path-specific active states
     if (playerInstance.currentPath === 'mage') {
         if (playerInstance.isShieldOvercharging) textParts.push(`Overcharge (${(playerInstance.shieldOverchargeTimer / 1000).toFixed(1)}s)`);
     } else if (playerInstance.currentPath === 'aegis') {
@@ -222,22 +221,21 @@ export function updateAbilityCooldownUI(playerInstance) {
     let lmbDesc = { type: 'mouse', id: 'lmb_placeholder', keybindText: 'LMB', iconText: '?', name: "LMB Ability", check: () => false };
     let rmbDesc = { type: 'mouse', id: 'rmb_placeholder', keybindText: 'RMB', iconText: '?', name: "RMB Ability", check: () => false };
 
-    // Define mouse abilities based on current path
     if (playerInstance.currentPath === 'mage') {
         lmbDesc = { type: 'mouse', id: 'omegaLaser_LMB_Mage', keybindText: 'LMB', iconText: '🔥', name: 'Omega Laser',
                     check: () => playerInstance.hasOmegaLaser, 
                     isCharging: () => playerInstance.isFiringOmegaLaser, 
                     timer: () => playerInstance.omegaLaserTimer, 
-                    maxTime: () => CONSTANTS.OMEGA_LASER_DURATION,  // Use constant
+                    maxTime: () => CONSTANTS.OMEGA_LASER_DURATION,
                     cooldownTimer: () => playerInstance.omegaLaserCooldownTimer, 
-                    cooldownMax: () => CONSTANTS.OMEGA_LASER_COOLDOWN }; // Use constant
+                    cooldownMax: () => CONSTANTS.OMEGA_LASER_COOLDOWN };
         rmbDesc = { type: 'mouse', id: 'shieldOvercharge_RMB_Mage', keybindText: 'RMB', iconText: '🛡️', name: 'Shield Overcharge',
                     check: () => playerInstance.hasShieldOvercharge, 
                     isCharging: () => playerInstance.isShieldOvercharging, 
                     timer: () => playerInstance.shieldOverchargeTimer, 
-                    maxTime: () => CONSTANTS.SHIELD_OVERCHARGE_DURATION, // Use constant
+                    maxTime: () => CONSTANTS.SHIELD_OVERCHARGE_DURATION,
                     cooldownTimer: () => playerInstance.shieldOverchargeCooldownTimer, 
-                    cooldownMax: () => CONSTANTS.SHIELD_OVERCHARGE_COOLDOWN }; // Use constant
+                    cooldownMax: () => CONSTANTS.SHIELD_OVERCHARGE_COOLDOWN };
     } else if (playerInstance.currentPath === 'aegis') {
         lmbDesc = { type: 'mouse', id: 'aegisCharge_LMB_Aegis', keybindText: 'LMB', iconText: '💨', name: 'Aegis Charge',
                     check: () => playerInstance.hasAegisCharge, 
@@ -355,12 +353,11 @@ export function updateAbilityCooldownUI(playerInstance) {
                 cooldownOverlayDiv.style.height = '100%'; 
                 cooldownTimerSpan.textContent = '0.0s';
             }
-             // Aegis Charge specific: if charging (not dashing), show charge progress instead of cooldown
             if (desc.id === 'aegisCharge_LMB_Aegis' && playerInstance.isChargingAegisCharge && !playerInstance.isAegisChargingDash) {
                 const chargeProgress = playerInstance.aegisChargeCurrentChargeTime / CONSTANTS.AEGIS_CHARGE_MAX_CHARGE_TIME;
                 cooldownOverlayDiv.style.height = `${Math.min(100, chargeProgress * 100)}%`;
                 cooldownTimerSpan.textContent = `${(chargeProgress * 100).toFixed(0)}%`;
-                 slotDiv.classList.remove('on-cooldown'); // Ensure it's not also styled as on-cooldown
+                 slotDiv.classList.remove('on-cooldown');
             }
 
         } else if (!isReady && displayCooldownTimerValue > 0) {
@@ -418,31 +415,17 @@ export function updateBerserkerRageUI(ragePercentage, playerInstance) {
         berserkerRageUIElement.style.display = 'none';
         return;
     }
-
-    // Max possible rage bonus from low HP based on BERSERKERS_ECHO_DAMAGE_PER_10_HP
-    // (e.g., if it's 0.09, max bonus is 0.09 * 10 = 0.9 or 90%)
     const maxPossibleRageBonusPercentage = CONSTANTS.BERSERKERS_ECHO_DAMAGE_PER_10_HP * 10 * 100; 
-    
-    // Calculate fill percentage relative to the *max possible* bonus, not just the current ragePercentage.
-    // If maxPossibleRageBonusPercentage is 0 (e.g. if constant is 0), avoid division by zero.
     let fillPercentage = 0;
     if (maxPossibleRageBonusPercentage > 0) {
         fillPercentage = Math.min(100, (ragePercentage / maxPossibleRageBonusPercentage) * 100);
     }
-    
     berserkerRageBarFillElement.style.width = `${fillPercentage}%`;
-
     let barColor;
-    // Color transition based on the actual ragePercentage value
-    if (ragePercentage > maxPossibleRageBonusPercentage * 0.66) { // High rage
-        barColor = 'rgba(220, 20, 20, 0.9)'; // Red
-    } else if (ragePercentage > maxPossibleRageBonusPercentage * 0.33) { // Medium rage
-        barColor = 'rgba(255, 140, 0, 0.9)'; // Orange
-    } else { // Low rage (or 0)
-        barColor = 'rgba(255, 220, 50, 0.9)'; // Yellow
-    }
+    if (ragePercentage > maxPossibleRageBonusPercentage * 0.66) barColor = 'rgba(220, 20, 20, 0.9)';
+    else if (ragePercentage > maxPossibleRageBonusPercentage * 0.33) barColor = 'rgba(255, 140, 0, 0.9)';
+    else barColor = 'rgba(255, 220, 50, 0.9)';
     berserkerRageBarFillElement.style.backgroundColor = barColor;
-
     berserkerRageTextElement.textContent = `Rage: +${ragePercentage.toFixed(0)}% Dmg`;
 }
 
@@ -544,10 +527,9 @@ export function populateEvolutionOptionsUI(
     currentInputState
 ) {
     if (!evolutionOptionsContainer || !playerInstance || !currentInputState) return;
-    evolutionOptionsContainer.innerHTML = ''; // Clear previous cards first
+    evolutionOptionsContainer.innerHTML = '';
     const maxReRolls = CONSTANTS.MAX_EVOLUTION_REROLLS; const maxBlocks = CONSTANTS.MAX_EVOLUTION_BLOCKS; const maxFreezes = CONSTANTS.MAX_EVOLUTION_FREEZES_PER_RUN;
 
-    // Reroll, Block, Freeze controls (these are outside the loop, so they are set once)
     if (rerollEvolutionButton && rerollInfoSpan) {
         rerollEvolutionButton.disabled = playerInstance.evolutionReRollsRemaining <= 0 || playerInstance.isFreezeModeActive || playerInstance.isBlockModeActive;
         rerollEvolutionButton.onclick = rerollCallback;
@@ -562,30 +544,44 @@ export function populateEvolutionOptionsUI(
     }
     if (toggleFreezeModeButton && freezeInfoSpan) {
         toggleFreezeModeButton.disabled = (playerInstance.evolutionFreezesRemaining <= 0 && !playerInstance.isFreezeModeActive && !playerInstance.frozenEvolutionChoice) || playerInstance.isBlockModeActive;
-        if (playerInstance.isFreezeModeActive) { toggleFreezeModeButton.textContent = "Freeze Active (Cancel F)"; toggleFreezeModeButton.classList.add('freeze-mode-active'); toggleFreezeModeButton.classList.remove('has-frozen-choice');}
-        else if (playerInstance.frozenEvolutionChoice) { toggleFreezeModeButton.textContent = "Unfreeze Current (F)"; toggleFreezeModeButton.classList.add('has-frozen-choice'); toggleFreezeModeButton.classList.remove('freeze-mode-active');}
-        else { toggleFreezeModeButton.textContent = `Enable Freeze (F)`; toggleFreezeModeButton.classList.remove('freeze-mode-active'); toggleFreezeModeButton.classList.remove('has-frozen-choice');}
+        
+        toggleFreezeModeButton.classList.remove('freeze-mode-active', 'has-frozen-choice');
+        if (playerInstance.isFreezeModeActive) {
+            toggleFreezeModeButton.textContent = "Freeze Active (Cancel F)";
+            toggleFreezeModeButton.classList.add('freeze-mode-active');
+        } else {
+            if (playerInstance.frozenEvolutionChoice) {
+                if (playerInstance.hasUsedFreezeForCurrentOffers) {
+                    toggleFreezeModeButton.textContent = "Unfreeze Current (F)";
+                    toggleFreezeModeButton.classList.add('has-frozen-choice');
+                } else {
+                    toggleFreezeModeButton.textContent = `Enable Freeze (F)`;
+                    // No 'has-frozen-choice' class for carried-over, not-yet-active freeze
+                }
+            } else {
+                toggleFreezeModeButton.textContent = `Enable Freeze (F)`;
+            }
+        }
         toggleFreezeModeButton.onclick = toggleFreezeModeCallback;
         freezeInfoSpan.textContent = `Freezes left: ${playerInstance.evolutionFreezesRemaining || 0}/${maxFreezes}`;
     }
 
-    // Shift key prompt
-    let shiftPrompt = evolutionOptionsContainer.parentNode.querySelector('.shift-prompt-evo'); // Search within parent of container
-    if (!shiftPrompt && importedEvolutionScreen) { // Fallback to search in whole screen if not found in parent
+    let shiftPrompt = evolutionOptionsContainer.parentNode.querySelector('.shift-prompt-evo');
+    if (!shiftPrompt && importedEvolutionScreen) {
         shiftPrompt = importedEvolutionScreen.querySelector('.shift-prompt-evo');
     }
-    if (!shiftPrompt && importedEvolutionScreen) { // If still not found, create and prepend to evolutionScreen
+    if (!shiftPrompt && importedEvolutionScreen) {
         shiftPrompt = document.createElement('p');
         shiftPrompt.classList.add('shift-prompt-evo');
         shiftPrompt.style.textAlign = 'center';
         shiftPrompt.style.fontSize = '13px';
         shiftPrompt.style.color = '#a0b0d0';
         shiftPrompt.style.width = '100%';
-        shiftPrompt.style.marginBottom = '15px'; // Placed above options container
-        shiftPrompt.style.order = "-1"; // Try to put it before the options flex container
-        if (evolutionOptionsContainer.parentNode) { // Insert before the options container
+        shiftPrompt.style.marginBottom = '15px';
+        shiftPrompt.style.order = "-1";
+        if (evolutionOptionsContainer.parentNode) {
             evolutionOptionsContainer.parentNode.insertBefore(shiftPrompt, evolutionOptionsContainer);
-        } else { // Fallback if container has no parent yet (should not happen if structure is as expected)
+        } else {
             importedEvolutionScreen.insertBefore(shiftPrompt, importedEvolutionScreen.firstChild);
         }
     }
@@ -598,20 +594,19 @@ export function populateEvolutionOptionsUI(
         const choiceWrapper = document.createElement('div'); choiceWrapper.classList.add('evolution-choice-wrapper');
         const optionDiv = document.createElement('div'); optionDiv.classList.add('evolutionOption'); optionDiv.dataset.class = uiChoiceData.classType; optionDiv.dataset.baseId = uiChoiceData.baseId;
 
-        // Always set the data-tier attribute for CSS styling
         if (!uiChoiceData.originalEvolution.isTiered) {
             optionDiv.dataset.tier = "core";
         } else if (uiChoiceData.originalEvolution.isTiered && uiChoiceData.rolledTier && uiChoiceData.rolledTier !== "none") {
             optionDiv.dataset.tier = uiChoiceData.rolledTier;
         } else {
-            optionDiv.dataset.tier = 'disabled'; // Fallback if tier is unknown for a tiered item
+            optionDiv.dataset.tier = 'disabled';
         }
 
         const tierLabel = document.createElement('span'); tierLabel.classList.add('evolution-tier-label');
         const tierStyle = getTierStyling(optionDiv.dataset.tier);
         tierLabel.textContent = tierStyle.text;
         tierLabel.style.color = tierStyle.color;
-        tierLabel.classList.add('has-tier'); // Make it visible
+        tierLabel.classList.add('has-tier');
 
         let currentEffectText = "";
         if (uiChoiceData.originalEvolution && typeof uiChoiceData.originalEvolution.getEffectString === 'function') {
@@ -638,6 +633,7 @@ export function populateEvolutionOptionsUI(
         const baseEvoForMaxCheck = uiChoiceData.originalEvolution;
         const isMaxed = baseEvoForMaxCheck.isMaxed ? baseEvoForMaxCheck.isMaxed(playerInstance) : false;
         const isAlreadyBlockedByPlayer = playerInstance.blockedEvolutionIds && playerInstance.blockedEvolutionIds.includes(uiChoiceData.baseId);
+        
         if (playerInstance.frozenEvolutionChoice && playerInstance.frozenEvolutionChoice.choiceData.baseId === uiChoiceData.baseId && playerInstance.hasUsedFreezeForCurrentOffers) {
             optionDiv.classList.add('actually-frozen');
         }
@@ -648,7 +644,7 @@ export function populateEvolutionOptionsUI(
                 if (playerInstance.isFreezeModeActive && uiChoiceData.baseId !== 'noMoreEvolutions' && !uiChoiceData.baseId.startsWith('empty_slot_') && !isMaxed && !isAlreadyBlockedByPlayer && (playerInstance.evolutionFreezesRemaining > 0 || (playerInstance.frozenEvolutionChoice && playerInstance.frozenEvolutionChoice.choiceData.baseId === uiChoiceData.baseId))) optionDiv.classList.add('primed-for-freeze');
 
                 let tooltipText = "";
-                const ttTierStyle = getTierStyling(optionDiv.dataset.tier); // Get tier from the div itself
+                const ttTierStyle = getTierStyling(optionDiv.dataset.tier);
                 tooltipText = `<span style="text-transform: capitalize; font-weight: bold; color: ${ttTierStyle.color};">${ttTierStyle.text} TIER</span><br>`;
 
                 if (currentInputState.shiftPressed) {
@@ -665,7 +661,7 @@ export function populateEvolutionOptionsUI(
 
         if (baseEvoForMaxCheck.id === 'noMoreEvolutions' || (uiChoiceData.baseId && uiChoiceData.baseId.startsWith('empty_slot_')) || isMaxed || isAlreadyBlockedByPlayer ) {
             optionDiv.classList.add('disabled');
-            optionDiv.dataset.tier = 'disabled'; // Ensure disabled cards get the disabled tier for styling
+            optionDiv.dataset.tier = 'disabled';
             if(isAlreadyBlockedByPlayer && !optionDiv.classList.contains('disabled')){ const h3 = optionDiv.querySelector('h3'); if (h3) h3.innerHTML += `<p style="font-size:10px; color:#ff8080;">(Blocked)</p>`;}
             if (baseEvoForMaxCheck.id === 'smallerPlayer' && currentShrinkMeCooldownVal > 0) { const h3 = optionDiv.querySelector('h3'); if (h3) h3.innerHTML += `<p style="font-size:10px; color:#aaa;">(Cooldown: ${currentShrinkMeCooldownVal})</p>`;}
         } else {
@@ -870,7 +866,7 @@ export function displayDetailedHighScoresScreenUI(allHighScoresObject, onEntryCl
     }
 }
 
-export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText) { // panelTitleText is for the overall screen (e.g. Pause Menu)
+export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText) {
     const statsRunDiv = document.getElementById('statsRun');
     const statsPlayerCoreDiv = document.getElementById('statsPlayerCore');
     const statsGearUl = document.getElementById('statsGearList');
@@ -970,14 +966,12 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText) { /
     };
 
 
-    // --- 📊 Run Information ---
     let runHTML = '';
     runHTML += `<p><span class="stat-label">Time Played:</span><span class="stat-value">${formatMillisecondsToTime(runStats.gameplayTime)}</span></p>`;
     runHTML += `<p><span class="stat-label">Times Hit:</span><span class="stat-value">${formatInt(runStats.timesHit)}</span></p>`;
     runHTML += `<p><span class="stat-label">Damage Dealt:</span><span class="stat-value">${runStats.totalDamageDealt ? runStats.totalDamageDealt.toLocaleString() : 0}</span></p>`;
     statsRunDiv.innerHTML = runHTML;
 
-    // --- 👤 Player Stats ---
     let coreHTML = '';
     coreHTML += `<p><span class="stat-label">Max HP:</span><span class="stat-value">${formatInt(playerCoreStats.maxHp)}</span></p>`;
     coreHTML += `<p><span class="stat-label">Player Size:</span><span class="stat-value">${formatNum(playerCoreStats.finalRadius)}</span></p>`;
@@ -1020,18 +1014,15 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText) { /
     }
     statsPlayerCoreDiv.innerHTML = coreHTML;
 
-    // --- 🛡️ Immunities ---
     statsImmunitiesContainer.innerHTML = '';
     if (immunities && immunities.length > 0) { immunities.forEach(color => { const s = document.createElement('div'); s.className = 'immunity-swatch-pause'; s.style.backgroundColor = color; s.title = getReadableColorNameFromUtils(color); statsImmunitiesContainer.appendChild(s); });}
     else { statsImmunitiesContainer.innerHTML = '<span style="color: #aaa; font-size:11px;">None</span>'; }
 
-    // --- 🛠️ Gear ---
     statsGearUl.innerHTML = '';
     if (gear && gear.length > 0) {
         gear.forEach(g => { const li = document.createElement('li'); li.innerHTML = `<span class="stat-label">${g.name}</span><span class="stat-value">${g.description || 'Active'}</span>`; statsGearUl.appendChild(li); });
     } else { statsGearUl.innerHTML = '<li><span style="color: #aaa; font-size:11px;">No gear acquired.</span></li>'; }
 
-    // --- 💡 Abilities (Combined) ---
     statsAbilitiesCombinedDiv.innerHTML = '';
     if (abilities && abilities.length > 0) {
         abilities.forEach(ab => {
@@ -1046,7 +1037,6 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText) { /
         });
     } else { statsAbilitiesCombinedDiv.innerHTML = '<p><span style="color: #aaa; font-size:11px;">No abilities acquired.</span></p>';}
 
-    // --- Blocked Evolutions (if any) ---
     const abilitiesHeaderElement = document.getElementById('abilitiesHeader');
     let existingBlockedHeader = pausePlayerStatsPanel.querySelector('#blockedEvolutionsHeader');
     if (existingBlockedHeader) existingBlockedHeader.remove();
@@ -1082,7 +1072,6 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText) { /
         }
     }
 
-    // --- 💀 Boss Encounters ---
     statsBossTiersDiv.innerHTML = '';
     if (bossTierData && bossTypeNamesFromSource && bossTypeKeysFromSource && bossTypeNamesFromSource.length > 0) {
         let encountered = false;

@@ -6,10 +6,10 @@ import * as GameState from './gameState.js';
 import * as UIManager from './uiManager.js';
 import { getHighScores, addHighScore, updatePendingTierRecordNames } from './highScoreManager.js';
 import { initGameLoop, startGameLoop, stopGameLoop } from './gameLoop.js';
-import * as EvolutionManager from './evolutionManager.js';
+import * as EvolutionManager from './evolutionManager.js'; // Import the whole module
 import * as LootManager from './lootManager.js';
 import { createFinalStatsSnapshot } from './playerDataManager.js';
-import { Player } from './player.js'; // <--------------------------------- ADDED THIS IMPORT
+import { Player } from './player.js';
 import {
     initializeGameLogic as importedInitializeGameLogic,
     resetGameLogicState as importedResetGameLogicState,
@@ -92,20 +92,15 @@ let gameLogicUpdateCanvasDimensionsFunc = null;
 function checkPlayerIntegrity(label) {
     const p = gameLogicGetPlayerFunc ? gameLogicGetPlayerFunc() : null;
     if (p) {
-        // console.log(`[MainJS CheckPlayer - ${label}] typeof p.draw: ${typeof p.draw}, typeof p.update: ${typeof p.update}, p instanceof Player: ${p instanceof Player}`);
-        if (!(p instanceof Player) || typeof p.draw !== 'function' || typeof p.update !== 'function') { // Check update too
-        //    console.error(`CRITICAL CORRUPTION DETECTED at ${label}. Player:`, p, `Is instance of Player: ${p instanceof Player}`);
-            // debugger; 
+        if (!(p instanceof Player) || typeof p.draw !== 'function' || typeof p.update !== 'function') {
         }
     } else {
-        // console.log(`[MainJS CheckPlayer - ${label}] Player is null/undefined.`);
     }
 }
 
 
 function setCanvasDimensions() {
     if (!gameCanvasElement) return;
-    // checkPlayerIntegrity("setCanvasDimensions - START"); // Temporarily comment out for startup
 
     gameCanvasElement.width = window.innerWidth;
     gameCanvasElement.height = window.innerHeight;
@@ -113,7 +108,6 @@ function setCanvasDimensions() {
     if (initializeGameLogicFunc && typeof gameLogicUpdateCanvasDimensionsFunc === 'function') {
          gameLogicUpdateCanvasDimensionsFunc(gameCanvasElement.width, gameCanvasElement.height);
     }
-    // checkPlayerIntegrity("setCanvasDimensions - After updateCanvasDimensionsLogic");
 
 
     inputState.mouseX = gameCanvasElement.width / 2;
@@ -125,22 +119,17 @@ function setCanvasDimensions() {
              currentPlayer.x=Math.max(currentPlayer.radius,Math.min(currentPlayer.x,gameCanvasElement.width-currentPlayer.radius));
              currentPlayer.y=Math.max(currentPlayer.radius,Math.min(currentPlayer.y,gameCanvasElement.height-currentPlayer.radius));
         } else {
-            // console.warn("[setCanvasDimensions] currentPlayer missing x,y, or radius for boundary check during setCanvasDimensions.");
         }
     }
-    // checkPlayerIntegrity("setCanvasDimensions - After player boundary check");
 
 
     if(gameLogicDrawFunc && GameState.isGameRunning() && !GameState.isGameOver() && !GameState.isAnyPauseActive()) {
-        // Check player integrity just before calling drawGame if it's going to draw the player
         const pForDraw = gameLogicGetPlayerFunc ? gameLogicGetPlayerFunc() : null;
         if (pForDraw && typeof pForDraw.draw !== 'function') {
-        //    console.error("PRE-DRAW CHECK FAILED in setCanvasDimensions: player.draw is not a function", pForDraw);
         } else {
             gameLogicDrawFunc();
         }
     }
-    // checkPlayerIntegrity("setCanvasDimensions - After gameLogicDrawFunc (if called)");
 
 
     if ((GameState.isGamePausedByEsc() || GameState.isGameOver() || (UIManager.getCurrentActiveScreen() === detailedHighScoresScreen)) && uiPausePlayerStatsPanel && uiPausePlayerStatsPanel.style.display === 'block') {
@@ -150,7 +139,6 @@ function setCanvasDimensions() {
             uiPausePlayerStatsPanel.style.top = '20px';
         }
     }
-    // checkPlayerIntegrity("setCanvasDimensions - END");
 }
 
 
@@ -423,17 +411,12 @@ function orchestrateScreenChange(screenToShow) {
 
 
 function initGame() {
-    // console.log("[MainJS initGame] Function START");
-    // checkPlayerIntegrity("initGame - Top");
-
     GameState.resetCoreGameState();
-    // checkPlayerIntegrity("initGame - After GameState.resetCoreGameState");
 
     EvolutionManager.initializeEvolutionMasterList();
     EvolutionManager.resetEvolutionLevels();
     currentPlayerNameForHighScores = "CHAMPION";
     currentRunId = Date.now();
-    // checkPlayerIntegrity("initGame - After EvoManager inits");
 
 
     const mainCallbacksForLogic = {
@@ -445,27 +428,23 @@ function initGame() {
         getGameContextForBossManager: (lootMgrRef) => getGameContextForBossManager(lootMgrRef || LootManager),
         updateLastEvolutionScore: (score) => { lastEvolutionScore = score; },
         getLastEvolutionScore: () => lastEvolutionScore,
-        getAbilityContextForPlayer: getAbilityContextForPlayerFuncFromGameLogic, // This should be the exported function from gameLogic
+        getAbilityContextForPlayer: getAbilityContextForPlayerFuncFromGameLogic,
         updateShootInterval: updateShootIntervalAndGameState,
         handleFullHealthHeartPickup: handleFullHealthHeartPickupInternal,
     };
 
     if (initializeGameLogicFunc) {
         initializeGameLogicFunc(gameCanvasElement, inputState, mainCallbacksForLogic, CONSTANTS.PLAYER_SPEED_BASE);
-        // checkPlayerIntegrity("initGame - Right AFTER initializeGameLogicFunc call");
     } else { 
-      //  console.error("FATAL: gameLogic.js's initializeGameLogicFunc is not available!"); return; 
     }
 
     GameState.setGameRunning(true);
-    // checkPlayerIntegrity("initGame - After GameState.setGameRunning(true)");
 
     UIManager.updateScoreDisplay(GameState.getScore());
     lastEvolutionScore = 0;
     wasLastEvolutionScoreBased = true;
 
     initFreeUpgradeChoicesInternal();
-    // checkPlayerIntegrity("initGame - After initFreeUpgradeChoicesInternal");
 
 
     const currentPlayer = gameLogicGetPlayerFunc(); 
@@ -481,19 +460,15 @@ function initGame() {
         UIManager.updateActiveBuffIndicator(currentPlayer, GameState.getPostPopupImmunityTimer(), GameState.getPostDamageImmunityTimer());
     }
     UIManager.updateSurvivalBonusIndicator(GameState.getSurvivalUpgrades(), CONSTANTS.MAX_SURVIVAL_UPGRADES);
-    // checkPlayerIntegrity("initGame - After UIManager updates");
 
 
     if (uiPausePlayerStatsPanel) uiPausePlayerStatsPanel.style.display = 'none';
 
     setCanvasDimensions(); 
-    // checkPlayerIntegrity("initGame - After setCanvasDimensions");
 
     orchestrateScreenChange(null); 
-    // checkPlayerIntegrity("initGame - After orchestrateScreenChange(null)");
 
     UIManager.updateAllHighScoreDisplays(getHighScores());
-    // console.log("[MainJS initGame] Function END");
 }
 
 
@@ -779,19 +754,19 @@ const gameContextForEventListeners = {
         handleEvolutionReRoll: () => {
             const cp = gameLogicGetPlayerFunc();
             if (cp && EvolutionManager && GameState.isGamePausedForEvolution()) {
-                EvolutionManager.handleEvolutionReRoll(cp);
+                EvolutionManager.handleEvolutionReRoll(cp); // Call exported function
             }
         },
         toggleBlockMode: () => {
             const cp = gameLogicGetPlayerFunc();
              if (cp && EvolutionManager && GameState.isGamePausedForEvolution()) {
-                EvolutionManager.toggleBlockMode(cp);
+                EvolutionManager.toggleBlockMode(cp); // Call exported function
             }
         },
         toggleFreezeMode: () => {
             const cp = gameLogicGetPlayerFunc();
             if (cp && EvolutionManager && GameState.isGamePausedForEvolution()) {
-                EvolutionManager.toggleFreezeMode(cp);
+                EvolutionManager.toggleFreezeMode(cp); // Call exported function
             }
         },
         redrawEvolutionOptions: redrawEvolutionOptionsInternal,
@@ -898,7 +873,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         gameLogicUpdateCanvasDimensionsFunc = gameLogicModule.updateCanvasDimensionsLogic;
 
     } catch (e) {
-      //  console.error("Failed to load gameLogic.js:", e);
         document.body.innerHTML = `<div style="color: white; text-align: center; padding-top: 50px;"><h1>Error Loading Game</h1><p>Could not load critical game components. Please check the console for details.</p></div>`;
         return;
     }

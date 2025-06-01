@@ -247,17 +247,15 @@ export function initializeEvolutionMasterList() {
         },
         {
             id: 'temporalEcho', classType: 'ability', text: "Temporal Echo", level: 0, maxLevel: 999,
-            // MODIFIED: detailedDescription function to correctly format the time
-            detailedDescription: function(playerInstance, evolutionId) { // evolutionId can be used if needed for context
+            detailedDescription: function(playerInstance, evolutionId) {
                 const chance = playerInstance ? Math.round(playerInstance.temporalEchoChance * 100) : 0;
-                // Use the constant directly for the description, as playerInstance.temporalEchoFixedReduction might not be set if this is the first time offered.
                 const reductionSeconds = (CONSTANTS.TEMPORAL_ECHO_FIXED_REDUCTION / 1000).toFixed(1);
                 return `Grants a ${chance}% chance, when any ability is used, to also reduce the current cooldown of your *other* active abilities and mouse abilities by a fixed ${reductionSeconds} seconds. This echo does not affect the ability that triggered it.`;
             },
             isTiered: true,
             isMaxed: function(p) { return p && p.temporalEchoChance >= 1.0; },
             tiers: {
-                common:    { description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.common}%.`,   apply: function(p) { p.temporalEchoChance = Math.min(1.0, (p.temporalEchoChance || 0) + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.common / 100); }}, // Ensure p.temporalEchoChance is initialized
+                common:    { description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.common}%.`,   apply: function(p) { p.temporalEchoChance = Math.min(1.0, (p.temporalEchoChance || 0) + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.common / 100); }},
                 rare:      { description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.rare}%.`,     apply: function(p) { p.temporalEchoChance = Math.min(1.0, (p.temporalEchoChance || 0) + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.rare / 100); }},
                 epic:      { description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.epic}%.`,     apply: function(p) { p.temporalEchoChance = Math.min(1.0, (p.temporalEchoChance || 0) + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.epic / 100); }},
                 legendary: { description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.legendary}%.`, apply: function(p) { p.temporalEchoChance = Math.min(1.0, (p.temporalEchoChance || 0) + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.legendary / 100); }}
@@ -267,7 +265,7 @@ export function initializeEvolutionMasterList() {
         },
         {
             id: 'streamlinedSystems', classType: 'ability', text: "Streamlined Systems", level: 0, maxLevel: 999,
-            detailedDescription: function(tier) { // This function is fine as it uses the passed tier for description
+            detailedDescription: function(tier) {
                 const reduction = tier ? CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION[tier] : 0;
                 return `Permanently reduces the cooldowns of ALL your current and future abilities by an additional ${reduction}%. Stacks additively.`;
             },
@@ -373,7 +371,6 @@ export function generateEvolutionOffers(playerInstance) {
                 classType: originalMasterEvo.classType,
                 text: originalMasterEvo.text,
                 originalEvolution: originalMasterEvo,
-                wasGloballyFrozen: true
             };
 
             if (originalMasterEvo.isTiered) {
@@ -382,7 +379,6 @@ export function generateEvolutionOffers(playerInstance) {
                     const tierSpecificData = originalMasterEvo.tiers[heldTier];
                     reconstructedHeldOffer.rolledTier = heldTier;
                     const descFunc = typeof tierSpecificData.description === 'function' ? tierSpecificData.description : (typeof originalMasterEvo.detailedDescription === 'function' ? originalMasterEvo.detailedDescription : null);
-                    // Pass baseId to detailedDescription if it's a function
                     reconstructedHeldOffer.detailedDescription = descFunc
                         ? descFunc(playerInstance, heldTier)
                         : (typeof originalMasterEvo.detailedDescription === 'function'
@@ -398,7 +394,6 @@ export function generateEvolutionOffers(playerInstance) {
                 }
             } else {
                 reconstructedHeldOffer.rolledTier = null;
-                // Pass baseId to detailedDescription if it's a function
                 reconstructedHeldOffer.detailedDescription = typeof originalMasterEvo.detailedDescription === 'function'
                     ? originalMasterEvo.detailedDescription(playerInstance, originalMasterEvo.id)
                     : originalMasterEvo.detailedDescription;
@@ -448,7 +443,6 @@ export function generateEvolutionOffers(playerInstance) {
                     classType: baseEvo.classType,
                     rolledTier: baseEvo.isTiered ? rolledTierIfApplicable : null,
                     text: baseEvo.text,
-                    // Pass baseId to detailedDescription if it's a function
                     detailedDescription: baseEvo.isTiered && tierSpecificData
                         ? (typeof tierSpecificData.description === 'function' ? tierSpecificData.description(playerInstance, rolledTierIfApplicable) : tierSpecificData.description)
                         : (typeof baseEvo.detailedDescription === 'function' ? baseEvo.detailedDescription(playerInstance, baseEvo.id) : baseEvo.detailedDescription),
@@ -547,7 +541,7 @@ export function redrawEvolutionOptionsWithShiftState(playerInstance) {
 }
 
 
-function handleEvolutionReRoll(playerInstance) {
+export function handleEvolutionReRoll(playerInstance) {
     if (!playerInstance || playerInstance.evolutionReRollsRemaining <= 0 || playerInstance.isFreezeModeActive || _isBlockModeActiveManager) {
         if (_dependencies.playSound) _dependencies.playSound(_dependencies.audioTargetHitSound);
         return;
@@ -555,8 +549,21 @@ function handleEvolutionReRoll(playerInstance) {
     playerInstance.evolutionReRollsRemaining--;
     if (_dependencies.playSound) _dependencies.playSound(_dependencies.audioEvolutionSound);
 
-    playerInstance.frozenEvolutionChoice = null;
-    playerInstance.hasUsedFreezeForCurrentOffers = false;
+    // If a choice was frozen and actively confirmed for this turn,
+    // the re-roll means that active confirmation is void, but the item remains globally frozen.
+    // The charge for *that specific active confirmation* is not refunded here.
+    // The charge for the *global hold* remains spent.
+    // If the player re-rolls again, the global hold will be cleared before generating new offers.
+    if (playerInstance.frozenEvolutionChoice && playerInstance.hasUsedFreezeForCurrentOffers) {
+        // The item was actively frozen this turn. Re-rolling keeps it globally frozen
+        // but it's no longer 'active' for the *new* set of offers until re-confirmed.
+        playerInstance.hasUsedFreezeForCurrentOffers = false;
+    } else if (playerInstance.frozenEvolutionChoice && !playerInstance.hasUsedFreezeForCurrentOffers) {
+        // The item was carried over. If re-rolled again, the global freeze is lost.
+        // The charge for holding it is NOT refunded.
+        playerInstance.frozenEvolutionChoice = null;
+    }
+
 
     generateEvolutionOffers(playerInstance);
     _dependencies.UIManager.populateEvolutionOptionsUI(
@@ -571,7 +578,7 @@ function handleEvolutionReRoll(playerInstance) {
     );
 }
 
-function toggleBlockMode(playerInstance) {
+export function toggleBlockMode(playerInstance) {
     if (!playerInstance || playerInstance.isFreezeModeActive) {
         if (_dependencies.playSound) _dependencies.playSound(_dependencies.audioTargetHitSound);
         return;
@@ -601,7 +608,7 @@ function toggleBlockMode(playerInstance) {
     );
 }
 
-function toggleFreezeMode(playerInstance) {
+export function toggleFreezeMode(playerInstance) {
     if (!playerInstance || _isBlockModeActiveManager) {
         if (_dependencies.playSound) _dependencies.playSound(_dependencies.audioTargetHitSound);
         return;
@@ -632,18 +639,32 @@ function toggleFreezeMode(playerInstance) {
 function handleFreezeSelection(uiSelectedChoiceToFreeze, indexOfCardInOffer, playerInstance) {
     if (!playerInstance || !GameState.isGamePausedForEvolution() || !playerInstance.isFreezeModeActive) return;
 
-    if (playerInstance.frozenEvolutionChoice && playerInstance.frozenEvolutionChoice.choiceData.baseId === uiSelectedChoiceToFreeze.baseId) {
-        playerInstance.frozenEvolutionChoice = null;
-        playerInstance.evolutionFreezesRemaining++;
-        playerInstance.hasUsedFreezeForCurrentOffers = false;
-        if (_dependencies.playSound) _dependencies.playSound(_dependencies.audioUpgradeSound);
-    } else if (playerInstance.evolutionFreezesRemaining > 0 || playerInstance.frozenEvolutionChoice) {
-        if (playerInstance.frozenEvolutionChoice && playerInstance.frozenEvolutionChoice.choiceData.baseId !== uiSelectedChoiceToFreeze.baseId) {
+    const newFreezeTargetBaseId = uiSelectedChoiceToFreeze.baseId;
+    const oldFrozenChoiceData = playerInstance.frozenEvolutionChoice;
+
+    if (oldFrozenChoiceData && oldFrozenChoiceData.choiceData.baseId === newFreezeTargetBaseId) {
+        if (playerInstance.hasUsedFreezeForCurrentOffers) { 
             playerInstance.frozenEvolutionChoice = null;
-            playerInstance.evolutionFreezesRemaining++;
+            playerInstance.evolutionFreezesRemaining++; 
+            playerInstance.hasUsedFreezeForCurrentOffers = false;
+            if (_dependencies.playSound) _dependencies.playSound(_dependencies.audioUpgradeSound);
+        } else { 
+            if (playerInstance.evolutionFreezesRemaining > 0) {
+                playerInstance.evolutionFreezesRemaining--; 
+                playerInstance.hasUsedFreezeForCurrentOffers = true;
+                if (_dependencies.playSound) _dependencies.playSound(_dependencies.audioEvolutionSound);
+            } else {
+                 if (_dependencies.playSound) _dependencies.playSound(_dependencies.audioTargetHitSound);
+            }
         }
+    }
+    else { 
         if (playerInstance.evolutionFreezesRemaining > 0) {
-            playerInstance.evolutionFreezesRemaining--;
+            if (oldFrozenChoiceData && playerInstance.hasUsedFreezeForCurrentOffers) {
+                 playerInstance.evolutionFreezesRemaining++;
+            }
+            
+            playerInstance.evolutionFreezesRemaining--; 
             const { originalEvolution, ...restOfChoiceData } = uiSelectedChoiceToFreeze;
             playerInstance.frozenEvolutionChoice = {
                 choiceData: { ...restOfChoiceData, baseId: originalEvolution.id },
@@ -652,11 +673,8 @@ function handleFreezeSelection(uiSelectedChoiceToFreeze, indexOfCardInOffer, pla
             playerInstance.hasUsedFreezeForCurrentOffers = true;
             if (_dependencies.playSound) _dependencies.playSound(_dependencies.audioEvolutionSound);
         } else {
-             if (_dependencies.playSound) _dependencies.playSound(_dependencies.audioTargetHitSound);
+            if (_dependencies.playSound) _dependencies.playSound(_dependencies.audioTargetHitSound);
         }
-    }
-    else {
-        if (_dependencies.playSound) _dependencies.playSound(_dependencies.audioTargetHitSound);
     }
 
     playerInstance.isFreezeModeActive = false;
@@ -667,10 +685,11 @@ function handleFreezeSelection(uiSelectedChoiceToFreeze, indexOfCardInOffer, pla
         () => toggleBlockMode(playerInstance),
         GameState.getShrinkMeCooldown(),
         () => toggleFreezeMode(playerInstance),
-        (choice, index) => handleFreezeSelection(choice, index, playerInstance),
+        handleFreezeSelection,
         _dependencies.inputState
     );
 }
+
 
 function handleBlockActionOnCard(baseIdToBlock, playerInstance) {
     if (!playerInstance || playerInstance.evolutionBlocksRemaining <= 0) {
@@ -682,7 +701,7 @@ function handleBlockActionOnCard(baseIdToBlock, playerInstance) {
             () => handleEvolutionReRoll(playerInstance), () => toggleBlockMode(playerInstance),
             GameState.getShrinkMeCooldown(), () => toggleFreezeMode(playerInstance),
             (choice, index) => handleFreezeSelection(choice, index, playerInstance),
-            _dependencies.inputState
+             _dependencies.inputState
         );
         return;
     }
@@ -706,11 +725,11 @@ function handleBlockActionOnCard(baseIdToBlock, playerInstance) {
     if (_dependencies.playSound) _dependencies.playSound(_dependencies.audioUpgradeSound);
 
     if (playerInstance.frozenEvolutionChoice && playerInstance.frozenEvolutionChoice.choiceData.baseId === baseIdToBlock) {
-        playerInstance.frozenEvolutionChoice = null;
-         if (playerInstance.hasUsedFreezeForCurrentOffers) {
+        if (playerInstance.hasUsedFreezeForCurrentOffers) { 
             playerInstance.evolutionFreezesRemaining++;
-            playerInstance.hasUsedFreezeForCurrentOffers = false;
         }
+        playerInstance.frozenEvolutionChoice = null;
+        playerInstance.hasUsedFreezeForCurrentOffers = false;
     }
 
     const blockedCardIndex = _currentlyDisplayedEvolutionOffers.findIndex(offer => offer.baseId === baseIdToBlock);
@@ -745,11 +764,19 @@ function confirmEvolutionChoice(uiSelectedChoice, indexOfCardInOffer, playerInst
         return;
     }
 
-    if (_isBlockModeActiveManager) {
+    if (_isBlockModeActiveManager || playerInstance.isBlockModeActive) {
         if (uiSelectedChoice.baseId !== 'noMoreEvolutions' && !uiSelectedChoice.baseId.startsWith('empty_slot_')) {
             handleBlockActionOnCard(uiSelectedChoice.baseId, playerInstance);
         } else {
-            toggleBlockMode(playerInstance);
+            _isBlockModeActiveManager = false; playerInstance.isBlockModeActive = false;
+            _dependencies.UIManager.populateEvolutionOptionsUI(
+                 _currentlyDisplayedEvolutionOffers, playerInstance,
+                (choice, index) => confirmEvolutionChoice(choice, index, playerInstance),
+                () => handleEvolutionReRoll(playerInstance), () => toggleBlockMode(playerInstance),
+                GameState.getShrinkMeCooldown(), () => toggleFreezeMode(playerInstance),
+                (choice, index) => handleFreezeSelection(choice, index, playerInstance),
+                _dependencies.inputState
+            );
         }
         return;
     }
@@ -762,7 +789,7 @@ function confirmEvolutionChoice(uiSelectedChoice, indexOfCardInOffer, playerInst
             () => handleEvolutionReRoll(playerInstance), () => toggleBlockMode(playerInstance),
             GameState.getShrinkMeCooldown(), () => toggleFreezeMode(playerInstance),
             (choice, index) => handleFreezeSelection(choice, index, playerInstance),
-             _dependencies.inputState
+            _dependencies.inputState
         );
         return;
     }
@@ -780,14 +807,24 @@ function confirmEvolutionChoice(uiSelectedChoice, indexOfCardInOffer, playerInst
         }
     }
 
-    if ((playerInstance.frozenEvolutionChoice && playerInstance.frozenEvolutionChoice.choiceData.baseId === uiSelectedChoice.baseId) ||
-        !playerInstance.hasUsedFreezeForCurrentOffers) {
-        playerInstance.frozenEvolutionChoice = null;
+    if (playerInstance.frozenEvolutionChoice) {
+        if (playerInstance.frozenEvolutionChoice.choiceData.baseId === uiSelectedChoice.baseId) {
+            playerInstance.frozenEvolutionChoice = null;
+        } else {
+            if (!playerInstance.hasUsedFreezeForCurrentOffers) {
+                // If player picked something else, and the frozen choice was NOT actively re-confirmed THIS turn,
+                // the global freeze is lost. The charge is considered spent for the previous hold.
+                playerInstance.frozenEvolutionChoice = null;
+            }
+            // If hasUsedFreezeForCurrentOffers IS true, it means the player actively froze/re-froze
+            // an item this turn. If they then pick a *different* item, that active freeze should persist.
+        }
     }
 
     playerInstance.hasUsedFreezeForCurrentOffers = false;
     _isBlockModeActiveManager = false;
     playerInstance.isBlockModeActive = false;
+    playerInstance.isFreezeModeActive = false;
 
     if (_dependencies.onEvolutionCompleteCallback) {
         _dependencies.onEvolutionCompleteCallback(uiSelectedChoice, playerInstance);

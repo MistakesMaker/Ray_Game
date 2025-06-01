@@ -268,7 +268,7 @@ export const KINETIC_BASE_CHARGE_RATE = 1.0;
 
 // ---- NEW: Aegis Path (Juggernaut) Constants ----
 export const AEGIS_PATH_BASE_COLLISION_DAMAGE = 1; // Flat damage per collision
-export const AEGIS_PATH_MAX_HP_SCALING_FACTOR = 0.05; // Damage = base + (maxHP * factor)
+export const AEGIS_PATH_MAX_HP_SCALING_FACTOR = 0.1; // Damage = base + (maxHP * factor)
 export const AEGIS_PATH_RADIUS_SCALING_FACTOR = 0.1; // Damage += (radius * factor)
 export const AEGIS_PATH_BOSS_KNOCKBACK_FORCE = 30; // Base knockback force on boss
 export const AEGIS_PATH_PLAYER_SELF_KNOCKBACK_FACTOR = 0.3; // Player gets knocked back a bit too
