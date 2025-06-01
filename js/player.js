@@ -34,8 +34,8 @@ import {
     BLOODPACT_DURATION, BLOODPACT_LIFESTEAL_PERCENT, BLOODPACT_COOLDOWN,
     SAVAGE_HOWL_FEAR_RADIUS, SAVAGE_HOWL_FEAR_DURATION, SAVAGE_HOWL_ATTACK_SPEED_BUFF_PERCENT,
     SAVAGE_HOWL_ATTACK_SPEED_BUFF_DURATION, SAVAGE_HOWL_COOLDOWN,
-    BUFF_NOTIFICATION_DURATION
-
+    BUFF_NOTIFICATION_DURATION,
+    PLAYER_GRAVITY_WELL_ABSORBED_RAY_COLOR // <<< ADDED THIS IMPORT
 } from './constants.js';
 import * as GameState from './gameState.js';
 import { checkCollision, hexToRgb, lightenColor, isLineSegmentIntersectingCircle, getPooledRay } from './utils.js';
@@ -46,13 +46,21 @@ import {
     shootSound,
     bossHitSound as audioBossHitSound,
     savageHowlSound,
-    upgradeSound as audioUpgradeSound
+    upgradeSound as audioUpgradeSound,
 } from './audio.js';
 import { PlayerGravityWell, Ray } from './ray.js';
 import { NexusWeaverBoss } from './nexusWeaverBoss.js';
 import { BossNPC } from './bossBase.js';
 
 const AEGIS_RAM_COOLDOWN = 1000;
+
+// Aegis Charge Visual Constants
+const AEGIS_CHARGE_INDICATOR_RADIUS_OFFSET = 8;
+const AEGIS_CHARGE_INDICATOR_LINE_WIDTH = 5;
+const AEGIS_CHARGE_INDICATOR_COLOR_CHARGING = 'rgba(100, 180, 255, 0.7)';
+const AEGIS_CHARGE_INDICATOR_COLOR_FULL = 'rgba(255, 215, 0, 0.9)';
+const AEGIS_CHARGE_READY_PULSE_COLOR = 'rgba(100, 180, 255, 0.3)';
+
 
 export class Player {
     constructor(x, y, initialPlayerSpeed) {
@@ -486,8 +494,8 @@ export class Player {
                                 const damageMultiplier = this.consumeKineticChargeForDamageBoost();
                                 ray.momentumDamageBonusValue = (ray.momentumDamageBonusValue || 0) + (damageMultiplier - 1);
                                  if (ui && ui.updateKineticChargeUI) {
-                                    let maxPotencyAtFullCharge = this.initialKineticDamageBonus;
-                                    ui.updateKineticChargeUI(this.kineticCharge, this.kineticChargeConsumption, maxPotencyAtFullCharge, this.kineticConversionLevel > 0);
+                                    let maxPotencyBonusAtFullCharge = this.initialKineticDamageBonus;
+                                    ui.updateKineticChargeUI(this.kineticCharge, this.kineticChargeConsumption, maxPotencyBonusAtFullCharge, this.kineticConversionLevel > 0);
                                 }
                             }
                             if (this.isBloodpactActive && this.currentPath === 'berserker') ray.lifestealPercent = BLOODPACT_LIFESTEAL_PERCENT;
@@ -563,7 +571,6 @@ export class Player {
         };
     }
 
-    // Standard class methods start here
     reset(canvasWidth, canvasHeight) {
         this.x = canvasWidth ? canvasWidth / 2 : PLAYER_BASE_RADIUS * 5;
         this.y = canvasHeight ? canvasHeight / 2 : PLAYER_BASE_RADIUS * 5;
@@ -672,7 +679,8 @@ export class Player {
         if (!ctx) return;
         const { isCountingDownToResume = false,
                 postPopupImmunityTimer: postPopupTimerFromCtx = 0,
-                postDamageImmunityTimer: postDamageTimerFromCtx = 0
+                postDamageImmunityTimer: postDamageTimerFromCtx = 0,
+                CONSTANTS: gameDrawConstants = CONSTANTS 
               } = gameContext;
         const now = Date.now();
         this.naniteAnimTimer = this.naniteAnimTimer || now;
@@ -690,11 +698,7 @@ export class Player {
             ctx.rotate(this.currentChargeRotation);
         }
 
-        ctx.save();
-        if (this.currentPath === 'aegis' && this.isChargingAegisCharge && this.currentChargeRotation !== 0) {
-        }
-
-
+        ctx.save(); 
         if (this.hasAegisPathHelm) {
             ctx.fillStyle = "rgba(180, 180, 200, 0.7)";
             ctx.strokeStyle = "rgba(220, 220, 240, 0.9)";
@@ -781,7 +785,36 @@ export class Player {
             ctx.arc(0, -this.radius * 1.5, this.radius * 0.15, 0, Math.PI * 2);
             ctx.fill();
         }
-        ctx.restore();
+        ctx.restore(); 
+
+        if (this.currentPath === 'aegis' && this.hasAegisCharge) {
+            const indicatorVisualRadius = this.radius + AEGIS_CHARGE_INDICATOR_RADIUS_OFFSET;
+            if (this.isChargingAegisCharge) {
+                const chargeProgress = Math.min(1, this.aegisChargeCurrentChargeTime / AEGIS_CHARGE_MAX_CHARGE_TIME);
+                const endAngle = -Math.PI / 2 + (chargeProgress * Math.PI * 2); 
+
+                ctx.beginPath();
+                ctx.arc(0, 0, indicatorVisualRadius, -Math.PI / 2, endAngle);
+                ctx.strokeStyle = chargeProgress >= 1 ? AEGIS_CHARGE_INDICATOR_COLOR_FULL : AEGIS_CHARGE_INDICATOR_COLOR_CHARGING;
+                ctx.lineWidth = AEGIS_CHARGE_INDICATOR_LINE_WIDTH;
+                ctx.stroke();
+
+                if (chargeProgress >= 1) { 
+                    ctx.beginPath();
+                    ctx.arc(0, 0, indicatorVisualRadius, 0, Math.PI * 2);
+                    ctx.strokeStyle = `rgba(255, 215, 0, ${0.5 + Math.abs(Math.sin(now / 150)) * 0.4})`; 
+                    ctx.lineWidth = AEGIS_CHARGE_INDICATOR_LINE_WIDTH + 2; 
+                    ctx.stroke();
+                }
+            } else if (this.aegisChargeCooldownTimer <= 0 && !this.isAegisChargingDash) { 
+                ctx.beginPath();
+                ctx.arc(0, 0, indicatorVisualRadius, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(100, 180, 255, ${0.15 + Math.abs(Math.sin(now / 300)) * 0.15})`; 
+                ctx.lineWidth = AEGIS_CHARGE_INDICATOR_LINE_WIDTH -1;
+                ctx.stroke();
+            }
+        }
+
 
         if (this.teleporting && this.teleportEffectTimer > 0) {
             const effectProgress = 1 - (this.teleportEffectTimer / TELEPORT_IMMUNITY_DURATION);
@@ -924,7 +957,7 @@ export class Player {
             ctx.restore();
         }
 
-        ctx.restore();
+        ctx.restore(); 
     }
 
     static drawFromSnapshot(ctx, snapshotPlayerData, centerX, centerY, aimAngle = 0) {
@@ -1278,17 +1311,13 @@ export class Player {
                 if (entity && entity instanceof Ray) {
                     if (!entity.isGravityWellRay &&
                         !entity.isCorruptedByPlayerWell &&
-                        !(entity.sourceAbility === 'miniGravityWell' && entity.color === PLAYER_GRAVITY_WELL_ABSORBED_RAY_COLOR)
+                        !(entity.sourceAbility === 'miniGravityWell' && entity.color === PLAYER_GRAVITY_WELL_ABSORBED_RAY_COLOR) // Check constant
                        ) {
                         entity.isActive = false;
                     }
                 }
             }
         }
-
-        // FIX: Removed the Mage-specific boss damaging loop. EMP Burst should only clear rays.
-        // The Mage's "double ability damage" from Ultimate Configuration will apply to other damaging abilities,
-        // but EMP is now purely utility for ray clearing.
 
         if (screenShakeParams) { screenShakeParams.isScreenShaking = true; screenShakeParams.screenShakeTimer = 400; screenShakeParams.currentShakeMagnitude = 8; screenShakeParams.currentShakeType = 'playerHit'; screenShakeParams.hitShakeDx = 0; screenShakeParams.hitShakeDy = 0; }
         playSound(empBurstSound);
@@ -1342,7 +1371,7 @@ export class Player {
                 this.aegisChargeDashTargetY = abilityContext.mouseY;
                 const dist = Math.hypot(this.aegisChargeDashTargetX - this.x, this.aegisChargeDashTargetY - this.y);
                 const dashSpeed = this.originalPlayerSpeed * AEGIS_CHARGE_DASH_SPEED_FACTOR;
-                this.aegisChargeDashTimer = (dist / dashSpeed) * (1000/60) * 2;
+                this.aegisChargeDashTimer = (dist / dashSpeed) * (1000/60) * 2; 
                 this.procTemporalEcho('aegisCharge_LMB_Aegis', abilityContext);
             }
         }
