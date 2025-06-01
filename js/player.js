@@ -35,7 +35,7 @@ import {
     SAVAGE_HOWL_FEAR_RADIUS, SAVAGE_HOWL_FEAR_DURATION, SAVAGE_HOWL_ATTACK_SPEED_BUFF_PERCENT,
     SAVAGE_HOWL_ATTACK_SPEED_BUFF_DURATION, SAVAGE_HOWL_COOLDOWN,
     BUFF_NOTIFICATION_DURATION,
-    PLAYER_GRAVITY_WELL_ABSORBED_RAY_COLOR // <<< ADDED THIS IMPORT
+    PLAYER_GRAVITY_WELL_ABSORBED_RAY_COLOR
 } from './constants.js';
 import * as GameState from './gameState.js';
 import { checkCollision, hexToRgb, lightenColor, isLineSegmentIntersectingCircle, getPooledRay } from './utils.js';
@@ -55,10 +55,10 @@ import { BossNPC } from './bossBase.js';
 const AEGIS_RAM_COOLDOWN = 1000;
 
 // Aegis Charge Visual Constants
-const AEGIS_CHARGE_INDICATOR_RADIUS_OFFSET = 8;
+const AEGIS_CHARGE_INDICATOR_RADIUS_OFFSET = 8; 
 const AEGIS_CHARGE_INDICATOR_LINE_WIDTH = 5;
 const AEGIS_CHARGE_INDICATOR_COLOR_CHARGING = 'rgba(100, 180, 255, 0.7)';
-const AEGIS_CHARGE_INDICATOR_COLOR_FULL = 'rgba(255, 215, 0, 0.9)';
+const AEGIS_CHARGE_INDICATOR_COLOR_FULL = 'rgba(255, 215, 0, 0.9)'; 
 const AEGIS_CHARGE_READY_PULSE_COLOR = 'rgba(100, 180, 255, 0.3)';
 
 
@@ -700,36 +700,40 @@ export class Player {
 
         ctx.save(); 
         if (this.hasAegisPathHelm) {
-            ctx.fillStyle = "rgba(180, 180, 200, 0.7)";
-            ctx.strokeStyle = "rgba(220, 220, 240, 0.9)";
-            ctx.lineWidth = 2.5;
-            const visorWidth = this.radius * 1.2;
-            ctx.beginPath();
-            ctx.moveTo(-visorWidth / 2, -this.radius * 0.3);
-            ctx.lineTo(visorWidth / 2, -this.radius * 0.3);
-            ctx.lineTo(visorWidth * 0.3, this.radius * 0.4);
-            ctx.lineTo(-visorWidth * 0.3, this.radius * 0.4);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-
-            const numSpikes = 5;
-            const spikeAnimSpeed = 0.002;
-            const baseSpikeLength = this.radius * 0.2;
-            const animSpikeLength = this.radius * 0.15 * Math.sin(this.aegisAnimTimer * spikeAnimSpeed);
-
-            ctx.strokeStyle = "rgba(200, 220, 255, 0.6)";
-            ctx.lineWidth = 1.5;
+            ctx.fillStyle = "rgba(100, 150, 100, 0.7)"; // Base metallic green
+            ctx.strokeStyle = "rgba(50, 100, 50, 0.9)";   // Darker green outline
+            ctx.lineWidth = 2.0; // Slightly thinner for a sharper look
+        
+            const numSpikes = 7; // More spikes
+            const spikeAnimSpeed = 0.0015;
+            const baseSpikeLength = this.radius * 0.35; // Longer base
+            const animSpikeLength = this.radius * 0.10 * Math.sin(this.aegisAnimTimer * spikeAnimSpeed);
+            const spikeBaseWidth = this.radius * 0.15; // Width at the player's body
+        
             for (let i = 0; i < numSpikes; i++) {
                 const angle = (i / numSpikes) * Math.PI * 2 + (this.aegisAnimTimer * spikeAnimSpeed * 0.5);
-                const startX = Math.cos(angle) * (this.radius * 0.9);
-                const startY = Math.sin(angle) * (this.radius * 0.9);
-                const endX = Math.cos(angle) * (this.radius + baseSpikeLength + animSpikeLength);
-                const endY = Math.sin(angle) * (this.radius + baseSpikeLength + animSpikeLength);
+                
+                ctx.save();
+                ctx.rotate(angle);
+        
+                // Create a gradient for a metallic sheen
+                const gradX = this.radius + baseSpikeLength / 2;
+                const gradient = ctx.createLinearGradient(this.radius, 0, this.radius + baseSpikeLength + animSpikeLength, 0);
+                gradient.addColorStop(0, "rgba(120, 180, 120, 0.8)"); // Lighter green highlight
+                gradient.addColorStop(0.5, "rgba(80, 140, 80, 0.9)");  // Mid green
+                gradient.addColorStop(1, "rgba(40, 90, 40, 0.8)");    // Darker green shadow
+                ctx.fillStyle = gradient;
+        
+                // Draw a pointy triangle (spike)
                 ctx.beginPath();
-                ctx.moveTo(startX, startY);
-                ctx.lineTo(endX, endY);
-                ctx.stroke();
+                ctx.moveTo(this.radius - spikeBaseWidth * 0.2, -spikeBaseWidth / 2); // Inner base point 1
+                ctx.lineTo(this.radius - spikeBaseWidth * 0.2, spikeBaseWidth / 2);  // Inner base point 2
+                ctx.lineTo(this.radius + baseSpikeLength + animSpikeLength, 0);       // Tip of the spike
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke(); // Outline each spike
+        
+                ctx.restore();
             }
         } else if (this.hasBerserkersEchoHelm) {
             ctx.fillStyle = "rgb(120, 20, 20)";
@@ -999,25 +1003,34 @@ export class Player {
         ctx.save();
 
         if (inferredHelmType === "aegisPath") {
-            ctx.fillStyle = "rgba(180, 180, 200, 0.7)";
-            ctx.strokeStyle = "rgba(220, 220, 240, 0.9)";
-            ctx.lineWidth = 2.5 * displayScale;
-            const visorWidth = radius * 1.2;
-            ctx.beginPath();
-            ctx.moveTo(-visorWidth / 2, -radius * 0.3); ctx.lineTo(visorWidth / 2, -radius * 0.3);
-            ctx.lineTo(visorWidth * 0.3, radius * 0.4); ctx.lineTo(-visorWidth * 0.3, radius * 0.4);
-            ctx.closePath(); ctx.fill(); ctx.stroke();
-
-            const numSpikes = 5; const spikeAnimSpeed = 0.002;
-            const baseSpikeLength = radius * 0.2;
-            const animSpikeLength = radius * 0.15 * Math.sin(aegisAnimTimer * spikeAnimSpeed);
-            ctx.strokeStyle = "rgba(200, 220, 255, 0.6)"; ctx.lineWidth = 1.5 * displayScale;
+            ctx.fillStyle = "rgba(100, 150, 100, 0.7)"; 
+            ctx.strokeStyle = "rgba(50, 100, 50, 0.9)";   
+            ctx.lineWidth = 2.0 * displayScale; 
+        
+            const numSpikes = 7; 
+            const spikeAnimSpeed = 0.0015;
+            const baseSpikeLength = radius * 0.35; 
+            const animSpikeLength = radius * 0.10 * Math.sin(aegisAnimTimer * spikeAnimSpeed);
+            const spikeBaseWidth = radius * 0.15; 
+        
             for (let i = 0; i < numSpikes; i++) {
                 const angle = (i / numSpikes) * Math.PI * 2 + (aegisAnimTimer * spikeAnimSpeed * 0.5);
-                const startX = Math.cos(angle) * (radius * 0.9); const startY = Math.sin(angle) * (radius * 0.9);
-                const endX = Math.cos(angle) * (radius + baseSpikeLength + animSpikeLength);
-                const endY = Math.sin(angle) * (radius + baseSpikeLength + animSpikeLength);
-                ctx.beginPath(); ctx.moveTo(startX, startY); ctx.lineTo(endX, endY); ctx.stroke();
+                ctx.save();
+                ctx.rotate(angle);
+                const gradX = radius + baseSpikeLength / 2;
+                const gradient = ctx.createLinearGradient(radius, 0, radius + baseSpikeLength + animSpikeLength, 0);
+                gradient.addColorStop(0, "rgba(120, 180, 120, 0.8)"); 
+                gradient.addColorStop(0.5, "rgba(80, 140, 80, 0.9)");  
+                gradient.addColorStop(1, "rgba(40, 90, 40, 0.8)");    
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.moveTo(radius - spikeBaseWidth * 0.2, -spikeBaseWidth / 2); 
+                ctx.lineTo(radius - spikeBaseWidth * 0.2, spikeBaseWidth / 2);  
+                ctx.lineTo(radius + baseSpikeLength + animSpikeLength, 0);      
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke(); 
+                ctx.restore();
             }
         } else if (inferredHelmType === "berserkersEcho") {
             ctx.fillStyle = "rgb(120, 20, 20)"; ctx.strokeStyle = "rgb(50, 0, 0)"; ctx.lineWidth = 1.5 * displayScale;
@@ -1311,7 +1324,7 @@ export class Player {
                 if (entity && entity instanceof Ray) {
                     if (!entity.isGravityWellRay &&
                         !entity.isCorruptedByPlayerWell &&
-                        !(entity.sourceAbility === 'miniGravityWell' && entity.color === PLAYER_GRAVITY_WELL_ABSORBED_RAY_COLOR) // Check constant
+                        !(entity.sourceAbility === 'miniGravityWell' && entity.color === PLAYER_GRAVITY_WELL_ABSORBED_RAY_COLOR) 
                        ) {
                         entity.isActive = false;
                     }
