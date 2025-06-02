@@ -115,6 +115,7 @@ export class Player {
         this.hpRegenTimer = 0; this.baseHpRegenAmount = 1;
         this.hpRegenBonusFromEvolution = 0;
         this.acquiredBossUpgrades = [];
+        this.acquiredEvolutions = [];
 
         this.currentPath = null;
         this.hasBerserkersEchoHelm = false;
@@ -177,6 +178,7 @@ export class Player {
         this.aegisChargeDashTargetY = 0;
         this.aegisChargeDashTimer = 0;
         this.currentChargeRotation = 0;
+        this.aegisChargeBossDamageDealtThisRun = 0;
 
         this.hasSeismicSlam = false;
         this.seismicSlamCooldownTimer = 0;
@@ -185,6 +187,7 @@ export class Player {
         this.isBloodpactActive = false;
         this.bloodpactTimer = 0;
         this.bloodpactCooldownTimer = 0;
+        this.healingThisBloodpact = 0;
 
         this.hasSavageHowl = false;
         this.savageHowlCooldownTimer = 0;
@@ -201,6 +204,9 @@ export class Player {
 
         this.usedAbilityInCurrentBossFight = false;
         this.hasTriggeredAegisPassiveBossDamageThisRun = false;
+        this.damageTakenThisBossFight = 0;
+        this.teleportTimestamps = [];
+        this.eventDataForNextSignal = {}; // For indirect event signaling
 
 
         this.update = (gameContext) => {
@@ -230,7 +236,6 @@ export class Player {
                 this.teleportEffectTimer -= dt;
                 if (this.teleportEffectTimer <= 0) {
                     this.teleporting = false; this.teleportEffectTimer = 0;
-                    // Tele-Frag check done in doTeleport at the moment of arrival
                 }
             }
 
@@ -276,22 +281,23 @@ export class Player {
             const updateGenericMouseAbility_local = (abilityActiveProp, abilityTimerProp, abilityCooldownTimerProp, abilityCooldownConst, abilityDurationConst = 0) => {
                 let effectiveCooldownMultiplier = 1.0 - this.globalCooldownReduction;
                 effectiveCooldownMultiplier = Math.max(0.1, effectiveCooldownMultiplier);
+                let justFinished = false;
 
                 if (this[abilityActiveProp]) {
                     this[abilityTimerProp] -= dt;
                     mouseAbilityUIUpdateNeeded = true;
                     if (this[abilityTimerProp] <= 0) {
                         this[abilityActiveProp] = false;
+                        justFinished = true;
                         let cd = abilityCooldownConst * (1.0 - this.globalCooldownReduction);
                         this[abilityCooldownTimerProp] = Math.max(abilityCooldownConst * 0.1, cd);
-                        return true; // Indicates ability just finished
                     }
                 } else if (this[abilityCooldownTimerProp] > 0) {
                     this[abilityCooldownTimerProp] -= dt / effectiveCooldownMultiplier;
                     mouseAbilityUIUpdateNeeded = true;
                     if (this[abilityCooldownTimerProp] < 0) this[abilityCooldownTimerProp] = 0;
                 }
-                return false; // Ability did not just finish
+                return justFinished;
             };
 
             if (this.currentPath === 'mage') {
@@ -309,10 +315,10 @@ export class Player {
                 }
                 if (this.hasShieldOvercharge) {
                     const shieldFinished = updateGenericMouseAbility_local('isShieldOvercharging', 'shieldOverchargeTimer', 'shieldOverchargeCooldownTimer', gameConstants.SHIELD_OVERCHARGE_COOLDOWN, gameConstants.SHIELD_OVERCHARGE_DURATION);
-                    if (shieldFinished && signalAchievementEvent && this.raysAbsorbedThisShieldOvercharge >= 5) { // <<< SHIELD SIPHON CHECK
+                    if (shieldFinished && signalAchievementEvent && this.raysAbsorbedThisShieldOvercharge >= 5) {
                         signalAchievementEvent("shield_siphon_mage");
                     }
-                    if (shieldFinished || !this.isShieldOvercharging) { // Reset counter if ability ends or is not active
+                    if (shieldFinished || !this.isShieldOvercharging) {
                         this.raysAbsorbedThisShieldOvercharge = 0;
                     }
                 }
@@ -356,7 +362,14 @@ export class Player {
                 }
                 if (this.hasSeismicSlam && this.seismicSlamCooldownTimer > 0) {let ecm = Math.max(0.1, 1.0 - this.globalCooldownReduction); this.seismicSlamCooldownTimer -= dt/ecm; mouseAbilityUIUpdateNeeded = true; if(this.seismicSlamCooldownTimer < 0) this.seismicSlamCooldownTimer=0;}
             } else if (this.currentPath === 'berserker') {
-                if (this.hasBloodpact) updateGenericMouseAbility_local('isBloodpactActive', 'bloodpactTimer', 'bloodpactCooldownTimer', gameConstants.BLOODPACT_COOLDOWN, gameConstants.BLOODPACT_DURATION);
+                const bloodpactFinished = updateGenericMouseAbility_local('isBloodpactActive', 'bloodpactTimer', 'bloodpactCooldownTimer', gameConstants.BLOODPACT_COOLDOWN, gameConstants.BLOODPACT_DURATION);
+                if (bloodpactFinished && signalAchievementEvent && this.healingThisBloodpact >= 50) {
+                    signalAchievementEvent("bloodpact_heal_amount", { healedThisActivation: this.healingThisBloodpact });
+                }
+                if (bloodpactFinished || !this.isBloodpactActive) {
+                    this.healingThisBloodpact = 0;
+                }
+
                 if (this.hasSavageHowl) {
                      if (this.savageHowlAttackSpeedBuffTimer > 0) { this.savageHowlAttackSpeedBuffTimer -= dt; mouseAbilityUIUpdateNeeded = true; if (this.savageHowlAttackSpeedBuffTimer <= 0) this.isSavageHowlAttackSpeedBuffActive = false;}
                      if (this.savageHowlCooldownTimer > 0) {let ecm = Math.max(0.1, 1.0 - this.globalCooldownReduction); this.savageHowlCooldownTimer -= dt/ecm; mouseAbilityUIUpdateNeeded = true; if(this.savageHowlCooldownTimer < 0) this.savageHowlCooldownTimer=0;}
@@ -566,7 +579,7 @@ export class Player {
                         gameContext.screenShakeParams.currentShakeMagnitude = 4;
                         gameContext.screenShakeParams.currentShakeType = 'playerHit';
                      }
-                    if (!this.hasTriggeredAegisPassiveBossDamageThisRun && gameContext.signalAchievementEvent) { // <<< IMPACT INITIATED
+                    if (!this.hasTriggeredAegisPassiveBossDamageThisRun && gameContext.signalAchievementEvent) {
                         gameContext.signalAchievementEvent("aegis_passive_collision_damage_boss");
                         this.hasTriggeredAegisPassiveBossDamageThisRun = true;
                     }
@@ -627,6 +640,7 @@ export class Player {
         this.rayCritDamageMultiplier = 1.5;
         this.abilityCritChance = 0.0;
         this.abilityCritDamageMultiplier = 1.5;
+        this.acquiredEvolutions = [];
 
         this.kineticCharge = 0;
         this.baseKineticChargeRate = 0;
@@ -669,10 +683,15 @@ export class Player {
         this.hasAegisCharge = false; this.isChargingAegisCharge = false; this.aegisChargeCurrentChargeTime = 0; this.aegisChargeCooldownTimer = 0;
         this.isAegisChargingDash = false; this.aegisChargeDashTimer = 0;
         this.currentChargeRotation = 0;
+        this.aegisChargeBossDamageDealtThisRun = 0;
+
         this.hasSeismicSlam = false; this.seismicSlamCooldownTimer = 0;
 
         this.hasBloodpact = false; this.isBloodpactActive = false; this.bloodpactTimer = 0; this.bloodpactCooldownTimer = 0;
-        this.hasSavageHowl = false; this.savageHowlCooldownTimer = 0; this.isSavageHowlAttackSpeedBuffActive = false; this.savageHowlAttackSpeedBuffTimer = 0;
+        this.healingThisBloodpact = 0;
+
+        this.hasSavageHowl = false; this.savageHowlCooldownTimer = 0;
+        this.isSavageHowlAttackSpeedBuffActive = false; this.savageHowlAttackSpeedBuffTimer = 0;
 
         this.evolutionReRollsRemaining = MAX_EVOLUTION_REROLLS;
         this.blockedEvolutionIds = [];
@@ -681,7 +700,10 @@ export class Player {
         this.frozenEvolutionChoice = null;
         this.isFreezeModeActive = false;
         this.hasUsedFreezeForCurrentOffers = false;
-        this.hasTriggeredAegisPassiveBossDamageThisRun = false; // <<< RESET For Impact Initiated achievement
+        this.hasTriggeredAegisPassiveBossDamageThisRun = false;
+        this.damageTakenThisBossFight = 0;
+        this.teleportTimestamps = [];
+        this.eventDataForNextSignal = {};
     }
 
     drawHpBar(ctx) {
@@ -1150,6 +1172,7 @@ export class Player {
     takeDamage(hittingRayOrAmount, gameContext, damageContext) {
         const postPopupTimerFromCtx = gameContext.postPopupImmunityTimer || 0;
         const postDamageTimerFromCtx = gameContext.postDamageImmunityTimer || 0;
+        const bossManager = gameContext.getBossManager ? gameContext.getBossManager() : null;
 
         let effectiveDamageTakenMultiplier = this.damageTakenMultiplier;
         if (this.isAegisChargingDash && this.currentPath === 'aegis') {
@@ -1174,7 +1197,7 @@ export class Player {
                 if (!isOwnFreshRay) {
                     hittingRay.isActive = false;
                     this.gainHealth(SHIELD_OVERCHARGE_HEAL_PER_RAY, gameContext.updateHealthDisplayCallback);
-                    this.raysAbsorbedThisShieldOvercharge = (this.raysAbsorbedThisShieldOvercharge || 0) + 1; // <<< SHIELD SIPHON TRACKING
+                    this.raysAbsorbedThisShieldOvercharge = (this.raysAbsorbedThisShieldOvercharge || 0) + 1;
                 }
                 else { hittingRay.isActive = false; }
             }
@@ -1212,6 +1235,12 @@ export class Player {
 
         this.hp -= damageToTake;
         if (this.hp < 0) this.hp = 0;
+
+        if (bossManager && bossManager.isBossSequenceActive()) {
+            this.damageTakenThisBossFight += damageToTake;
+        }
+
+
         if (gameContext.updateHealthDisplayCallback) gameContext.updateHealthDisplayCallback(this.hp, this.maxHp);
 
         const threshold = (gameContext.CONSTANTS && gameContext.CONSTANTS.CLOSE_SHAVE_HP_THRESHOLD !== undefined)
@@ -1241,6 +1270,7 @@ export class Player {
         if (this.isBloodpactActive && this.currentPath === 'berserker' && damageDealt > 0) {
             const healAmount = Math.max(1, Math.floor(damageDealt * BLOODPACT_LIFESTEAL_PERCENT));
             this.gainHealth(healAmount, updateHealthDisplayCallback);
+            this.healingThisBloodpact += healAmount;
         }
     }
 
@@ -1317,8 +1347,16 @@ export class Player {
         if (ability.id === 'miniGravityWell') {
             if (this.activeMiniWell && this.activeMiniWell.isActive) {
                 this.currentGravityWellKineticBoost = this.consumeKineticChargeForDamageBoost();
-                this.activeMiniWell.detonate({ targetX: abilityContext.mouseX, targetY: abilityContext.mouseY, player: this });
+                this.activeMiniWell.detonate({ targetX: abilityContext.mouseX, targetY: abilityContext.mouseY, player: this }); // Player passed
                 ability.cooldownTimer = effectiveCooldownToSet; ability.justBecameReady = false; abilityUsedSuccessfully = true;
+
+                // <<< WELL MASTER: Signal event after detonation >>>
+                if (this.eventDataForNextSignal && this.eventDataForNextSignal.player_well_detonated && signalAchievementEvent) {
+                    signalAchievementEvent("player_well_detonated", this.eventDataForNextSignal.player_well_detonated);
+                    delete this.eventDataForNextSignal.player_well_detonated; // Clear after use
+                }
+                // <<< END WELL MASTER >>>
+
             } else if (ability.cooldownTimer <= 0) {
                 this.deployMiniGravityWell(ability.duration, abilityContext.decoysArray, abilityContext.mouseX, abilityContext.mouseY);
                 if (this.activeMiniWell) { abilityUsedSuccessfully = true; ability.cooldownTimer = effectiveCooldownToSet; ability.justBecameReady = false; }
@@ -1353,28 +1391,50 @@ export class Player {
     doTeleport(bossDefeatEffectsArray, mouseX, mouseY, canvasWidth, canvasHeight, targetsArray, signalAchievementEventCallback) {
         if (this.teleporting && this.teleportEffectTimer > 0) return;
         const oldX = this.x; const oldY = this.y;
+
+        if (signalAchievementEventCallback) {
+            this.teleportTimestamps.push(Date.now());
+            if (this.teleportTimestamps.length > 10) {
+                this.teleportTimestamps.splice(0, this.teleportTimestamps.length - 10);
+            }
+        }
+
         this.x = mouseX; this.y = mouseY;
         this.x = Math.max(this.radius, Math.min(this.x, canvasWidth - this.radius));
         this.y = Math.max(this.radius, Math.min(this.y, canvasHeight - this.radius));
         this.teleporting = true; this.teleportEffectTimer = TELEPORT_IMMUNITY_DURATION;
+
         if (bossDefeatEffectsArray) {
             bossDefeatEffectsArray.push({ x: oldX, y: oldY, radius: this.radius * 2.5, maxRadius: this.radius * 0.5, opacity: 0.8, timer: 200, duration: 200, color: 'rgba(180, 180, 255, opacity)', initialRadius: this.radius * 2.5, shrink: true });
             bossDefeatEffectsArray.push({ x: this.x, y: this.y, radius: this.radius * 0.2, maxRadius: this.radius * 1.8, opacity: 0.8, timer: 350, duration: 350, color: 'rgba(200, 200, 255, opacity)', initialRadius: this.radius * 0.2 });
         }
         playSound(teleportSound);
 
-        if (targetsArray && targetsArray.length > 0 && signalAchievementEventCallback) { // <<< TELE-FRAG CHECK
+        if (targetsArray && targetsArray.length > 0 && signalAchievementEventCallback) {
             let teleFragged = false;
             for (let i = targetsArray.length - 1; i >= 0; i--) {
                 if (checkCollision(this, targetsArray[i])) {
-                    // Assuming the target will be removed by gameLogic's ray/target collision check
-                    // or if we need to remove it here, then `targetsArray.splice(i, 1);`
                     teleFragged = true;
                     break;
                 }
             }
             if (teleFragged) {
                 signalAchievementEventCallback("teleport_kill_target");
+            }
+        }
+
+        if (signalAchievementEventCallback && this.teleportTimestamps.length >= 5) {
+            const requiredCount = 5;
+            const timeWindow = 60000;
+            for (let i = this.teleportTimestamps.length - requiredCount; i >= 0; i--) {
+                const recentTimestamps = this.teleportTimestamps.slice(i, i + requiredCount);
+                if (recentTimestamps.length === requiredCount) {
+                    if ((recentTimestamps[requiredCount - 1] - recentTimestamps[0]) <= timeWindow) {
+                        signalAchievementEventCallback("rapid_relocation_success");
+                        this.teleportTimestamps = [];
+                        break;
+                    }
+                }
             }
         }
     }
@@ -1516,6 +1576,7 @@ export class Player {
         if (this.hasBloodpact && !this.isBloodpactActive && this.bloodpactCooldownTimer <= 0) {
             this.isBloodpactActive = true;
             this.bloodpactTimer = BLOODPACT_DURATION;
+            this.healingThisBloodpact = 0;
             if(abilityContext.activeBuffNotificationsArray) abilityContext.activeBuffNotificationsArray.push({ text: `Bloodpact Active! Lifesteal!`, timer: BLOODPACT_DURATION });
 
             let cd = BLOODPACT_COOLDOWN * (1.0 - this.globalCooldownReduction);
@@ -1548,17 +1609,20 @@ export class Player {
                 abilityContext.screenShakeParams.currentShakeType = 'bonus';
             }
 
+            let enemiesFearedCount = 0;
             if (abilityContext.activeBosses) {
                 abilityContext.activeBosses.forEach(boss => {
                     if (Math.hypot(this.x - boss.x, this.y - boss.y) < SAVAGE_HOWL_FEAR_RADIUS + boss.radius) {
                         if (typeof boss.applyFear === 'function') {
                             boss.applyFear(SAVAGE_HOWL_FEAR_DURATION, this.x, this.y);
+                            enemiesFearedCount++;
                         }
                         if (boss instanceof NexusWeaverBoss && boss.activeMinions) {
                             boss.activeMinions.forEach(minion => {
                                 if (minion.isActive && Math.hypot(this.x - minion.x, this.y - minion.y) < SAVAGE_HOWL_FEAR_RADIUS + minion.radius) {
                                     if (typeof minion.applyFear === 'function') {
                                         minion.applyFear(SAVAGE_HOWL_FEAR_DURATION, this.x, this.y);
+                                        enemiesFearedCount++;
                                     }
                                 }
                             });
@@ -1566,6 +1630,10 @@ export class Player {
                     }
                 });
             }
+            if (abilityContext.signalAchievementEvent && enemiesFearedCount >= 2) {
+                 abilityContext.signalAchievementEvent("savage_howl_fear_count", { enemiesFeared: enemiesFearedCount });
+            }
+
 
             let cd = SAVAGE_HOWL_COOLDOWN * (1.0 - this.globalCooldownReduction);
             this.savageHowlCooldownTimer = Math.max(SAVAGE_HOWL_COOLDOWN * 0.1, cd);
@@ -1623,7 +1691,10 @@ export class Player {
                 if (Math.hypot(this.x - boss.x, this.y - boss.y) < AEGIS_CHARGE_AOE_RADIUS + boss.radius) {
                     if (boss.takeDamage) {
                         const dmgDone = boss.takeDamage(baseDamage, null, this, {isAbility: true, abilityType: 'aegisCharge'});
-                        if (dmgDone > 0) this.totalDamageDealt += dmgDone;
+                        if (dmgDone > 0) {
+                             this.totalDamageDealt += dmgDone;
+                             this.aegisChargeBossDamageDealtThisRun += dmgDone;
+                        }
                     }
                 }
             });

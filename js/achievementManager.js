@@ -76,6 +76,7 @@ function evaluateCondition(achievement, gameContext) {
 
     switch (conditions.type) {
         case "player_stat_gte":
+            if (conditions.path && player.currentPath !== conditions.path) return false;
             const statPartsGTE = conditions.stat.split('.');
             let currentValueGTE = player;
             for (const part of statPartsGTE) {
@@ -85,7 +86,6 @@ function evaluateCondition(achievement, gameContext) {
             }
             if (typeof currentValueGTE === 'number' || (Array.isArray(currentValueGTE) && conditions.stat.endsWith('.length'))) {
                  let valueToCheckGTE = Array.isArray(currentValueGTE) && conditions.stat.endsWith('.length') ? currentValueGTE.length : currentValueGTE;
-                 if (conditions.path && player.currentPath !== conditions.path) return false;
                  return valueToCheckGTE >= conditions.value;
             }
             break;
@@ -116,13 +116,8 @@ function evaluateCondition(achievement, gameContext) {
         case "boss_defeat_condition":
             if (gameContext.eventFlags && gameContext.eventFlags.boss_defeat_no_abilities) {
                 const eventData = gameContext.eventFlags.boss_defeat_no_abilities_data || {};
-
-                if (eventData.noAbilitiesUsedFromBossManager !== conditions.noAbilitiesUsed) {
-                    return false;
-                }
-                if (eventData.bossTier !== conditions.bossTier) {
-                    return false;
-                }
+                if (eventData.noAbilitiesUsedFromBossManager !== conditions.noAbilitiesUsed) return false;
+                if (eventData.bossTier !== conditions.bossTier) return false;
                 if (conditions.bossKey === "any_standard") {
                     const standardKeys = ["chaser", "reflector", "singularity"];
                     return standardKeys.includes(eventData.bossKey);
@@ -132,44 +127,81 @@ function evaluateCondition(achievement, gameContext) {
 
         case "evo_interaction_depleted_on_screen":
             const resourceKeyForInitial = conditions.resourceStat.replace("Remaining", "");
-
             if (!(player.hasOwnProperty(conditions.resourceStat))) return false;
             if (!(initialCharges.hasOwnProperty(resourceKeyForInitial))) return false;
             if (!(conditions.maxResourceConstKey in constants)) return false;
-
             const initialCountForThisScreen = initialCharges[resourceKeyForInitial];
             const currentRunTotalRemaining = player[conditions.resourceStat];
             const maxPossibleForInteraction = constants[conditions.maxResourceConstKey];
             const expectedValueAfterUse = conditions.targetValueAfterUse;
             const usedThisScreen = initialCountForThisScreen - currentRunTotalRemaining;
+            return initialCountForThisScreen >= maxPossibleForInteraction &&
+                   usedThisScreen === maxPossibleForInteraction &&
+                   currentRunTotalRemaining === expectedValueAfterUse;
 
-            if (initialCountForThisScreen >= maxPossibleForInteraction &&
-                usedThisScreen === maxPossibleForInteraction &&
-                currentRunTotalRemaining === expectedValueAfterUse) {
-                return true;
-            }
-            break;
-
-        case "event_teleport_kill_target": // <<< NEW
+        case "event_teleport_kill_target":
             return !!(gameContext.eventFlags && gameContext.eventFlags.teleport_kill_target);
 
-        case "path_ability_specific_count": // <<< NEW
+        case "path_ability_specific_count":
             if (player.currentPath === conditions.path) {
                 if (conditions.ability === "shieldOvercharge" && conditions.countType === "rays_absorbed_single_activation") {
-                    return !!(gameContext.eventFlags && gameContext.eventFlags.shield_siphon_mage); // Event flag set by player.js
+                    return !!(gameContext.eventFlags && gameContext.eventFlags.shield_siphon_mage);
                 }
             }
             break;
 
-        case "path_event_first_time": // <<< NEW
+        case "path_event_first_time":
              if (player.currentPath === conditions.path) {
                 if (conditions.eventName === "passive_collision_damage_boss") {
-                    return !!(gameContext.eventFlags && gameContext.eventFlags.aegis_passive_collision_damage_boss); // Event flag set by player.js
+                    return !!(gameContext.eventFlags && gameContext.eventFlags.aegis_passive_collision_damage_boss);
                 }
             }
             break;
-    }
 
+        case "event_nexus_weaver_defeated_first_time_run":
+            return !!(gameContext.eventFlags && gameContext.eventFlags.nexus_weaver_defeated_first_time_run);
+
+        case "event_boss_defeated_flawless":
+            return !!(gameContext.eventFlags && gameContext.eventFlags.boss_defeated_flawless);
+
+        case "player_core_evolutions_gte":
+            if (player.acquiredEvolutions && Array.isArray(player.acquiredEvolutions)) {
+                const coreEvoCount = player.acquiredEvolutions.filter(evo => evo.isTiered === false).length;
+                return coreEvoCount >= conditions.value;
+            }
+            return false;
+
+        case "event_rapid_relocation_success": // <<< NEW CASE
+            return !!(gameContext.eventFlags && gameContext.eventFlags.rapid_relocation_success);
+
+        case "event_player_well_detonated_mage_min_rays":
+            if (player.currentPath === 'mage' && gameContext.eventFlags && gameContext.eventFlags.player_well_detonated) {
+                const eventData = gameContext.eventFlags.player_well_detonated_data || {};
+                return eventData.launchedRays >= conditions.minRays;
+            }
+            return false;
+
+        case "event_bloodpact_heal_amount":
+            if (player.currentPath === conditions.path && gameContext.eventFlags && gameContext.eventFlags.bloodpact_heal_amount) {
+                const eventData = gameContext.eventFlags.bloodpact_heal_amount_data || {};
+                return eventData.healedThisActivation >= conditions.minHeal;
+            }
+            return false;
+
+        case "event_savage_howl_fear_count":
+            if (player.currentPath === conditions.path && gameContext.eventFlags && gameContext.eventFlags.savage_howl_fear_count) {
+                const eventData = gameContext.eventFlags.savage_howl_fear_count_data || {};
+                return eventData.enemiesFeared >= conditions.minFeared;
+            }
+            return false;
+
+        case "event_momentum_ray_hit_high_damage":
+            if (gameContext.eventFlags && gameContext.eventFlags.momentum_ray_hit_high_damage) {
+                const eventData = gameContext.eventFlags.momentum_ray_hit_high_damage_data || {};
+                return eventData.damageDealt >= conditions.minDamage && eventData.momentumBonus > 0;
+            }
+            return false;
+    }
     return false;
 }
 
@@ -185,14 +217,31 @@ export function checkAllAchievements(gameContext) {
         }
     });
 
-    // Reset one-time event flags after checking all achievements for this frame/event
     if (gameContext.eventFlags) {
-        for (const flag in gameContext.eventFlags) {
-            // Only reset flags that are simple booleans and not data objects
-            if (typeof gameContext.eventFlags[flag] === 'boolean' && !flag.endsWith("_data")) {
-                gameContext.eventFlags[flag] = false;
+        const flagsToReset = [
+            "heart_pickup_full_hp",
+            "player_hp_critical_after_hit",
+            "teleport_kill_target",
+            "shield_siphon_mage",
+            "aegis_passive_collision_damage_boss",
+            "nexus_weaver_defeated_first_time_run",
+            "boss_defeat_no_abilities",
+            "ray_hit_boss_after_bounces",
+            "boss_defeated_flawless",
+            "rapid_relocation_success", // <<< ADDED to reset
+            "player_well_detonated",
+            "bloodpact_heal_amount",
+            "savage_howl_fear_count",
+            "momentum_ray_hit_high_damage",
+        ];
+        flagsToReset.forEach(flagName => {
+            if (gameContext.eventFlags.hasOwnProperty(flagName)) {
+                gameContext.eventFlags[flagName] = false;
             }
-        }
+            if (gameContext.eventFlags.hasOwnProperty(flagName + "_data")) {
+                delete gameContext.eventFlags[flagName + "_data"];
+            }
+        });
     }
 }
 

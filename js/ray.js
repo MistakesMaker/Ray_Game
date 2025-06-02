@@ -52,7 +52,7 @@ export class Ray {
         this.trail = [];
         this.speed = 0;
         this.initialSpeedMultiplier = 1.0;
-        this.isActive = false; 
+        this.isActive = false;
         this.absoluteAgeTimer = 0;
         this.wallsHit = { top: false, bottom: false, left: false, right: false };
         this.uniqueWallsHitCount = 0;
@@ -79,9 +79,9 @@ export class Ray {
         this.formingTimer = 0;
         this.targetCustomRadius = 0;
         this.selfCollisionGraceTimer = 0;
-        this.damageValue = RAY_DAMAGE_TO_PLAYER; 
-        this.sourceAbility = null; 
-        this.pathDamageMultiplier = 1.0; // <<< NEW: For path-based damage multiplication
+        this.damageValue = RAY_DAMAGE_TO_PLAYER;
+        this.sourceAbility = null;
+        this.pathDamageMultiplier = 1.0;
     }
 
     reset(x, y, color, dx, dy, globalSpeedMultiplier, playerInstance, maxLifetimeForThisRay,
@@ -92,9 +92,9 @@ export class Ray {
         this.isPlayerAbilityRay = false;
         this.isForming = false; this.formingDuration = 0; this.formingTimer = 0; this.targetCustomRadius = 0;
         this.selfCollisionGraceTimer = 0;
-        this.damageValue = RAY_DAMAGE_TO_PLAYER; 
-        this.sourceAbility = null; 
-        this.pathDamageMultiplier = 1.0; // <<< RESET path damage multiplier
+        this.damageValue = RAY_DAMAGE_TO_PLAYER;
+        this.sourceAbility = null;
+        this.pathDamageMultiplier = 1.0;
 
         const ownRaySpeedMult = (playerInstance && !isBoss && !isGravityRay) ? playerInstance.ownRaySpeedMultiplier : 1.0;
 
@@ -125,7 +125,7 @@ export class Ray {
         this.stationaryTimer = 0; this.fadeTimer = 0; this.opacity = 1;
         this.spawnGraceTimer = RAY_SPAWN_GRACE_PERIOD; this.wallBounceCount = 0; this.trail.length = 0;
         this.initialSpeedMultiplier = globalSpeedMultiplier * ownRaySpeedMult;
-        this.isActive = true; 
+        this.isActive = true;
         this.absoluteAgeTimer = 0;
         this.wallsHit = { top: false, bottom: false, left: false, right: false };
         this.uniqueWallsHitCount = 0; this.momentumDamageBonusValue = 0;
@@ -214,7 +214,7 @@ export class Ray {
                     if(playSound && gravityWellChargeSound) playSound(gravityWellChargeSound, true);
                 }
             }
-            return; 
+            return;
         }
 
         this.absoluteAgeTimer += dt;
@@ -259,14 +259,14 @@ export class Ray {
                         this.y += Math.sin(pushAngle) * nudgeStrength;
 
                         const dotProduct = this.dx * Math.cos(pushAngle) + this.dy * Math.sin(pushAngle);
-                        if (dotProduct < 0) { 
+                        if (dotProduct < 0) {
                             const tangentAngle1 = pushAngle + Math.PI / 2;
                             const tangentAngle2 = pushAngle - Math.PI / 2;
                             const currentMoveAngle = Math.atan2(this.dy, this.dx);
                             const diff1 = Math.abs(currentMoveAngle - tangentAngle1);
                             const diff2 = Math.abs(currentMoveAngle - tangentAngle2);
-                            const finalTangentAngle = (diff1 < diff2) ? tangentAngle1 : tangentAngle2; 
-                            this.dx = Math.cos(finalTangentAngle) * 0.5 + this.dx * 0.5; 
+                            const finalTangentAngle = (diff1 < diff2) ? tangentAngle1 : tangentAngle2;
+                            this.dx = Math.cos(finalTangentAngle) * 0.5 + this.dx * 0.5;
                             this.dy = Math.sin(finalTangentAngle) * 0.5 + this.dy * 0.5;
                             const newMag = Math.sqrt(this.dx**2 + this.dy**2) || 1;
                             this.dx /= newMag; this.dy /= newMag;
@@ -285,11 +285,11 @@ export class Ray {
                 const nearTop = this.y - currentCollisionRadius < N;
                 const nearBottom = this.y + currentCollisionRadius > canvasHeight - N;
                 if (nearLeft || nearRight || nearTop || nearBottom) {
-                    if (Math.random() < 0.15) passedThroughWall = true; 
+                    if (Math.random() < 0.15) passedThroughWall = true;
                 }
             }
 
-            if (!passedThroughWall && !this.isCorruptedByGravityWell && !this.isCorruptedByPlayerWell) { 
+            if (!passedThroughWall && !this.isCorruptedByGravityWell && !this.isCorruptedByPlayerWell) {
                 const maxBouncesForThisRay = this.isGravityWellRay && this.gravityWellTarget ? 2 : MAX_RAY_BOUNCES;
                 if (this.x - currentCollisionRadius < 0) { this.x = currentCollisionRadius + N; this.dx *= -1; this.wallBounceCount++; didBounce = true; }
                 else if (this.x + currentCollisionRadius > canvasWidth) { this.x = canvasWidth - currentCollisionRadius - N; this.dx *= -1; this.wallBounceCount++; didBounce = true; }
@@ -306,7 +306,7 @@ export class Ray {
                 }
             }
             if (didBounce && player && player.visualModifiers && player.visualModifiers.momentumInjectors && !this.isBossProjectile && !this.isGravityWellRay) {const maxBonus = 0.25; this.momentumDamageBonusValue = Math.min(maxBonus, (this.momentumDamageBonusValue || 0) + (player.momentumDamageBonus || 0));}
-            if (!this.isActive) return; 
+            if (!this.isActive) return;
 
 
             if (this.isGravityWellRay && player && this.gravityWellTarget && this.selfCollisionGraceTimer <= 0 && !this.isForming) {
@@ -317,7 +317,7 @@ export class Ray {
 
                 if (playerCanBeHit && checkCollision(player, this)) {
                     if (playerTakeDamageFromRayCallback) {
-                         playerTakeDamageFromRayCallback(this); 
+                         playerTakeDamageFromRayCallback(this);
                     }
                 }
             }
@@ -325,26 +325,26 @@ export class Ray {
 
             let shouldStartFading = false;
             if (this.absoluteAgeTimer >= ABSOLUTE_MAX_RAY_LIFETIME) { shouldStartFading = true; }
-            else if (this.lifeTimer <= 0 && !this.isGravityWellRay) { shouldStartFading = true; } 
-            else if (this.wallBounceCount >= MAX_RAY_BOUNCES && !(this.isGravityWellRay && this.gravityWellTarget)) { shouldStartFading = true; } 
+            else if (this.lifeTimer <= 0 && !this.isGravityWellRay) { shouldStartFading = true; }
+            else if (this.wallBounceCount >= MAX_RAY_BOUNCES && !(this.isGravityWellRay && this.gravityWellTarget)) { shouldStartFading = true; }
 
 
-            if (this.isGravityWellRay && this.lifeTimer <= 0 && this.gravityWellTarget) { 
-                if (detonateGravityWell) detonateGravityWell(this); 
-                this.isActive = false; return; 
+            if (this.isGravityWellRay && this.lifeTimer <= 0 && this.gravityWellTarget) {
+                if (detonateGravityWell) detonateGravityWell(this);
+                this.isActive = false; return;
             }
             if (shouldStartFading) {
-                if (!(this.isGravityWellRay && this.gravityWellTarget) || isThisAScatteredRay ) { 
+                if (!(this.isGravityWellRay && this.gravityWellTarget) || isThisAScatteredRay ) {
                     this.state = 'fading'; this.fadeTimer = RAY_FADE_DURATION_BASE; this.dx = 0; this.dy = 0;
                 }
             }
         } else if (this.state === 'fading') {
             this.fadeTimer -= dt; this.opacity = Math.max(0, this.fadeTimer / RAY_FADE_DURATION_BASE);
-            if (this.trail.length > 0 && Math.random() < .35) this.trail.shift(); 
+            if (this.trail.length > 0 && Math.random() < .35) this.trail.shift();
             if (this.opacity <= 0) { this.isActive = false; }
         }
     }
-    bounce() { const nA = Math.random() * Math.PI * 2; this.dx = Math.cos(nA); this.dy = Math.sin(nA); } 
+    bounce() { const nA = Math.random() * Math.PI * 2; this.dx = Math.cos(nA); this.dy = Math.sin(nA); }
 }
 
 
@@ -366,51 +366,51 @@ export class PlayerGravityWell {
 
         this.lifeTimer -= dt;
         if (this.lifeTimer <= 0 && !this.isPendingDetonation) {
-            this.isPendingDetonation = true; 
+            this.isPendingDetonation = true;
         }
         this.pulseTimer += dt;
-        this.absorbedRays = this.absorbedRays.filter(r => r && r.isActive); 
+        this.absorbedRays = this.absorbedRays.filter(r => r && r.isActive);
 
         if (activeBosses && activeBosses.length > 0) {
             for (const boss of activeBosses) {
-                if (checkCollision(this, boss)) { this.isPendingDetonation = true; return; } 
+                if (checkCollision(this, boss)) { this.isPendingDetonation = true; return; }
             }
         }
 
 
         if (allRays) {
             allRays.forEach(ray => {
-                if (!ray.isActive || ray.isGravityWellRay || ray.state !== 'moving') return; 
+                if (!ray.isActive || ray.isGravityWellRay || ray.state !== 'moving') return;
 
                 const distToWellCenter = Math.sqrt((ray.x - this.x) ** 2 + (ray.y - this.y) ** 2);
 
                 if (ray.isCorruptedByPlayerWell) {
                     const angleRayToWell = Math.atan2(this.y - ray.y, this.x - ray.x);
-                    const targetOrbitR = ray.targetOrbitDistPlayerWell; 
+                    const targetOrbitR = ray.targetOrbitDistPlayerWell;
                     const tangentialAngle = angleRayToWell + (ray.orbitDirPlayerWell * Math.PI / 2);
                     let desiredDx = 0; let desiredDy = 0;
 
-                    if (distToWellCenter < targetOrbitR * 0.75 ) { 
+                    if (distToWellCenter < targetOrbitR * 0.75 ) {
                         const pushOutStrength = 0.25 * ray.speed * (dt / (1000/60));
                         desiredDx = -Math.cos(angleRayToWell) * pushOutStrength + Math.cos(tangentialAngle) * ray.speed * 0.1;
                         desiredDy = -Math.sin(angleRayToWell) * pushOutStrength + Math.sin(tangentialAngle) * ray.speed * 0.1;
-                    } else { 
+                    } else {
                         let tDx = Math.cos(tangentialAngle) * ray.speed;
                         let tDy = Math.sin(tangentialAngle) * ray.speed;
                         const radialError = distToWellCenter - targetOrbitR;
-                        const radialCorrectionStrength = 0.1 * (dt / (1000 / 60)); 
+                        const radialCorrectionStrength = 0.1 * (dt / (1000 / 60));
                         let rDx = 0, rDy = 0;
-                        if (Math.abs(radialError) > 0.5) { 
+                        if (Math.abs(radialError) > 0.5) {
                             rDx = -Math.cos(angleRayToWell) * radialError * radialCorrectionStrength;
                             rDy = -Math.sin(angleRayToWell) * radialError * radialCorrectionStrength;
                         }
                         desiredDx = tDx + rDx; desiredDy = tDy + rDy;
                     }
-                    const blend = 0.4; 
+                    const blend = 0.4;
                     ray.dx = ray.dx * (1 - blend) + desiredDx * blend;
                     ray.dy = ray.dy * (1 - blend) + desiredDy * blend;
                     const currentSpeedMag = Math.sqrt(ray.dx ** 2 + ray.dy ** 2) || 1;
-                    ray.dx = (ray.dx / currentSpeedMag) * ray.speed; 
+                    ray.dx = (ray.dx / currentSpeedMag) * ray.speed;
                     ray.dy = (ray.dy / currentSpeedMag) * ray.speed;
 
                     const containmentRadius = this.pullRadius * 0.98;
@@ -428,28 +428,28 @@ export class PlayerGravityWell {
                         if (clampedSpeedMag > 0.01) { ray.dx = (ray.dx / clampedSpeedMag) * ray.speed; ray.dy = (ray.dy / clampedSpeedMag) * ray.speed; }
                     }
 
-                } else if (distToWellCenter < this.pullRadius) { 
+                } else if (distToWellCenter < this.pullRadius) {
                     const pullAngle = Math.atan2(this.y - ray.y, this.x - ray.x);
-                    const pullFactor = this.pullStrengthFactor * ((this.pullRadius - distToWellCenter) / this.pullRadius); 
+                    const pullFactor = this.pullStrengthFactor * ((this.pullRadius - distToWellCenter) / this.pullRadius);
                     ray.dx += Math.cos(pullAngle) * pullFactor * (dt / (1000 / 60));
                     ray.dy += Math.sin(pullAngle) * pullFactor * (dt / (1000 / 60));
                     const speedMag = Math.sqrt(ray.dx ** 2 + ray.dy ** 2);
-                    let maxPullInfluence = ray.initialSpeedMultiplier * BASE_RAY_SPEED * (ray.isBossProjectile ? 1.2 : 1.8); 
+                    let maxPullInfluence = ray.initialSpeedMultiplier * BASE_RAY_SPEED * (ray.isBossProjectile ? 1.2 : 1.8);
                     if (speedMag > maxPullInfluence) { ray.dx = (ray.dx / speedMag) * maxPullInfluence; ray.dy = (ray.dy / speedMag) * maxPullInfluence; }
 
-                    if (checkCollision(ray, this)) { 
+                    if (checkCollision(ray, this)) {
                         if (!this.absorbedRays.includes(ray)) { this.absorbedRays.push(ray); }
                         if (!ray.isCorruptedByPlayerWell) {
                             ray.isCorruptedByPlayerWell = true;
-                            ray.isCorruptedByGravityWell = false; 
+                            ray.isCorruptedByGravityWell = false;
                             ray.color = PLAYER_GRAVITY_WELL_ABSORBED_RAY_COLOR;
                             let currentRaySpeed = Math.sqrt(ray.dx ** 2 + ray.dy ** 2) || ray.speed;
-                            ray.speed = Math.max(currentRaySpeed * 0.6, BASE_RAY_SPEED * 0.5); 
-                            ray.targetOrbitDistPlayerWell = this.radius + (this.pullRadius - this.radius) * (0.65 + Math.random() * 0.30); 
-                            ray.orbitDirPlayerWell = (Math.random() < 0.5 ? 1 : -1); 
+                            ray.speed = Math.max(currentRaySpeed * 0.6, BASE_RAY_SPEED * 0.5);
+                            ray.targetOrbitDistPlayerWell = this.radius + (this.pullRadius - this.radius) * (0.65 + Math.random() * 0.30);
+                            ray.orbitDirPlayerWell = (Math.random() < 0.5 ? 1 : -1);
                             const angleToCenter = Math.atan2(this.y - ray.y, this.x - ray.x);
                             const initTangentialAngle = angleToCenter + (ray.orbitDirPlayerWell * Math.PI / 2);
-                            const tangentWeight = 0.95; 
+                            const tangentWeight = 0.95;
                             ray.dx = (Math.cos(initTangentialAngle) * tangentWeight + Math.cos(angleToCenter) * (1 - tangentWeight));
                             ray.dy = (Math.sin(initTangentialAngle) * tangentWeight + Math.sin(angleToCenter) * (1 - tangentWeight));
                             const norm = Math.sqrt(ray.dx ** 2 + ray.dy ** 2) || 1;
@@ -463,12 +463,12 @@ export class PlayerGravityWell {
     }
 
     draw(ctx) {
-        if (!ctx || (!this.isActive && !this.isPendingDetonation)) return; 
+        if (!ctx || (!this.isActive && !this.isPendingDetonation)) return;
         ctx.save();
         const pulseFactor = 0.8 + Math.abs(Math.sin(this.pulseTimer / 200)) * 0.2;
         const currentVisualRadius = this.radius * pulseFactor;
-        const currentPullRadiusDisplay = this.pullRadius * pulseFactor * 0.8; 
-        const alpha = 0.3 + (this.lifeTimer / this.maxLife) * 0.4; 
+        const currentPullRadiusDisplay = this.pullRadius * pulseFactor * 0.8;
+        const alpha = 0.3 + (this.lifeTimer / this.maxLife) * 0.4;
 
         ctx.beginPath(); ctx.arc(this.x, this.y, currentPullRadiusDisplay, 0, Math.PI * 2);
         ctx.strokeStyle = `rgba(173, 216, 230, ${alpha * 0.2})`; ctx.lineWidth = 1; ctx.stroke();
@@ -482,55 +482,83 @@ export class PlayerGravityWell {
 
         for (let i = 0; i < 5; i++) {
             const angle = (this.pulseTimer / (300 + i * 50)) + (i * Math.PI * 2 / 5);
-            const dist = currentVisualRadius * 0.6 * Math.sin(this.pulseTimer / (400 + i * 60)); 
+            const dist = currentVisualRadius * 0.6 * Math.sin(this.pulseTimer / (400 + i * 60));
             const px = this.x + Math.cos(angle) * dist;
             const py = this.y + Math.sin(angle) * dist;
             ctx.fillStyle = `rgba(220, 230, 255, ${alpha * 0.7})`;
-            ctx.fillRect(px - 1, py - 1, 2, 2); 
+            ctx.fillRect(px - 1, py - 1, 2, 2);
         }
         ctx.restore();
     }
 
     detonate(detonateContext) {
-        if (!this.isActive) return; 
-        this.isActive = false; this.isPendingDetonation = false; 
+        if (!this.isActive) return;
+        this.isActive = false; this.isPendingDetonation = false;
         const { targetX, targetY, player } = detonateContext;
+
+        // <<< WELL MASTER Achievement Check >>>
+        const launchedRayCount = this.absorbedRays.length;
+        if (player && player.currentPath === 'mage' && launchedRayCount >= 10) {
+            // It's assumed player has a signalAchievementEvent method or it's passed via detonateContext
+            if (player.update && player.update.constructor.name === "Function" && detonateContext.player.signalAchievementEvent) {
+                // This is a bit of a hacky check. Ideally, signalAchievementEvent would be directly on player.
+                // If signalAchievementEvent is part of gameContext passed to player.update,
+                // we need to ensure it's accessible here.
+                // For now, let's assume it might be directly callable on player if we modify player.js
+            }
+            // Prefer signaling via a passed callback if possible
+            if (player && typeof player.activateAbility === 'function' && _mainCallbacks && _mainCallbacks.signalAchievementEvent) { // Check if player object can signal
+                 // This is trying to access main.js's _mainCallbacks, which is not ideal from here.
+                 // The event should be signaled from player.js or gameLogic.js after this detonation.
+                 // For now, we will rely on player.js `activateAbility` to handle this after detonation.
+                 // The signal from player.js would look like:
+                 // gameContext.signalAchievementEvent("player_well_detonated", { launchedRays: launchedRayCount });
+            }
+            // Let's modify player.js's activateAbility to send this event after detonation.
+            // For now, just log it.
+            if (player && player.currentPath === 'mage' && launchedRayCount >= 10) {
+                 // This will be signaled from player.js after this returns.
+                // We will add the event data to the player instance for player.js to pick up.
+                if (!player.eventDataForNextSignal) player.eventDataForNextSignal = {};
+                player.eventDataForNextSignal.player_well_detonated = { launchedRays: launchedRayCount };
+            }
+        }
+        // <<< END WELL MASTER >>>
+
 
         playSound(this.playerWellDetonateSound);
         this.absorbedRays.forEach(ray => {
-            if (ray && ray.isActive) { 
+            if (ray && ray.isActive) {
                 const angleToCursor = Math.atan2(targetY - ray.y, targetX - ray.x);
                 ray.dx = Math.cos(angleToCursor);
                 ray.dy = Math.sin(angleToCursor);
-                
-                let boostedSpeed = (ray.initialSpeedMultiplier * BASE_RAY_SPEED) * 2.0; 
+
+                let boostedSpeed = (ray.initialSpeedMultiplier * BASE_RAY_SPEED) * 2.0;
                 if (player && typeof player.currentGravityWellKineticBoost === 'number' && player.currentGravityWellKineticBoost > 1.0) {
                     boostedSpeed *= player.currentGravityWellKineticBoost;
                 }
-                // <<< START MAGE PATH DAMAGE BOOST FOR MINI-WELL LAUNCHED RAYS >>>
                 if (player && player.currentPath === 'mage') {
-                    ray.pathDamageMultiplier = 2.0; // Store the multiplier on the ray
+                    ray.pathDamageMultiplier = 2.0;
                 } else {
-                    ray.pathDamageMultiplier = 1.0; // Default if not Mage
+                    ray.pathDamageMultiplier = 1.0;
                 }
-                // <<< END MAGE PATH DAMAGE BOOST FOR MINI-WELL LAUNCHED RAYS >>>
 
                 ray.speed = boostedSpeed;
-                ray.initialSpeedMultiplier = boostedSpeed / BASE_RAY_SPEED; 
+                ray.initialSpeedMultiplier = boostedSpeed / BASE_RAY_SPEED;
 
-                ray.isBossProjectile = false; 
-                ray.isGravityWellRay = false; 
-                ray.isCorruptedByPlayerWell = false; 
-                ray.isCorruptedByGravityWell = false; 
-                ray.color = PLAYER_GRAVITY_WELL_ABSORBED_RAY_COLOR; 
-                ray.spawnGraceTimer = 50; 
+                ray.isBossProjectile = false;
+                ray.isGravityWellRay = false;
+                ray.isCorruptedByPlayerWell = false;
+                ray.isCorruptedByGravityWell = false;
+                ray.color = PLAYER_GRAVITY_WELL_ABSORBED_RAY_COLOR;
+                ray.spawnGraceTimer = 50;
                 ray.pierceUsesLeft = (player && player.hasTargetPierce) ? 1 : 0;
-                ray.momentumDamageBonusValue = 0; 
-                ray.isPlayerAbilityRay = true; 
-                ray.sourceAbility = 'miniGravityWell'; 
+                ray.momentumDamageBonusValue = 0;
+                ray.isPlayerAbilityRay = true;
+                ray.sourceAbility = 'miniGravityWell';
             }
         });
-        this.absorbedRays = []; 
-        if(player && player.activeMiniWell === this) player.activeMiniWell = null; 
+        this.absorbedRays = [];
+        if(player && player.activeMiniWell === this) player.activeMiniWell = null;
     }
 }

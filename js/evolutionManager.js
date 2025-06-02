@@ -549,18 +549,9 @@ export function handleEvolutionReRoll(playerInstance) {
     playerInstance.evolutionReRollsRemaining--;
     if (_dependencies.playSound) _dependencies.playSound(_dependencies.audioEvolutionSound);
 
-    // If a choice was frozen and actively confirmed for this turn,
-    // the re-roll means that active confirmation is void, but the item remains globally frozen.
-    // The charge for *that specific active confirmation* is not refunded here.
-    // The charge for the *global hold* remains spent.
-    // If the player re-rolls again, the global hold will be cleared before generating new offers.
     if (playerInstance.frozenEvolutionChoice && playerInstance.hasUsedFreezeForCurrentOffers) {
-        // The item was actively frozen this turn. Re-rolling keeps it globally frozen
-        // but it's no longer 'active' for the *new* set of offers until re-confirmed.
         playerInstance.hasUsedFreezeForCurrentOffers = false;
     } else if (playerInstance.frozenEvolutionChoice && !playerInstance.hasUsedFreezeForCurrentOffers) {
-        // The item was carried over. If re-rolled again, the global freeze is lost.
-        // The charge for holding it is NOT refunded.
         playerInstance.frozenEvolutionChoice = null;
     }
 
@@ -643,14 +634,14 @@ function handleFreezeSelection(uiSelectedChoiceToFreeze, indexOfCardInOffer, pla
     const oldFrozenChoiceData = playerInstance.frozenEvolutionChoice;
 
     if (oldFrozenChoiceData && oldFrozenChoiceData.choiceData.baseId === newFreezeTargetBaseId) {
-        if (playerInstance.hasUsedFreezeForCurrentOffers) { 
+        if (playerInstance.hasUsedFreezeForCurrentOffers) {
             playerInstance.frozenEvolutionChoice = null;
-            playerInstance.evolutionFreezesRemaining++; 
+            playerInstance.evolutionFreezesRemaining++;
             playerInstance.hasUsedFreezeForCurrentOffers = false;
             if (_dependencies.playSound) _dependencies.playSound(_dependencies.audioUpgradeSound);
-        } else { 
+        } else {
             if (playerInstance.evolutionFreezesRemaining > 0) {
-                playerInstance.evolutionFreezesRemaining--; 
+                playerInstance.evolutionFreezesRemaining--;
                 playerInstance.hasUsedFreezeForCurrentOffers = true;
                 if (_dependencies.playSound) _dependencies.playSound(_dependencies.audioEvolutionSound);
             } else {
@@ -658,13 +649,13 @@ function handleFreezeSelection(uiSelectedChoiceToFreeze, indexOfCardInOffer, pla
             }
         }
     }
-    else { 
+    else {
         if (playerInstance.evolutionFreezesRemaining > 0) {
             if (oldFrozenChoiceData && playerInstance.hasUsedFreezeForCurrentOffers) {
                  playerInstance.evolutionFreezesRemaining++;
             }
-            
-            playerInstance.evolutionFreezesRemaining--; 
+
+            playerInstance.evolutionFreezesRemaining--;
             const { originalEvolution, ...restOfChoiceData } = uiSelectedChoiceToFreeze;
             playerInstance.frozenEvolutionChoice = {
                 choiceData: { ...restOfChoiceData, baseId: originalEvolution.id },
@@ -725,7 +716,7 @@ function handleBlockActionOnCard(baseIdToBlock, playerInstance) {
     if (_dependencies.playSound) _dependencies.playSound(_dependencies.audioUpgradeSound);
 
     if (playerInstance.frozenEvolutionChoice && playerInstance.frozenEvolutionChoice.choiceData.baseId === baseIdToBlock) {
-        if (playerInstance.hasUsedFreezeForCurrentOffers) { 
+        if (playerInstance.hasUsedFreezeForCurrentOffers) {
             playerInstance.evolutionFreezesRemaining++;
         }
         playerInstance.frozenEvolutionChoice = null;
@@ -804,6 +795,16 @@ function confirmEvolutionChoice(uiSelectedChoice, indexOfCardInOffer, playerInst
         const originalEvo = evolutionChoicesMasterList.find(e => e.id === uiSelectedChoice.baseId);
         if (originalEvo) {
             originalEvo.level = (originalEvo.level || 0) + 1;
+            // <<< SYNERGIST: Store acquired evolution info >>>
+            if (!playerInstance.acquiredEvolutions) {
+                playerInstance.acquiredEvolutions = [];
+            }
+            playerInstance.acquiredEvolutions.push({
+                id: originalEvo.id,
+                isTiered: originalEvo.isTiered, // Store if it's a tiered or core evo
+                classType: originalEvo.classType // Optionally store class if needed for other achievements
+            });
+            // <<< END SYNERGIST >>>
         }
     }
 
@@ -812,12 +813,8 @@ function confirmEvolutionChoice(uiSelectedChoice, indexOfCardInOffer, playerInst
             playerInstance.frozenEvolutionChoice = null;
         } else {
             if (!playerInstance.hasUsedFreezeForCurrentOffers) {
-                // If player picked something else, and the frozen choice was NOT actively re-confirmed THIS turn,
-                // the global freeze is lost. The charge is considered spent for the previous hold.
                 playerInstance.frozenEvolutionChoice = null;
             }
-            // If hasUsedFreezeForCurrentOffers IS true, it means the player actively froze/re-froze
-            // an item this turn. If they then pick a *different* item, that active freeze should persist.
         }
     }
 

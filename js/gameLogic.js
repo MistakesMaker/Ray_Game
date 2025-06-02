@@ -110,7 +110,8 @@ export function getAbilityContextForPlayerLogic() {
             updateKineticChargeUI: UIManager.updateKineticChargeUI,
             updateBerserkerRageUI: UIManager.updateBerserkerRageUI
         },
-        getBossManager: () => bossManager
+        getBossManager: () => bossManager,
+        signalAchievementEvent: _mainCallbacks.signalAchievementEvent // Pass through from main
     };
 }
 
@@ -163,11 +164,10 @@ export function initializeGameLogic(canvasElement, inputStateRef, mainCallbacksO
 }
 
 export function resetGameLogicState() {
-    if (player) { // <<< MODIFICATION: Only reset if player exists
+    if (player) {
         if (typeof player.reset === 'function') {
             player.reset(_canvas ? _canvas.width : window.innerWidth, _canvas ? _canvas.height : window.innerHeight);
         } else {
-            // Fallback if reset method is missing (should not happen with Player class)
             console.warn("[GameLogic reset] Player object exists but reset method is missing. Applying basic reset.");
             player.hp = player.maxHp || CONSTANTS.PLAYER_MAX_HP;
             player.x = _canvas ? _canvas.width / 2 : window.innerWidth / 2;
@@ -176,8 +176,6 @@ export function resetGameLogicState() {
             if('activeAbilities' in player) player.activeAbilities = {'1':null, '2':null, '3':null};
         }
     }
-    // No warning if player is null, as it's expected on the very first load
-    // before initGame() has created the player instance.
 
     if (bossManager) bossManager.reset();
     if (entitySpawner) entitySpawner.reset();
@@ -303,7 +301,7 @@ export function updateGame(deltaTime) {
         }
 
         if (bossManager && !GameState.isGameOver()) {
-            bossManager.trySpawnBoss(GameState.getScore(), player); 
+            bossManager.trySpawnBoss(GameState.getScore(), player);
             if (_mainCallbacks.getGameContextForBossManager) {
                 bossManager.update(player, _mainCallbacks.getGameContextForBossManager(LootManager));
             }
@@ -321,7 +319,14 @@ export function updateGame(deltaTime) {
         }
         wellsToDetonate.forEach(well => {
             if (well && well.isActive) {
-                well.detonate({ targetX: _inputState.mouseX, targetY: _inputState.mouseY, player: player });
+                // Pass signalAchievementEvent if available and needed by PlayerGravityWell.detonate
+                const detonatePayload = { targetX: _inputState.mouseX, targetY: _inputState.mouseY, player: player};
+                if (_mainCallbacks.signalAchievementEvent && player && typeof player.signalAchievementEvent === 'function') {
+                     // This is a bit indirect. PlayerGravityWell would need a way to call player's signalAchievementEvent
+                     // or player.signalAchievementEvent would need to be passed into detonate.
+                     // For now, assuming Well Master is checked in PlayerGravityWell or via Player.
+                }
+                 well.detonate(detonatePayload);
             }
         });
         for (let i = decoys.length - 1; i >= 0; i--) { if(decoys[i] && !decoys[i].isActive) { if(player && player.activeMiniWell === decoys[i]) player.activeMiniWell = null; decoys.splice(i, 1);}}
@@ -399,7 +404,8 @@ export function updateGame(deltaTime) {
                                 updateHealthDisplayCallback: (hp, maxHp) => UIManager.updateHealthDisplay(hp, maxHp), endGameCallback: _mainCallbacks.endGameInternal,
                                 updateScoreCallback: (amt) => { GameState.incrementScore(amt); UIManager.updateScoreDisplay(GameState.getScore()); if(_mainCallbacks.checkForNewColorUnlock) _mainCallbacks.checkForNewColorUnlock(); },
                                 checkForNewColorCallback: _mainCallbacks.checkForNewColorUnlock, activeBuffNotificationsArray: activeBuffNotifications,
-                                signalAchievementEvent: _mainCallbacks.signalAchievementEvent
+                                signalAchievementEvent: _mainCallbacks.signalAchievementEvent,
+                                getBossManager: () => bossManager // Added for takeDamage context
                             };
                             const ptdDamageCtxForGravityBall = { screenShakeParams: getScreenShakeParams() };
                             const damageActuallyDealt = player.takeDamage(rayThatHitPlayer, ptdGameCtxForGravityBall, ptdDamageCtxForGravityBall);
@@ -448,7 +454,7 @@ export function updateGame(deltaTime) {
                             finalDamage = abilityBaseDamage;
                         }
 
-                        finalDamage *= (1 + (r.momentumDamageBonusValue || 0));
+                        finalDamage *= (1 + (r.momentumDamageBonusValue || 0)); // Apply momentum bonus to the already calculated base/path/kinetic damage
 
                         if (r.isPlayerAbilityRay) {
                             if (player.abilityCritChance > 0 && Math.random() < player.abilityCritChance) {
@@ -486,6 +492,8 @@ export function updateGame(deltaTime) {
                                 player.applyLifesteal(currentRayDamage, UIManager.updateHealthDisplay);
                             }
 
+                            // <<< MOMENTUM MASTER (Target Hit) - Not needed for this achievement, which is vs Boss >>>
+
                             if (r.pierceUsesLeft > 0) r.pierceUsesLeft--; else r.isActive = false;
                             if (!r.isActive) break;
                         }
@@ -506,6 +514,15 @@ export function updateGame(deltaTime) {
                                 const damageDealtByRayToBoss = currentBoss.takeDamage(currentRayDamage, r, player, bossTakeDmgCtx);
                                 if (damageDealtByRayToBoss > 0) {
                                     damageAppliedToBossValue = damageDealtByRayToBoss;
+                                    // <<< MOMENTUM MASTER (Boss Hit) >>>
+                                    if (r.momentumDamageBonusValue > 0 && currentRayDamage >= 30 && _mainCallbacks.signalAchievementEvent) {
+                                        _mainCallbacks.signalAchievementEvent("momentum_ray_hit_high_damage", {
+                                            damageDealt: currentRayDamage,
+                                            momentumBonus: r.momentumDamageBonusValue
+                                        });
+                                    }
+                                    // <<< END MOMENTUM MASTER >>>
+
                                     if (r.wallBounceCount >= 3 && _mainCallbacks.signalAchievementEvent) {
                                         _mainCallbacks.signalAchievementEvent("ray_hit_boss_after_bounces", {
                                             rayBounces: r.wallBounceCount,
@@ -588,7 +605,8 @@ export function updateGame(deltaTime) {
                     updateHealthDisplayCallback:(hp,maxHp)=>UIManager.updateHealthDisplay(hp,maxHp), endGameCallback:_mainCallbacks.endGameInternal,
                     updateScoreCallback: (amt) => { GameState.incrementScore(amt); UIManager.updateScoreDisplay(GameState.getScore()); if (_mainCallbacks.checkForNewColorUnlock) _mainCallbacks.checkForNewColorUnlock(); },
                     checkForNewColorCallback: _mainCallbacks.checkForNewColorUnlock, activeBuffNotificationsArray: activeBuffNotifications,
-                    signalAchievementEvent: _mainCallbacks.signalAchievementEvent
+                    signalAchievementEvent: _mainCallbacks.signalAchievementEvent,
+                    getBossManager: () => bossManager
                 };
                 const ptdDamageCtxForRay = { screenShakeParams: getScreenShakeParams() };
 
