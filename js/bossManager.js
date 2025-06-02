@@ -176,12 +176,10 @@ processBossSpawnQueue(gameContext) {
         const spawnY = 100 + (Math.random() - 0.5) * 50;
         const newBoss = new bossInfo.constructor(spawnX, spawnY, bossInfo.tier);
 
-        // <<< RESET damageSourcesThisFight for the new boss >>>
         newBoss.damageSourcesThisFight = {
             primary: 0, omegaLaser: 0, miniGravityWell: 0, aegisCharge: 0,
             seismicSlam: 0, otherAbility: 0, aegisPassive: 0,
         };
-        // <<< END RESET >>>
 
 
         if (gameContext.callbacks && gameContext.callbacks.getGameplayTimeElapsed) {
@@ -299,18 +297,18 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
         }
 
         // --- True Mage/Aegis/Berserker Path-Specific Kills for Nexus Weaver T2 ---
-        if (defeatedBoss.tier === 2 && playerInstance.currentPath) {
+        if (defeatedBoss.tier === 2 && playerInstance.currentPath && defeatedBoss.damageSourcesThisFight) { // Ensure damageSourcesThisFight exists
             const sources = defeatedBoss.damageSourcesThisFight;
             let onlyAllowedPathAbilitiesUsed = false;
-            let pathAbilitiesUsedList = [];
+            let pathAbilitiesUsedList = []; // To help achievementManager verify against allowedAbilities
 
             if (playerInstance.currentPath === 'mage') {
                 onlyAllowedPathAbilitiesUsed = sources.primary === 0 &&
                                                sources.aegisCharge === 0 &&
                                                sources.seismicSlam === 0 &&
                                                sources.aegisPassive === 0 &&
-                                               sources.otherAbility === 0 &&
-                                               (sources.omegaLaser > 0 || sources.miniGravityWell > 0);
+                                               sources.otherAbility === 0 && // No other numeric/slot abilities
+                                               (sources.omegaLaser > 0 || sources.miniGravityWell > 0); // At least one of the allowed Mage abilities did damage
                 if(sources.omegaLaser > 0) pathAbilitiesUsedList.push("omegaLaser");
                 if(sources.miniGravityWell > 0) pathAbilitiesUsedList.push("miniGravityWell");
 
@@ -318,13 +316,11 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
                 onlyAllowedPathAbilitiesUsed = sources.primary === 0 &&
                                                sources.omegaLaser === 0 &&
                                                sources.miniGravityWell === 0 &&
-                                               sources.otherAbility === 0 &&
-                                               (sources.aegisCharge > 0 || sources.seismicSlam > 0 || sources.aegisPassive > 0);
-                // Note: aegisPassive counts for Aegis path ability damage for this achievement
+                                               sources.otherAbility === 0 && // No other numeric/slot abilities
+                                               (sources.aegisCharge > 0 || sources.seismicSlam > 0 || sources.aegisPassive > 0); // At least one of the allowed Aegis abilities did damage
                 if(sources.aegisCharge > 0) pathAbilitiesUsedList.push("aegisCharge");
                 if(sources.seismicSlam > 0) pathAbilitiesUsedList.push("seismicSlam");
-                if(sources.aegisPassive > 0) pathAbilitiesUsedList.push("aegisPassive");
-
+                if(sources.aegisPassive > 0) pathAbilitiesUsedList.push("aegisPassive"); // Consider passive as an "ability" for this achievement
 
             } else if (playerInstance.currentPath === 'berserker') {
                 // For True Berserker, it's about active buffs, not damage source exclusivity
@@ -338,8 +334,11 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
 
             if ((playerInstance.currentPath === 'mage' || playerInstance.currentPath === 'aegis') && onlyAllowedPathAbilitiesUsed) {
                  gameContext.callbacks.signalAchievementEvent("path_boss_ability_only_kill", {
-                    bossKey: "nexusWeaver", bossTier: 2, path: playerInstance.currentPath,
-                    onlyAllowedAbilitiesUsed: true, abilitiesUsed: pathAbilitiesUsedList
+                    bossKey: "nexusWeaver",
+                    bossTier: 2,
+                    path: playerInstance.currentPath,
+                    onlyAllowedAbilitiesUsed: true, // Flag indicating non-allowed sources were zero
+                    abilitiesUsed: pathAbilitiesUsedList // List of the allowed abilities that actually dealt damage
                 });
             }
         }
@@ -647,16 +646,7 @@ debugSpawnBoss(tierToSpawn, bossTypeKey = 'nexusWeaver', playerInstance) {
     if (playerInstance) {
         playerInstance.usedAbilityInCurrentBossFight = false;
         playerInstance.damageTakenThisBossFight = 0;
-        // <<< Reset boss-specific damage tracking for the new debug boss >>>
-        const tempBossInstanceForReset = new constructorToUse(0,0,0,0,0,0,''); // Create a dummy to access prototype
-        if (tempBossInstanceForReset.damageSourcesThisFight) {
-            for (const key in tempBossInstanceForReset.damageSourcesThisFight) {
-                // This reset is a bit of a conceptual placeholder.
-                // The actual reset happens in processBossSpawnQueue when the new boss is created.
-            }
-        }
     }
-
 
     const firstBossInWaveInfo = this.bossSpawnQueue[0];
     this.nextBossToSpawnInfo = { name: firstBossInWaveInfo.name, tier: firstBossInWaveInfo.tier };
