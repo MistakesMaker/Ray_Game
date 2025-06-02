@@ -90,6 +90,9 @@ function evaluateCondition(achievement, gameContext) {
             }
             break;
 
+        case "gamestate_score_gte":
+            return gameState.getScore() >= conditions.value;
+
         case "player_stat_not_null":
             const statPartsNotNull = conditions.stat.split('.');
             let currentValueNotNull = player;
@@ -113,7 +116,7 @@ function evaluateCondition(achievement, gameContext) {
             }
             break;
 
-        case "boss_defeat_condition":
+        case "boss_defeat_condition": // Used for Resourceful Fighter
             if (gameContext.eventFlags && gameContext.eventFlags.boss_defeat_no_abilities) {
                 const eventData = gameContext.eventFlags.boss_defeat_no_abilities_data || {};
                 if (eventData.noAbilitiesUsedFromBossManager !== conditions.noAbilitiesUsed) return false;
@@ -171,7 +174,7 @@ function evaluateCondition(achievement, gameContext) {
             }
             return false;
 
-        case "event_rapid_relocation_success": // <<< NEW CASE
+        case "event_rapid_relocation_success":
             return !!(gameContext.eventFlags && gameContext.eventFlags.rapid_relocation_success);
 
         case "event_player_well_detonated_mage_min_rays":
@@ -201,6 +204,73 @@ function evaluateCondition(achievement, gameContext) {
                 return eventData.damageDealt >= conditions.minDamage && eventData.momentumBonus > 0;
             }
             return false;
+
+        case "event_nexus_tX_defeated_within_time":
+            if (gameContext.eventFlags && gameContext.eventFlags.nexus_tX_defeated_within_time) {
+                const eventData = gameContext.eventFlags.nexus_tX_defeated_within_time_data || {};
+                return eventData.bossTier === conditions.bossTier && eventData.timeTakenMs <= conditions.timeLimitMs;
+            }
+            return false;
+
+        case "event_tX_boss_defeated_high_hp":
+             if (gameContext.eventFlags && gameContext.eventFlags.tX_boss_defeated_high_hp) {
+                const eventData = gameContext.eventFlags.tX_boss_defeated_high_hp_data || {};
+                return eventData.bossTier === conditions.bossTier && eventData.playerHpPercent >= conditions.minHpPercent;
+            }
+            return false;
+
+        case "event_nexus_weaver_defeated_no_abilities_strict":
+            return !!(gameContext.eventFlags && gameContext.eventFlags.nexus_weaver_defeated_no_abilities_strict);
+
+        case "event_standard_boss_tX_defeated_no_class_evo":
+            if (gameContext.eventFlags && gameContext.eventFlags.standard_boss_tX_defeated_no_class_evo) {
+                const eventData = gameContext.eventFlags.standard_boss_tX_defeated_no_class_evo_data || {};
+                if (eventData.bossTier === conditions.bossTier && player.acquiredEvolutions && Array.isArray(player.acquiredEvolutions)) {
+                    return !player.acquiredEvolutions.some(evo => evo.classType === conditions.excludedClass);
+                }
+            }
+            return false;
+
+        case "event_multi_unique_boss_flawless":
+             if (gameContext.eventFlags && gameContext.eventFlags.multi_unique_boss_flawless) {
+                const eventData = gameContext.eventFlags.multi_unique_boss_flawless_data || {};
+                return eventData.uniqueFlawlessBossTypes >= conditions.count;
+            }
+            return false;
+
+        case "player_unique_legendary_evolutions_gte":
+            if (player.acquiredEvolutions && Array.isArray(player.acquiredEvolutions)) {
+                const legendaryEvos = player.acquiredEvolutions.filter(evo => evo.isTiered === true && evo.rolledTier === 'legendary');
+                const uniqueLegendaryIds = new Set(legendaryEvos.map(evo => evo.id));
+                return uniqueLegendaryIds.size >= conditions.value;
+            }
+            return false;
+
+        case "path_boss_ability_only_kill":
+            if (player.currentPath === conditions.path && gameContext.eventFlags && gameContext.eventFlags.path_boss_ability_only_kill) {
+                const eventData = gameContext.eventFlags.path_boss_ability_only_kill_data || {};
+                return eventData.bossKey === conditions.bossKey &&
+                       eventData.bossTier === conditions.bossTier &&
+                       eventData.onlyAllowedAbilitiesUsed === true &&
+                       Array.isArray(conditions.allowedAbilities) &&
+                       Array.isArray(eventData.abilitiesUsed) &&
+                       eventData.abilitiesUsed.every(usedAb => conditions.allowedAbilities.includes(usedAb));
+            }
+            return false;
+
+        case "path_boss_buffed_kill":
+            if (player.currentPath === conditions.path && gameContext.eventFlags && gameContext.eventFlags.path_boss_buffed_kill) {
+                const eventData = gameContext.eventFlags.path_boss_buffed_kill_data || {};
+                if (eventData.bossKey === conditions.bossKey && eventData.bossTier === conditions.bossTier) {
+                    return conditions.requiredBuffs.every(buffName => {
+                        if (buffName === "bloodpact") return eventData.bloodpactActive;
+                        if (buffName === "savageHowl") return eventData.savageHowlActive;
+                        return false; // Unknown buff requirement
+                    });
+                }
+            }
+            return false;
+
     }
     return false;
 }
@@ -228,11 +298,18 @@ export function checkAllAchievements(gameContext) {
             "boss_defeat_no_abilities",
             "ray_hit_boss_after_bounces",
             "boss_defeated_flawless",
-            "rapid_relocation_success", // <<< ADDED to reset
+            "rapid_relocation_success",
             "player_well_detonated",
             "bloodpact_heal_amount",
             "savage_howl_fear_count",
             "momentum_ray_hit_high_damage",
+            "nexus_tX_defeated_within_time",
+            "tX_boss_defeated_high_hp",
+            "nexus_weaver_defeated_no_abilities_strict",
+            "standard_boss_tX_defeated_no_class_evo",
+            "multi_unique_boss_flawless",
+            "path_boss_ability_only_kill",
+            "path_boss_buffed_kill"
         ];
         flagsToReset.forEach(flagName => {
             if (gameContext.eventFlags.hasOwnProperty(flagName)) {

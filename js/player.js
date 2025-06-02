@@ -206,7 +206,7 @@ export class Player {
         this.hasTriggeredAegisPassiveBossDamageThisRun = false;
         this.damageTakenThisBossFight = 0;
         this.teleportTimestamps = [];
-        this.eventDataForNextSignal = {}; // For indirect event signaling
+        this.eventDataForNextSignal = {};
 
 
         this.update = (gameContext) => {
@@ -1347,15 +1347,13 @@ export class Player {
         if (ability.id === 'miniGravityWell') {
             if (this.activeMiniWell && this.activeMiniWell.isActive) {
                 this.currentGravityWellKineticBoost = this.consumeKineticChargeForDamageBoost();
-                this.activeMiniWell.detonate({ targetX: abilityContext.mouseX, targetY: abilityContext.mouseY, player: this }); // Player passed
+                this.activeMiniWell.detonate({ targetX: abilityContext.mouseX, targetY: abilityContext.mouseY, player: this });
                 ability.cooldownTimer = effectiveCooldownToSet; ability.justBecameReady = false; abilityUsedSuccessfully = true;
 
-                // <<< WELL MASTER: Signal event after detonation >>>
                 if (this.eventDataForNextSignal && this.eventDataForNextSignal.player_well_detonated && signalAchievementEvent) {
                     signalAchievementEvent("player_well_detonated", this.eventDataForNextSignal.player_well_detonated);
-                    delete this.eventDataForNextSignal.player_well_detonated; // Clear after use
+                    delete this.eventDataForNextSignal.player_well_detonated;
                 }
-                // <<< END WELL MASTER >>>
 
             } else if (ability.cooldownTimer <= 0) {
                 this.deployMiniGravityWell(ability.duration, abilityContext.decoysArray, abilityContext.mouseX, abilityContext.mouseY);
@@ -1670,6 +1668,7 @@ export class Player {
             activeBossesArray.forEach(boss => {
                 if (boss && boss.health > 0 && isLineSegmentIntersectingCircle(beamStartX, beamStartY, beamEndX, beamEndY, boss.x, boss.y, boss.radius + this.omegaLaserWidth / 2)) {
                     if (typeof boss.takeDamage === 'function') {
+                        // Pass context for damage source tracking
                         const dmgDone = boss.takeDamage(finalDamagePerTick, null, this, {isAbility: true, abilityType: 'omegaLaser'});
                         if(dmgDone > 0) this.totalDamageDealt += dmgDone;
                     }
@@ -1690,6 +1689,7 @@ export class Player {
             activeBossesArray.forEach(boss => {
                 if (Math.hypot(this.x - boss.x, this.y - boss.y) < AEGIS_CHARGE_AOE_RADIUS + boss.radius) {
                     if (boss.takeDamage) {
+                        // Pass context for damage source tracking
                         const dmgDone = boss.takeDamage(baseDamage, null, this, {isAbility: true, abilityType: 'aegisCharge'});
                         if (dmgDone > 0) {
                              this.totalDamageDealt += dmgDone;

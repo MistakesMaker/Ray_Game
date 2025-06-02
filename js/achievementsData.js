@@ -175,7 +175,7 @@ export const allAchievements = [
         name: "Nexus Vanquisher",
         description: "Defeat the Nexus Weaver boss for the first time.",
         tier: achievementTiers.MEDIUM,
-        iconPath: "assets/icons/ach_nexus_vanquisher.png", // Placeholder
+        iconPath: "assets/icons/ach_nexus_vanquisher.png",
         unlockConditions: {
             type: "event_nexus_weaver_defeated_first_time_run"
         }
@@ -185,7 +185,7 @@ export const allAchievements = [
         name: "Specialized Defense",
         description: "Gain immunity to 8 different ray colors.",
         tier: achievementTiers.MEDIUM,
-        iconPath: "assets/icons/ach_specialized_defense_medium.png", // Placeholder
+        iconPath: "assets/icons/ach_specialized_defense_medium.png",
         unlockConditions: {
             type: "player_stat_gte",
             stat: "immuneColorsList.length",
@@ -198,7 +198,7 @@ export const allAchievements = [
         name: "Untouchable Streak",
         description: "Defeat a boss without taking any damage during the fight.",
         tier: achievementTiers.MEDIUM,
-        iconPath: "assets/icons/ach_untouchable_streak.png", // Placeholder
+        iconPath: "assets/icons/ach_untouchable_streak.png",
         unlockConditions: {
             type: "event_boss_defeated_flawless"
         }
@@ -208,7 +208,7 @@ export const allAchievements = [
         name: "Synergist",
         description: "Have at least 3 \"Core\" evolution upgrades active.",
         tier: achievementTiers.MEDIUM,
-        iconPath: "assets/icons/ach_synergist.png", // Placeholder
+        iconPath: "assets/icons/ach_synergist.png",
         unlockConditions: {
             type: "player_core_evolutions_gte",
             value: 3
@@ -219,7 +219,7 @@ export const allAchievements = [
         name: "Rapid Relocation",
         description: "Use the Teleport ability 5 times within 60 seconds.",
         tier: achievementTiers.MEDIUM,
-        iconPath: "assets/icons/ach_rapid_relocation.png", // Placeholder
+        iconPath: "assets/icons/ach_rapid_relocation.png",
         unlockConditions: {
             type: "event_rapid_relocation_success"
         }
@@ -227,25 +227,25 @@ export const allAchievements = [
     {
         id: "well_master_medium",
         name: "Well Master",
-        description: "Launch 10+ rays with a single Mini Gravity Well detonation.",
+        description: "As a Mage, launch 10+ rays with a single Mini Gravity Well detonation.",
         tier: achievementTiers.MEDIUM,
-        iconPath: "assets/icons/ach_well_master.png", // Placeholder
+        iconPath: "assets/icons/ach_well_master.png",
         unlockConditions: {
-            type: "event_player_well_detonated_mage_min_rays", // New specific event type
+            type: "event_player_well_detonated_mage_min_rays",
             minRays: 10
         }
     },
     {
         id: "battering_ram_medium",
         name: "Battering Ram",
-        description: "As an Aegis, deal 200 total damage to bosses using Aegis Charge impact.",
+        description: "As an Aegis, deal 500 total damage to bosses using Aegis Charge impact.",
         tier: achievementTiers.MEDIUM,
-        iconPath: "assets/icons/ach_battering_ram.png", // Placeholder
+        iconPath: "assets/icons/ach_battering_ram.png",
         unlockConditions: {
             type: "player_stat_gte",
             stat: "aegisChargeBossDamageDealtThisRun",
-            value: 200,
-            path: "aegis" // Ensure player is Aegis
+            value: 500,
+            path: "aegis"
         }
     },
     {
@@ -253,11 +253,11 @@ export const allAchievements = [
         name: "Vampiric Thirst",
         description: "As a Berserker, heal for 50+ HP from a single Bloodpact activation.",
         tier: achievementTiers.MEDIUM,
-        iconPath: "assets/icons/ach_vampiric_thirst.png", // Placeholder
+        iconPath: "assets/icons/ach_vampiric_thirst.png",
         unlockConditions: {
-            type: "event_bloodpact_heal_amount", // Event will carry data.healedThisActivation
+            type: "event_bloodpact_heal_amount",
             minHeal: 50,
-            path: "berserker" // Ensure player is Berserker
+            path: "berserker"
         }
     },
     {
@@ -265,22 +265,157 @@ export const allAchievements = [
         name: "War Cry",
         description: "As a Berserker, fear 2+ enemies with a single Savage Howl.",
         tier: achievementTiers.MEDIUM,
-        iconPath: "assets/icons/ach_war_cry.png", // Placeholder
+        iconPath: "assets/icons/ach_war_cry.png",
         unlockConditions: {
-            type: "event_savage_howl_fear_count", // Event will carry data.enemiesFeared
+            type: "event_savage_howl_fear_count",
             minFeared: 2,
-            path: "berserker" // Ensure player is Berserker
+            path: "berserker"
         }
     },
     {
         id: "momentum_master_medium",
         name: "Momentum Master",
-        description: "Deal over 30 damage with a single ray hit.",
+        description: "Deal over 30 damage with a single ray hit due to Momentum Injectors.",
         tier: achievementTiers.MEDIUM,
-        iconPath: "assets/icons/ach_momentum_master.png", // Placeholder
+        iconPath: "assets/icons/ach_momentum_master.png",
         unlockConditions: {
-            type: "event_momentum_ray_hit_high_damage", // Event will carry data.damageDealt and data.momentumBonus
+            type: "event_momentum_ray_hit_high_damage",
             minDamage: 30
         }
-    }
+    },
+
+    // --- Hard Tier ---
+    {
+        id: "true_survivor_hard",
+        name: "True Survivor",
+        description: "Reach a score of 5,000.",
+        tier: achievementTiers.HARD,
+        iconPath: "assets/icons/ach_true_survivor.png",
+        unlockConditions: {
+            type: "gamestate_score_gte",
+            value: 5000
+        }
+    },
+    {
+        id: "nexus_nemesis_hard",
+        name: "Nexus Nemesis",
+        description: "Defeat the Nexus Weaver without using any abilities.",
+        tier: achievementTiers.HARD,
+        iconPath: "assets/icons/ach_nexus_nemesis.png",
+        unlockConditions: {
+            type: "event_nexus_weaver_defeated_no_abilities_strict"
+        }
+    },
+    {
+        id: "glass_cannon_connoisseur_hard",
+        name: "Glass Cannon Connoisseur",
+        description: "Defeat a Tier 6 standard boss without acquiring any \"Tank\" class evolution upgrades.",
+        tier: achievementTiers.HARD,
+        iconPath: "assets/icons/ach_glass_cannon.png", // Placeholder
+        unlockConditions: {
+            type: "event_standard_boss_tX_defeated_no_class_evo",
+            bossTier: 6,
+            excludedClass: "tank"
+        }
+    },
+    {
+        id: "speed_demon_nexus_t1_hard",
+        name: "Speed Demon: Nexus T1",
+        description: "Defeat Nexus Weaver Tier 1 within 2 minutes.",
+        tier: achievementTiers.HARD,
+        iconPath: "assets/icons/ach_speed_demon_t1.png",
+        unlockConditions: {
+            type: "event_nexus_tX_defeated_within_time",
+            bossTier: 1,
+            timeLimitMs: 120000
+        }
+    },
+    {
+        id: "speed_demon_nexus_t2_hard", // You had T3 in description, but T2 in name/time. Assuming T2 for this one.
+        name: "Speed Demon: Nexus T2",
+        description: "Defeat Nexus Weaver Tier 2 within 3 minutes.",
+        tier: achievementTiers.HARD,
+        iconPath: "assets/icons/ach_speed_demon_t2.png",
+        unlockConditions: {
+            type: "event_nexus_tX_defeated_within_time",
+            bossTier: 2,
+            timeLimitMs: 180000
+        }
+    },
+    {
+        id: "flawless_victory_x3_hard",
+        name: "Flawless Victory x3",
+        description: "Defeat 3 different bosses flawlessly in a single run.",
+        tier: achievementTiers.HARD,
+        iconPath: "assets/icons/ach_flawless_x3.png", // Placeholder
+        unlockConditions: {
+            type: "event_multi_unique_boss_flawless",
+            count: 3
+        }
+    },
+    {
+        id: "legendary_hoarder_hard",
+        name: "Legendary Hoarder",
+        description: "Acquire 3 different Legendary tier evolution upgrades in a single run.",
+        tier: achievementTiers.HARD,
+        iconPath: "assets/icons/ach_legendary_hoarder.png", // Placeholder
+        unlockConditions: {
+            type: "player_unique_legendary_evolutions_gte",
+            value: 3
+        }
+    },
+    {
+        id: "true_mage_hard",
+        name: "True Mage",
+        description: "As Mage, defeat Nexus Weaver Tier 2 using only Omega Laser and Mini Gravity Well for damage.",
+        tier: achievementTiers.HARD,
+        iconPath: "assets/icons/ach_true_mage.png", // Placeholder
+        unlockConditions: {
+            type: "path_boss_ability_only_kill",
+            path: "mage",
+            bossKey: "nexusWeaver", // specific boss
+            bossTier: 2,
+            allowedAbilities: ["omegaLaser", "miniGravityWell"] // IDs of abilities
+        }
+    },
+    {
+        id: "true_aegis_hard",
+        name: "True Aegis",
+        description: "As Aegis, defeat Nexus Weaver Tier 2 using only Aegis Charge and Seismic Slam for damage.",
+        tier: achievementTiers.HARD,
+        iconPath: "assets/icons/ach_true_aegis.png", // Placeholder
+        unlockConditions: {
+            type: "path_boss_ability_only_kill",
+            path: "aegis",
+            bossKey: "nexusWeaver",
+            bossTier: 2,
+            allowedAbilities: ["aegisCharge", "seismicSlam"]
+        }
+    },
+    {
+        id: "true_berserker_hard",
+        name: "True Berserker",
+        description: "As Berserker, defeat Nexus Weaver Tier 2 while Bloodpact & Savage Howl buffs are active for the final blow.",
+        tier: achievementTiers.HARD,
+        iconPath: "assets/icons/ach_true_berserker.png", // Placeholder
+        unlockConditions: {
+            type: "path_boss_buffed_kill",
+            path: "berserker",
+            bossKey: "nexusWeaver",
+            bossTier: 2,
+            requiredBuffs: ["bloodpact", "savageHowl"] // internal buff names/flags
+        }
+    },
+    {
+        id: "max_efficiency_hard", // Was 27
+        name: "Max Efficiency",
+        description: "Defeat any Tier 5 boss with more than 90% HP remaining.",
+        tier: achievementTiers.HARD,
+        iconPath: "assets/icons/ach_max_efficiency.png",
+        unlockConditions: {
+            type: "event_tX_boss_defeated_high_hp",
+            bossTier: 5,
+            minHpPercent: 0.90
+        }
+    },
 ];

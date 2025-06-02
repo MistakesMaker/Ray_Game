@@ -67,6 +67,7 @@ this.standardAvailableBossTypes = [ChaserBoss, MirrorShieldBoss, GravityWellBoss
     this.nextBossToSpawnInfo = null;
 
     this.nexusWeaverDefeatedThisRun = false;
+    this.flawlessUniqueBossTypesDefeatedThisRun = new Set();
 
     this.playSound = (audioContextConfig && audioContextConfig.playSound) ? audioContextConfig.playSound : playSound;
     this.audioChaserSpawnSound = (audioContextConfig && audioContextConfig.audioChaserSpawnSound) ? audioContextConfig.audioChaserSpawnSound : audioChaserSpawnSoundLocal;
@@ -142,7 +143,7 @@ trySpawnBoss(currentScore, playerInstance) {
 
             if (playerInstance) {
                 playerInstance.usedAbilityInCurrentBossFight = false;
-                playerInstance.damageTakenThisBossFight = 0; // <<< RESET for Untouchable Streak
+                playerInstance.damageTakenThisBossFight = 0;
             }
 
             const firstBossInWaveInfo = this.bossSpawnQueue[0];
@@ -166,7 +167,7 @@ processBossSpawnQueue(gameContext) {
 
         if (playerToUse) {
             playerToUse.usedAbilityInCurrentBossFight = false;
-            playerToUse.damageTakenThisBossFight = 0; // <<< RESET for Untouchable Streak (also here for individual spawns if waves aren't used)
+            playerToUse.damageTakenThisBossFight = 0;
         }
 
         this.bossTiers[bossInfo.typeKey] = Math.max(this.bossTiers[bossInfo.typeKey] || 0, bossInfo.tier);
@@ -174,6 +175,14 @@ processBossSpawnQueue(gameContext) {
         const spawnX = gameContext.canvasWidth / 2 + (Math.random() - 0.5) * 200;
         const spawnY = 100 + (Math.random() - 0.5) * 50;
         const newBoss = new bossInfo.constructor(spawnX, spawnY, bossInfo.tier);
+
+        // <<< RESET damageSourcesThisFight for the new boss >>>
+        newBoss.damageSourcesThisFight = {
+            primary: 0, omegaLaser: 0, miniGravityWell: 0, aegisCharge: 0,
+            seismicSlam: 0, otherAbility: 0, aegisPassive: 0,
+        };
+        // <<< END RESET >>>
+
 
         if (gameContext.callbacks && gameContext.callbacks.getGameplayTimeElapsed) {
             newBoss.spawnTimestamp = gameContext.callbacks.getGameplayTimeElapsed();
@@ -185,9 +194,8 @@ processBossSpawnQueue(gameContext) {
 
 
         if (this.bossSpawnQueue.length > 0 && this.activeBosses.length < this.bossesToSpawnInCurrentWave && this.activeBosses.length < CONSTANTS_IMPORTED.MAX_BOSSES_IN_WAVE_CAP) {
-            // If more bosses in the current wave, don't reset warning (it will trigger for next if needed)
         } else {
-            this.nextBossToSpawnInfo = null; // No more immediate boss after this one from the queue.
+            this.nextBossToSpawnInfo = null;
         }
     }
 }
@@ -266,9 +274,11 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
         }
         return;
     }
-    if (!gameContext || !gameContext.callbacks || !gameContext.firstBossDefeatedThisRunRef || typeof gameContext.currentRunId === 'undefined') {
+    if (!gameContext || !gameContext.callbacks || !gameContext.firstBossDefeatedThisRunRef || typeof gameContext.currentRunId === 'undefined' || !playerInstance) {
         return;
     }
+    const gameplayTimeAtKill = gameContext.callbacks.getGameplayTimeElapsed ? gameContext.callbacks.getGameplayTimeElapsed() : 0;
+
 
     if (defeatedBoss instanceof NexusWeaverBoss && !this.nexusWeaverDefeatedThisRun) {
         if (gameContext.callbacks.signalAchievementEvent) {
@@ -277,29 +287,109 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
         this.nexusWeaverDefeatedThisRun = true;
     }
 
-
-    if (playerInstance) {
-        // --- Untouchable Streak Check ---
-        if (playerInstance.damageTakenThisBossFight === 0 && gameContext.callbacks.signalAchievementEvent) {
-            gameContext.callbacks.signalAchievementEvent("boss_defeated_flawless", { bossKey: getBossKeyFromName(defeatedBoss), bossTier: defeatedBoss.tier });
-        }
-        // --- End Untouchable Streak ---
-
-        if (defeatedBoss.tier === 2 &&
-            this.standardAvailableBossTypes.some(type => defeatedBoss instanceof type) &&
-            !playerInstance.usedAbilityInCurrentBossFight &&
-            gameContext.callbacks && gameContext.callbacks.signalAchievementEvent) {
-
-            const bossKey = getBossKeyFromName(defeatedBoss);
-            gameContext.callbacks.signalAchievementEvent("boss_defeat_no_abilities", {
-                bossTier: defeatedBoss.tier,
-                bossKey: bossKey,
-                noAbilitiesUsedFromBossManager: true
+    if (defeatedBoss instanceof NexusWeaverBoss && gameContext.callbacks.signalAchievementEvent) {
+        gameContext.callbacks.signalAchievementEvent("nexus_tX_defeated_within_time", {
+            bossTier: defeatedBoss.tier,
+            timeTakenMs: gameplayTimeAtKill
+        });
+        if (!playerInstance.usedAbilityInCurrentBossFight) {
+            gameContext.callbacks.signalAchievementEvent("nexus_weaver_defeated_no_abilities_strict", {
+                bossTier: defeatedBoss.tier
             });
         }
-        playerInstance.usedAbilityInCurrentBossFight = false; // Reset for next boss
-        // playerInstance.damageTakenThisBossFight = 0; // This is reset when a new boss/wave starts
+
+        // --- True Mage/Aegis/Berserker Path-Specific Kills for Nexus Weaver T2 ---
+        if (defeatedBoss.tier === 2 && playerInstance.currentPath) {
+            const sources = defeatedBoss.damageSourcesThisFight;
+            let onlyAllowedPathAbilitiesUsed = false;
+            let pathAbilitiesUsedList = [];
+
+            if (playerInstance.currentPath === 'mage') {
+                onlyAllowedPathAbilitiesUsed = sources.primary === 0 &&
+                                               sources.aegisCharge === 0 &&
+                                               sources.seismicSlam === 0 &&
+                                               sources.aegisPassive === 0 &&
+                                               sources.otherAbility === 0 &&
+                                               (sources.omegaLaser > 0 || sources.miniGravityWell > 0);
+                if(sources.omegaLaser > 0) pathAbilitiesUsedList.push("omegaLaser");
+                if(sources.miniGravityWell > 0) pathAbilitiesUsedList.push("miniGravityWell");
+
+            } else if (playerInstance.currentPath === 'aegis') {
+                onlyAllowedPathAbilitiesUsed = sources.primary === 0 &&
+                                               sources.omegaLaser === 0 &&
+                                               sources.miniGravityWell === 0 &&
+                                               sources.otherAbility === 0 &&
+                                               (sources.aegisCharge > 0 || sources.seismicSlam > 0 || sources.aegisPassive > 0);
+                // Note: aegisPassive counts for Aegis path ability damage for this achievement
+                if(sources.aegisCharge > 0) pathAbilitiesUsedList.push("aegisCharge");
+                if(sources.seismicSlam > 0) pathAbilitiesUsedList.push("seismicSlam");
+                if(sources.aegisPassive > 0) pathAbilitiesUsedList.push("aegisPassive");
+
+
+            } else if (playerInstance.currentPath === 'berserker') {
+                // For True Berserker, it's about active buffs, not damage source exclusivity
+                if (playerInstance.isBloodpactActive && playerInstance.isSavageHowlAttackSpeedBuffActive) {
+                     gameContext.callbacks.signalAchievementEvent("path_boss_buffed_kill", {
+                        bossKey: "nexusWeaver", bossTier: 2, path: "berserker",
+                        bloodpactActive: true, savageHowlActive: true
+                    });
+                }
+            }
+
+            if ((playerInstance.currentPath === 'mage' || playerInstance.currentPath === 'aegis') && onlyAllowedPathAbilitiesUsed) {
+                 gameContext.callbacks.signalAchievementEvent("path_boss_ability_only_kill", {
+                    bossKey: "nexusWeaver", bossTier: 2, path: playerInstance.currentPath,
+                    onlyAllowedAbilitiesUsed: true, abilitiesUsed: pathAbilitiesUsedList
+                });
+            }
+        }
+        // --- End True Path Kills ---
     }
+
+    if (this.standardAvailableBossTypes.some(type => defeatedBoss instanceof type) &&
+        defeatedBoss.tier === 6 &&
+        gameContext.callbacks.signalAchievementEvent) {
+        gameContext.callbacks.signalAchievementEvent("event_standard_boss_tX_defeated_no_class_evo", {
+            bossTier: defeatedBoss.tier
+        });
+    }
+
+
+    if (defeatedBoss.tier === 5 && gameContext.callbacks.signalAchievementEvent) {
+        gameContext.callbacks.signalAchievementEvent("tX_boss_defeated_high_hp", {
+            bossTier: defeatedBoss.tier,
+            playerHpPercent: playerInstance.hp / playerInstance.maxHp
+        });
+    }
+
+    if (playerInstance.damageTakenThisBossFight === 0 && gameContext.callbacks.signalAchievementEvent) {
+        const bossKey = getBossKeyFromName(defeatedBoss);
+        gameContext.callbacks.signalAchievementEvent("boss_defeated_flawless", { bossKey: bossKey, bossTier: defeatedBoss.tier });
+
+        if (!this.flawlessUniqueBossTypesDefeatedThisRun.has(bossKey)) {
+            this.flawlessUniqueBossTypesDefeatedThisRun.add(bossKey);
+            if (this.flawlessUniqueBossTypesDefeatedThisRun.size >= 3) {
+                 gameContext.callbacks.signalAchievementEvent("event_multi_unique_boss_flawless", {
+                    uniqueFlawlessBossTypes: this.flawlessUniqueBossTypesDefeatedThisRun.size
+                 });
+            }
+        }
+    }
+
+    if (!(defeatedBoss instanceof NexusWeaverBoss) &&
+        defeatedBoss.tier === 2 &&
+        this.standardAvailableBossTypes.some(type => defeatedBoss instanceof type) &&
+        !playerInstance.usedAbilityInCurrentBossFight &&
+        gameContext.callbacks && gameContext.callbacks.signalAchievementEvent) {
+
+        const bossKey = getBossKeyFromName(defeatedBoss);
+        gameContext.callbacks.signalAchievementEvent("boss_defeat_no_abilities", {
+            bossTier: defeatedBoss.tier,
+            bossKey: bossKey,
+            noAbilitiesUsedFromBossManager: true
+        });
+    }
+    playerInstance.usedAbilityInCurrentBossFight = false;
 
 
     if (defeatedBoss instanceof GravityWellBoss) {
@@ -333,7 +423,6 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
         !gameContext.callbacks.hasNexusWeaverTierTimeBeenRecordedThisRun(defeatedBoss.tier) &&
         gameContext.callbacks.getGameplayTimeElapsed) {
 
-        const gameplayTimeAtKill = gameContext.callbacks.getGameplayTimeElapsed();
         const category = `nexusWeaverTier${defeatedBoss.tier}Time`;
         let statsSnapshotForBossKill = null;
 
@@ -433,7 +522,7 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
             if (!lootGeneratedThisTurn && !evolutionTriggeredByThisDefeat && gameContext.callbacks.pausePickups) {
             }
         } else if (this.bossSpawnQueue.length > 0 && this.activeBosses.length < CONSTANTS_IMPORTED.MAX_BOSSES_IN_WAVE_CAP && !this.bossWarningActive) {
-             if (playerInstance) playerInstance.damageTakenThisBossFight = 0; // Reset for next boss in wave
+             if (playerInstance) playerInstance.damageTakenThisBossFight = 0;
             this.processBossSpawnQueue({...gameContext, player: playerInstance });
         } else if (this.activeBosses.length === 0 && this.bossSpawnQueue.length === 0 && this.isWaveInProgress) {
             this.isWaveInProgress = false;
@@ -525,6 +614,7 @@ reset() {
     this.bossesToSpawnInCurrentWave = 0;
     this.bossesDefeatedInCurrentWave = 0;
     this.nexusWeaverDefeatedThisRun = false;
+    this.flawlessUniqueBossTypesDefeatedThisRun = new Set();
 }
 
 isBossSequenceActive() { return this.activeBosses.length > 0 || this.bossWarningActive || this.bossSpawnQueue.length > 0; }
@@ -556,8 +646,17 @@ debugSpawnBoss(tierToSpawn, bossTypeKey = 'nexusWeaver', playerInstance) {
 
     if (playerInstance) {
         playerInstance.usedAbilityInCurrentBossFight = false;
-        playerInstance.damageTakenThisBossFight = 0; // <<< RESET for Untouchable Streak
+        playerInstance.damageTakenThisBossFight = 0;
+        // <<< Reset boss-specific damage tracking for the new debug boss >>>
+        const tempBossInstanceForReset = new constructorToUse(0,0,0,0,0,0,''); // Create a dummy to access prototype
+        if (tempBossInstanceForReset.damageSourcesThisFight) {
+            for (const key in tempBossInstanceForReset.damageSourcesThisFight) {
+                // This reset is a bit of a conceptual placeholder.
+                // The actual reset happens in processBossSpawnQueue when the new boss is created.
+            }
+        }
     }
+
 
     const firstBossInWaveInfo = this.bossSpawnQueue[0];
     this.nextBossToSpawnInfo = { name: firstBossInWaveInfo.name, tier: firstBossInWaveInfo.tier };

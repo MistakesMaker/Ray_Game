@@ -15,8 +15,8 @@ export class BossNPC {
         this.radius = radius; this.color = color;
 
         this.hitFlashTimer = 0;
-        this.HIT_FLASH_DURATION = 120; // Duration of the entire flash effect in ms
-        this.HIT_FLASH_BLINK_INTERVAL = 50; // Interval for on/off blinking in ms
+        this.HIT_FLASH_DURATION = 120;
+        this.HIT_FLASH_BLINK_INTERVAL = 50;
 
         this.hitStunTimer = 0;
         this.HIT_STUN_DURATION = 200;
@@ -34,6 +34,20 @@ export class BossNPC {
         this.fearSourceX = 0;
         this.fearSourceY = 0;
         this.FEAR_SPEED_MULTIPLIER = 1.2;
+
+        // <<< NEW: For tracking damage sources for achievements >>>
+        this.damageSourcesThisFight = {
+            primary: 0,          // Player's normal ray attacks
+            omegaLaser: 0,       // Mage path
+            miniGravityWell: 0,  // Mage path (launched rays) / or general ability if applicable
+            aegisCharge: 0,      // Aegis path (LMB impact)
+            seismicSlam: 0,      // Aegis path (RMB)
+            // Bloodpact and Savage Howl are buffs/debuffs, not direct damage dealers in the same way.
+            // Other direct damage numeric abilities could be added if needed for other achievements.
+            otherAbility: 0,     // Damage from other player abilities (e.g. EMP, future abilities)
+            aegisPassive: 0,     // Aegis path (passive ram)
+        };
+        // <<< END NEW >>>
     }
 
     applyBleed(dpt, duration) {
@@ -57,9 +71,6 @@ export class BossNPC {
 
 
     takeDamage(amount, ray, playerInstance, context = {}) {
-        // ADD DETAILED LOGGING HERE
-        // console.log(`[BossBase takeDamage] Boss: ${this.constructor.name}, Health BEFORE: ${this.health}, Damage amount: ${amount}, Context:`, JSON.stringify(context));
-
         if (this.health <= 0) return 0;
 
         let actualDamageTaken = amount;
@@ -67,7 +78,31 @@ export class BossNPC {
         this.hitFlashTimer = this.HIT_FLASH_DURATION;
         if (this.health < 0) this.health = 0;
 
-        // console.log(`[BossBase takeDamage] Boss: ${this.constructor.name}, Health AFTER: ${this.health}`);
+
+        // <<< NEW: Track damage source >>>
+        if (playerInstance) { // Only track if damage is from the player
+            if (context.isAegisCollision) {
+                this.damageSourcesThisFight.aegisPassive += actualDamageTaken;
+            } else if (context.isAbility) {
+                if (context.abilityType === 'omegaLaser') {
+                    this.damageSourcesThisFight.omegaLaser += actualDamageTaken;
+                } else if (context.abilityType === 'aegisCharge') {
+                    this.damageSourcesThisFight.aegisCharge += actualDamageTaken;
+                } else if (context.abilityType === 'seismicSlam') {
+                    this.damageSourcesThisFight.seismicSlam += actualDamageTaken;
+                } else {
+                    this.damageSourcesThisFight.otherAbility += actualDamageTaken;
+                }
+            } else if (ray) {
+                if (ray.isPlayerAbilityRay && ray.sourceAbility === 'miniGravityWell') {
+                    this.damageSourcesThisFight.miniGravityWell += actualDamageTaken;
+                } else if (!ray.isBossProjectile && !ray.isGravityWellRay) { // Player's primary ray
+                    this.damageSourcesThisFight.primary += actualDamageTaken;
+                }
+            }
+            // console.log("Boss Damage Sources Updated:", this.damageSourcesThisFight); // For debugging
+        }
+        // <<< END NEW >>>
 
 
         if (this.isFeared) {
@@ -102,15 +137,13 @@ export class BossNPC {
         ctx.strokeRect(barX, barY, BOSS_HEALTH_BAR_WIDTH, BOSS_HEALTH_BAR_HEIGHT);
     }
 
-    draw(ctx) { // Base draw method, subclasses will call super.draw(ctx)
+    draw(ctx) {
         if (!ctx) return;
-        this.drawHealthBar(ctx); // Health bar is common
+        this.drawHealthBar(ctx);
 
-        // Fear visual indicator common to all bosses
         if (this.isFeared) {
             ctx.save();
-            // Pulsing magenta circle around the boss when feared
-            const fearPulseProgress = Math.abs(Math.sin(this.fearTimer * 0.01)); // Slow pulse based on remaining fear time
+            const fearPulseProgress = Math.abs(Math.sin(this.fearTimer * 0.01));
             const fearCircleRadius = this.radius + 3 + fearPulseProgress * 3;
             const fearCircleAlpha = 0.3 + fearPulseProgress * 0.3;
 
@@ -120,11 +153,10 @@ export class BossNPC {
             ctx.arc(this.x, this.y, fearCircleRadius, 0, Math.PI * 2);
             ctx.stroke();
 
-            // Small "!!!" above head more reliably
             ctx.fillStyle = 'rgba(255, 0, 255, 0.9)';
-            ctx.font = 'bold 16px Arial'; // Ensure font is set if not elsewhere
+            ctx.font = 'bold 16px Arial';
             ctx.textAlign = 'center';
-            ctx.fillText("!!!", this.x, this.y - this.radius - BOSS_HEALTH_BAR_OFFSET_Y - 20); // Adjusted Y
+            ctx.fillText("!!!", this.x, this.y - this.radius - BOSS_HEALTH_BAR_OFFSET_Y - 20);
             ctx.restore();
         }
     }
@@ -133,7 +165,7 @@ export class BossNPC {
         if (this.hitFlashTimer > 0) {
             this.hitFlashTimer -= dt;
             if (this.hitFlashTimer < 0) {
-                this.hitFlashTimer = 0; // Ensure it doesn't stay negative
+                this.hitFlashTimer = 0;
             }
         }
 
@@ -142,7 +174,7 @@ export class BossNPC {
             if (this.fearTimer <= 0) {
                 this.isFeared = false;
                 this.fearTimer = 0;
-                if(this.hitStunTimer <=0) { // Only restore speed if not also hit-stunned
+                if(this.hitStunTimer <=0) {
                    this.speed = this.baseSpeed;
                 }
             } else {
@@ -182,7 +214,7 @@ export class BossNPC {
                 if (this.originalSpeed > 0 && typeof this.speed !== 'undefined' && !this.isFeared) {
                     this.speed = this.originalSpeed;
                     this.originalSpeed = 0;
-                } else if (!this.isFeared) { // If originalSpeed wasn't set (e.g. stun from non-ray source), restore base speed
+                } else if (!this.isFeared) {
                     this.speed = this.baseSpeed;
                 }
             }
