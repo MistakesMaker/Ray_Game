@@ -92,13 +92,13 @@ export function setupEventListeners(canvasElement, gameContext) {
             gameContext.callbacks.toggleFreezeMode();
         }
 
-
-        if (e.key === 'F1') {
-            if (gameContext.callbacks.debugSpawnBoss) {
-                e.preventDefault();
-                gameContext.callbacks.debugSpawnBoss(0);
-            }
-        }
+        // --- REMOVED F1 DEBUG SPAWN BOSS ---
+        // if (e.key === 'F1') {
+        //     if (gameContext.callbacks.debugSpawnBoss) {
+        //         e.preventDefault();
+        //         gameContext.callbacks.debugSpawnBoss(0);
+        //     }
+        // }
     });
 
     window.addEventListener('keyup', (e) => {

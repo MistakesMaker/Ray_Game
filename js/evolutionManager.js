@@ -55,7 +55,7 @@ function generateSingleNewOffer(playerInstance, existingOfferBaseIds, additional
             text: baseEvo.text,
             detailedDescription: baseEvo.isTiered && tierSpecificData
                 ? (typeof tierSpecificData.description === 'function' ? tierSpecificData.description(playerInstance, rolledTierIfApplicable) : tierSpecificData.description)
-                : (typeof baseEvo.detailedDescription === 'function' ? baseEvo.detailedDescription(playerInstance, baseEvo.id) : baseEvo.detailedDescription), // Pass baseEvo.id for context
+                : (typeof baseEvo.detailedDescription === 'function' ? baseEvo.detailedDescription(playerInstance, baseEvo.id, null) : baseEvo.detailedDescription), // Pass null for tier if not tiered
             applyEffect: baseEvo.isTiered && tierSpecificData ? tierSpecificData.apply : baseEvo.apply,
             cardEffectString: (typeof baseEvo.getCardEffectString === 'function')
                 ? baseEvo.getCardEffectString(rolledTierIfApplicable, playerInstance)
@@ -79,6 +79,7 @@ export function initializeEvolutionMasterList() {
     const maxColorImmunities = allColors ? allColors.length - CONSTANTS.INITIAL_RAY_COLORS.length : 0;
 
     evolutionChoicesMasterList = [
+        // ... (other evolutions remain the same) ...
         {
             id:'colorImmunity', classType: 'tank', text:"Chameleon Plating", level:0,
             maxLevel: maxColorImmunities,
@@ -151,10 +152,10 @@ export function initializeEvolutionMasterList() {
             isTiered: true,
             isMaxed: function(p){ return p && p.damageTakenMultiplier < 0.01; },
             tiers: {
-                common:    { description: `Reduces damage taken by a further ${CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS.common*100}%. Stacks multiplicatively.`,    apply: function(p) { p.damageTakenMultiplier *= (1 - CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS.common); p.damageTakenMultiplier = Math.max(0.001, p.damageTakenMultiplier); }},
-                rare:      { description: `Reduces damage taken by a further ${CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS.rare*100}%. Stacks multiplicatively.`,      apply: function(p) { p.damageTakenMultiplier *= (1 - CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS.rare); p.damageTakenMultiplier = Math.max(0.001, p.damageTakenMultiplier); }},
-                epic:      { description: `Reduces damage taken by a further ${CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS.epic*100}%. Stacks multiplicatively.`,      apply: function(p) { p.damageTakenMultiplier *= (1 - CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS.epic); p.damageTakenMultiplier = Math.max(0.001, p.damageTakenMultiplier); }},
-                legendary: { description: `Reduces damage taken by a further ${CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS.legendary*100}%. Stacks multiplicatively.`, apply: function(p) { p.damageTakenMultiplier *= (1 - CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS.legendary); p.damageTakenMultiplier = Math.max(0.001, p.damageTakenMultiplier); }}
+                common:    { description: (p, tier) => `Reduces damage taken by a further ${CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS[tier]*100}%. Stacks multiplicatively.`,    apply: function(p) { p.damageTakenMultiplier *= (1 - CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS.common); p.damageTakenMultiplier = Math.max(0.001, p.damageTakenMultiplier); }},
+                rare:      { description: (p, tier) => `Reduces damage taken by a further ${CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS[tier]*100}%. Stacks multiplicatively.`,      apply: function(p) { p.damageTakenMultiplier *= (1 - CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS.rare); p.damageTakenMultiplier = Math.max(0.001, p.damageTakenMultiplier); }},
+                epic:      { description: (p, tier) => `Reduces damage taken by a further ${CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS[tier]*100}%. Stacks multiplicatively.`,      apply: function(p) { p.damageTakenMultiplier *= (1 - CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS.epic); p.damageTakenMultiplier = Math.max(0.001, p.damageTakenMultiplier); }},
+                legendary: { description: (p, tier) => `Reduces damage taken by a further ${CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS[tier]*100}%. Stacks multiplicatively.`, apply: function(p) { p.damageTakenMultiplier *= (1 - CONSTANTS.REINFORCED_HULL_TIER_EFFECTIVENESS.legendary); p.damageTakenMultiplier = Math.max(0.001, p.damageTakenMultiplier); }}
             },
             getEffectString: function(playerInstance) {
                 const reductionPercent = playerInstance ? (1 - playerInstance.damageTakenMultiplier) * 100 : 0;
@@ -169,10 +170,10 @@ export function initializeEvolutionMasterList() {
             isTiered: true,
             isMaxed:function(p){return false;},
             tiers: {
-                common:    { description: `Increases HP regen by ${CONSTANTS.VITALITY_SURGE_TIER_BONUS.common} HP/tick.`, apply: function(p) { p.hpRegenBonusFromEvolution += CONSTANTS.VITALITY_SURGE_TIER_BONUS.common; }},
-                rare:      { description: `Increases HP regen by ${CONSTANTS.VITALITY_SURGE_TIER_BONUS.rare} HP/tick.`, apply: function(p) { p.hpRegenBonusFromEvolution += CONSTANTS.VITALITY_SURGE_TIER_BONUS.rare; }},
-                epic:      { description: `Increases HP regen by ${CONSTANTS.VITALITY_SURGE_TIER_BONUS.epic} HP/tick.`, apply: function(p) { p.hpRegenBonusFromEvolution += CONSTANTS.VITALITY_SURGE_TIER_BONUS.epic; }},
-                legendary: { description: `Increases HP regen by ${CONSTANTS.VITALITY_SURGE_TIER_BONUS.legendary} HP/tick.`, apply: function(p) { p.hpRegenBonusFromEvolution += CONSTANTS.VITALITY_SURGE_TIER_BONUS.legendary; }}
+                common:    { description: (p, tier) => `Increases HP regen by ${CONSTANTS.VITALITY_SURGE_TIER_BONUS[tier]} HP/tick.`, apply: function(p) { p.hpRegenBonusFromEvolution += CONSTANTS.VITALITY_SURGE_TIER_BONUS.common; }},
+                rare:      { description: (p, tier) => `Increases HP regen by ${CONSTANTS.VITALITY_SURGE_TIER_BONUS[tier]} HP/tick.`, apply: function(p) { p.hpRegenBonusFromEvolution += CONSTANTS.VITALITY_SURGE_TIER_BONUS.rare; }},
+                epic:      { description: (p, tier) => `Increases HP regen by ${CONSTANTS.VITALITY_SURGE_TIER_BONUS[tier]} HP/tick.`, apply: function(p) { p.hpRegenBonusFromEvolution += CONSTANTS.VITALITY_SURGE_TIER_BONUS.epic; }},
+                legendary: { description: (p, tier) => `Increases HP regen by ${CONSTANTS.VITALITY_SURGE_TIER_BONUS[tier]} HP/tick.`, apply: function(p) { p.hpRegenBonusFromEvolution += CONSTANTS.VITALITY_SURGE_TIER_BONUS.legendary; }}
             },
             getEffectString: function(playerInstance) {
                 const bonus = playerInstance ? playerInstance.hpRegenBonusFromEvolution : 0;
@@ -185,10 +186,10 @@ export function initializeEvolutionMasterList() {
             isTiered: true,
             isMaxed: function(p) { return false; },
             tiers: {
-                common:    { description: `Increases Max HP by ${CONSTANTS.FORTIFIED_CORE_TIER_BONUS.common}. Also heals for this amount.`, apply: function(p, deps) { p.maxHp += CONSTANTS.FORTIFIED_CORE_TIER_BONUS.common; p.gainHealth(CONSTANTS.FORTIFIED_CORE_TIER_BONUS.common, deps && deps.UIManager ? deps.UIManager.updateHealthDisplay : null); }},
-                rare:      { description: `Increases Max HP by ${CONSTANTS.FORTIFIED_CORE_TIER_BONUS.rare}. Also heals for this amount.`, apply: function(p, deps) { p.maxHp += CONSTANTS.FORTIFIED_CORE_TIER_BONUS.rare; p.gainHealth(CONSTANTS.FORTIFIED_CORE_TIER_BONUS.rare, deps && deps.UIManager ? deps.UIManager.updateHealthDisplay : null); }},
-                epic:      { description: `Increases Max HP by ${CONSTANTS.FORTIFIED_CORE_TIER_BONUS.epic}. Also heals for this amount.`, apply: function(p, deps) { p.maxHp += CONSTANTS.FORTIFIED_CORE_TIER_BONUS.epic; p.gainHealth(CONSTANTS.FORTIFIED_CORE_TIER_BONUS.epic, deps && deps.UIManager ? deps.UIManager.updateHealthDisplay : null); }},
-                legendary: { description: `Increases Max HP by ${CONSTANTS.FORTIFIED_CORE_TIER_BONUS.legendary}. Also heals for this amount.`, apply: function(p, deps) { p.maxHp += CONSTANTS.FORTIFIED_CORE_TIER_BONUS.legendary; p.gainHealth(CONSTANTS.FORTIFIED_CORE_TIER_BONUS.legendary, deps && deps.UIManager ? deps.UIManager.updateHealthDisplay : null); }}
+                common:    { description: (p, tier) => `Increases Max HP by ${CONSTANTS.FORTIFIED_CORE_TIER_BONUS[tier]}. Also heals for this amount.`, apply: function(p, deps) { p.maxHp += CONSTANTS.FORTIFIED_CORE_TIER_BONUS.common; p.gainHealth(CONSTANTS.FORTIFIED_CORE_TIER_BONUS.common, deps && deps.UIManager ? deps.UIManager.updateHealthDisplay : null); }},
+                rare:      { description: (p, tier) => `Increases Max HP by ${CONSTANTS.FORTIFIED_CORE_TIER_BONUS[tier]}. Also heals for this amount.`, apply: function(p, deps) { p.maxHp += CONSTANTS.FORTIFIED_CORE_TIER_BONUS.rare; p.gainHealth(CONSTANTS.FORTIFIED_CORE_TIER_BONUS.rare, deps && deps.UIManager ? deps.UIManager.updateHealthDisplay : null); }},
+                epic:      { description: (p, tier) => `Increases Max HP by ${CONSTANTS.FORTIFIED_CORE_TIER_BONUS[tier]}. Also heals for this amount.`, apply: function(p, deps) { p.maxHp += CONSTANTS.FORTIFIED_CORE_TIER_BONUS.epic; p.gainHealth(CONSTANTS.FORTIFIED_CORE_TIER_BONUS.epic, deps && deps.UIManager ? deps.UIManager.updateHealthDisplay : null); }},
+                legendary: { description: (p, tier) => `Increases Max HP by ${CONSTANTS.FORTIFIED_CORE_TIER_BONUS[tier]}. Also heals for this amount.`, apply: function(p, deps) { p.maxHp += CONSTANTS.FORTIFIED_CORE_TIER_BONUS.legendary; p.gainHealth(CONSTANTS.FORTIFIED_CORE_TIER_BONUS.legendary, deps && deps.UIManager ? deps.UIManager.updateHealthDisplay : null); }}
             },
             getEffectString: function(playerInstance) { return `Current Max HP: ${playerInstance ? playerInstance.maxHp : CONSTANTS.PLAYER_MAX_HP}`; },
             getCardEffectString: function(tier) { return `+${CONSTANTS.FORTIFIED_CORE_TIER_BONUS[tier]} Max HP & Heal`;}
@@ -198,10 +199,10 @@ export function initializeEvolutionMasterList() {
             isTiered: true,
             isMaxed:function(p){return false;},
             tiers: {
-                common:    { description: `Increases ray damage by ${CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE.common}.`, apply: function(p) { p.rayDamageBonus += CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE.common; }},
-                rare:      { description: `Increases ray damage by ${CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE.rare}.`, apply: function(p) { p.rayDamageBonus += CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE.rare; }},
-                epic:      { description: `Increases ray damage by ${CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE.epic}.`, apply: function(p) { p.rayDamageBonus += CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE.epic; }},
-                legendary: { description: `Increases ray damage by ${CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE.legendary}.`, apply: function(p) { p.rayDamageBonus += CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE.legendary; }}
+                common:    { description: (p, tier) => `Increases ray damage by ${CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE[tier]}.`, apply: function(p) { p.rayDamageBonus += CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE.common; }},
+                rare:      { description: (p, tier) => `Increases ray damage by ${CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE[tier]}.`, apply: function(p) { p.rayDamageBonus += CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE.rare; }},
+                epic:      { description: (p, tier) => `Increases ray damage by ${CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE[tier]}.`, apply: function(p) { p.rayDamageBonus += CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE.epic; }},
+                legendary: { description: (p, tier) => `Increases ray damage by ${CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE[tier]}.`, apply: function(p) { p.rayDamageBonus += CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE.legendary; }}
             },
             getEffectString: function(playerInstance) { return `Current Ray Dmg Bonus: +${(playerInstance?playerInstance.rayDamageBonus:0).toFixed(1)}`;},
             getCardEffectString: function(tier) { return `+${CONSTANTS.FOCUSED_BEAM_TIER_DAMAGE[tier].toFixed(1)} Ray Damage`;}
@@ -211,10 +212,10 @@ export function initializeEvolutionMasterList() {
             isTiered: true,
             isMaxed: function(p) { return p && p.chainReactionChance >= 1.0; },
             tiers: {
-                common:    { description: `Increases AOE chance by ${CONSTANTS.UNSTABLE_CORE_TIER_CHANCE.common}%.`,   apply: function(p) { p.chainReactionChance = Math.min(1.0, p.chainReactionChance + CONSTANTS.UNSTABLE_CORE_TIER_CHANCE.common / 100); }},
-                rare:      { description: `Increases AOE chance by ${CONSTANTS.UNSTABLE_CORE_TIER_CHANCE.rare}%.`,     apply: function(p) { p.chainReactionChance = Math.min(1.0, p.chainReactionChance + CONSTANTS.UNSTABLE_CORE_TIER_CHANCE.rare / 100); }},
-                epic:      { description: `Increases AOE chance by ${CONSTANTS.UNSTABLE_CORE_TIER_CHANCE.epic}%.`,     apply: function(p) { p.chainReactionChance = Math.min(1.0, p.chainReactionChance + CONSTANTS.UNSTABLE_CORE_TIER_CHANCE.epic / 100); }},
-                legendary: { description: `Increases AOE chance by ${CONSTANTS.UNSTABLE_CORE_TIER_CHANCE.legendary}%.`, apply: function(p) { p.chainReactionChance = Math.min(1.0, p.chainReactionChance + CONSTANTS.UNSTABLE_CORE_TIER_CHANCE.legendary / 100); }}
+                common:    { description: (p, tier) => `Increases AOE chance by ${CONSTANTS.UNSTABLE_CORE_TIER_CHANCE[tier]}%.`,   apply: function(p) { p.chainReactionChance = Math.min(1.0, p.chainReactionChance + CONSTANTS.UNSTABLE_CORE_TIER_CHANCE.common / 100); }},
+                rare:      { description: (p, tier) => `Increases AOE chance by ${CONSTANTS.UNSTABLE_CORE_TIER_CHANCE[tier]}%.`,     apply: function(p) { p.chainReactionChance = Math.min(1.0, p.chainReactionChance + CONSTANTS.UNSTABLE_CORE_TIER_CHANCE.rare / 100); }},
+                epic:      { description: (p, tier) => `Increases AOE chance by ${CONSTANTS.UNSTABLE_CORE_TIER_CHANCE[tier]}%.`,     apply: function(p) { p.chainReactionChance = Math.min(1.0, p.chainReactionChance + CONSTANTS.UNSTABLE_CORE_TIER_CHANCE.epic / 100); }},
+                legendary: { description: (p, tier) => `Increases AOE chance by ${CONSTANTS.UNSTABLE_CORE_TIER_CHANCE[tier]}%.`, apply: function(p) { p.chainReactionChance = Math.min(1.0, p.chainReactionChance + CONSTANTS.UNSTABLE_CORE_TIER_CHANCE.legendary / 100); }}
             },
             getEffectString: function(playerInstance) { return `Current AOE Chance: ${Math.round((playerInstance ? playerInstance.chainReactionChance : 0) * 100)}%`; },
             getCardEffectString: function(tier) { return `+${CONSTANTS.UNSTABLE_CORE_TIER_CHANCE[tier]}% AOE Chance`;}
@@ -224,10 +225,10 @@ export function initializeEvolutionMasterList() {
             isTiered: true,
             isMaxed: function(p) { return p && (p.rayCritChance !== undefined ? p.rayCritChance >= 1.0 : false); },
             tiers: {
-                common:    { description: `Increases ray critical hit chance by ${CONSTANTS.RAY_CRIT_CHANCE_TIER_BONUS.common*100}%.`, apply: function(p) { p.rayCritChance = Math.min(1.0, (p.rayCritChance || 0) + CONSTANTS.RAY_CRIT_CHANCE_TIER_BONUS.common); }},
-                rare:      { description: `Increases ray critical hit chance by ${CONSTANTS.RAY_CRIT_CHANCE_TIER_BONUS.rare*100}%.`,   apply: function(p) { p.rayCritChance = Math.min(1.0, (p.rayCritChance || 0) + CONSTANTS.RAY_CRIT_CHANCE_TIER_BONUS.rare);   }},
-                epic:      { description: `Increases ray critical hit chance by ${CONSTANTS.RAY_CRIT_CHANCE_TIER_BONUS.epic*100}%.`,   apply: function(p) { p.rayCritChance = Math.min(1.0, (p.rayCritChance || 0) + CONSTANTS.RAY_CRIT_CHANCE_TIER_BONUS.epic);   }},
-                legendary: { description: `Increases ray critical hit chance by ${CONSTANTS.RAY_CRIT_CHANCE_TIER_BONUS.legendary*100}%.`,apply: function(p) { p.rayCritChance = Math.min(1.0, (p.rayCritChance || 0) + CONSTANTS.RAY_CRIT_CHANCE_TIER_BONUS.legendary);}}
+                common:    { description: (p, tier) => `Increases ray critical hit chance by ${CONSTANTS.RAY_CRIT_CHANCE_TIER_BONUS[tier]*100}%.`, apply: function(p) { p.rayCritChance = Math.min(1.0, (p.rayCritChance || 0) + CONSTANTS.RAY_CRIT_CHANCE_TIER_BONUS.common); }},
+                rare:      { description: (p, tier) => `Increases ray critical hit chance by ${CONSTANTS.RAY_CRIT_CHANCE_TIER_BONUS[tier]*100}%.`,   apply: function(p) { p.rayCritChance = Math.min(1.0, (p.rayCritChance || 0) + CONSTANTS.RAY_CRIT_CHANCE_TIER_BONUS.rare);   }},
+                epic:      { description: (p, tier) => `Increases ray critical hit chance by ${CONSTANTS.RAY_CRIT_CHANCE_TIER_BONUS[tier]*100}%.`,   apply: function(p) { p.rayCritChance = Math.min(1.0, (p.rayCritChance || 0) + CONSTANTS.RAY_CRIT_CHANCE_TIER_BONUS.epic);   }},
+                legendary: { description: (p, tier) => `Increases ray critical hit chance by ${CONSTANTS.RAY_CRIT_CHANCE_TIER_BONUS[tier]*100}%.`,apply: function(p) { p.rayCritChance = Math.min(1.0, (p.rayCritChance || 0) + CONSTANTS.RAY_CRIT_CHANCE_TIER_BONUS.legendary);}}
             },
             getEffectString: function(p) { return `Current Ray Crit Chance: ${( (p && p.rayCritChance !== undefined ? p.rayCritChance:0) * 100).toFixed(0)}%`; },
             getCardEffectString: function(tier) { return `+${(CONSTANTS.RAY_CRIT_CHANCE_TIER_BONUS[tier]*100).toFixed(0)}% Ray Crit Chance`;}
@@ -237,45 +238,57 @@ export function initializeEvolutionMasterList() {
             isTiered: true,
             isMaxed: function(p) { return false; },
             tiers: {
-                common:    { description: `Increases ray critical damage multiplier by +${CONSTANTS.RAY_CRIT_DAMAGE_TIER_BONUS.common*100}%.`, apply: function(p) { p.rayCritDamageMultiplier = (p.rayCritDamageMultiplier !== undefined ? p.rayCritDamageMultiplier : 1.5) + CONSTANTS.RAY_CRIT_DAMAGE_TIER_BONUS.common; }},
-                rare:      { description: `Increases ray critical damage multiplier by +${CONSTANTS.RAY_CRIT_DAMAGE_TIER_BONUS.rare*100}%.`,   apply: function(p) { p.rayCritDamageMultiplier = (p.rayCritDamageMultiplier !== undefined ? p.rayCritDamageMultiplier : 1.5) + CONSTANTS.RAY_CRIT_DAMAGE_TIER_BONUS.rare;   }},
-                epic:      { description: `Increases ray critical damage multiplier by +${CONSTANTS.RAY_CRIT_DAMAGE_TIER_BONUS.epic*100}%.`,   apply: function(p) { p.rayCritDamageMultiplier = (p.rayCritDamageMultiplier !== undefined ? p.rayCritDamageMultiplier : 1.5) + CONSTANTS.RAY_CRIT_DAMAGE_TIER_BONUS.epic;   }},
-                legendary: { description: `Increases ray critical damage multiplier by +${CONSTANTS.RAY_CRIT_DAMAGE_TIER_BONUS.legendary*100}%.`,apply: function(p) { p.rayCritDamageMultiplier = (p.rayCritDamageMultiplier !== undefined ? p.rayCritDamageMultiplier : 1.5) + CONSTANTS.RAY_CRIT_DAMAGE_TIER_BONUS.legendary;}}
+                common:    { description: (p, tier) => `Increases ray critical damage multiplier by +${CONSTANTS.RAY_CRIT_DAMAGE_TIER_BONUS[tier]*100}%.`, apply: function(p) { p.rayCritDamageMultiplier = (p.rayCritDamageMultiplier !== undefined ? p.rayCritDamageMultiplier : 1.5) + CONSTANTS.RAY_CRIT_DAMAGE_TIER_BONUS.common; }},
+                rare:      { description: (p, tier) => `Increases ray critical damage multiplier by +${CONSTANTS.RAY_CRIT_DAMAGE_TIER_BONUS[tier]*100}%.`,   apply: function(p) { p.rayCritDamageMultiplier = (p.rayCritDamageMultiplier !== undefined ? p.rayCritDamageMultiplier : 1.5) + CONSTANTS.RAY_CRIT_DAMAGE_TIER_BONUS.rare;   }},
+                epic:      { description: (p, tier) => `Increases ray critical damage multiplier by +${CONSTANTS.RAY_CRIT_DAMAGE_TIER_BONUS[tier]*100}%.`,   apply: function(p) { p.rayCritDamageMultiplier = (p.rayCritDamageMultiplier !== undefined ? p.rayCritDamageMultiplier : 1.5) + CONSTANTS.RAY_CRIT_DAMAGE_TIER_BONUS.epic;   }},
+                legendary: { description: (p, tier) => `Increases ray critical damage multiplier by +${CONSTANTS.RAY_CRIT_DAMAGE_TIER_BONUS[tier]*100}%.`,apply: function(p) { p.rayCritDamageMultiplier = (p.rayCritDamageMultiplier !== undefined ? p.rayCritDamageMultiplier : 1.5) + CONSTANTS.RAY_CRIT_DAMAGE_TIER_BONUS.legendary;}}
             },
             getEffectString: function(p) { return `Current Ray Crit Damage: x${(p && p.rayCritDamageMultiplier !== undefined ? p.rayCritDamageMultiplier:1.5).toFixed(2)}`; },
             getCardEffectString: function(tier) { return `+${(CONSTANTS.RAY_CRIT_DAMAGE_TIER_BONUS[tier]*100).toFixed(0)}% Ray Crit Damage`;}
         },
         {
             id: 'temporalEcho', classType: 'ability', text: "Temporal Echo", level: 0, maxLevel: 999,
-            detailedDescription: function(playerInstance, evolutionId) {
-                const chance = playerInstance ? Math.round(playerInstance.temporalEchoChance * 100) : 0;
+            // This top-level detailedDescription is for the tooltip (Shift-hover)
+            detailedDescription: function(playerInstance, evolutionIdOrTier, actualTierIfDifferent) {
+                const currentChance = playerInstance ? Math.round(playerInstance.temporalEchoChance * 100) : 0;
                 const reductionSeconds = (CONSTANTS.TEMPORAL_ECHO_FIXED_REDUCTION / 1000).toFixed(1);
-                return `Grants a ${chance}% chance, when any ability is used, to also reduce the current cooldown of your *other* active abilities and mouse abilities by a fixed ${reductionSeconds} seconds. This echo does not affect the ability that triggered it.`;
+                let tierDesc = "";
+                if (typeof evolutionIdOrTier === 'string' && CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE[evolutionIdOrTier]) { // evolutionIdOrTier is actually the tier string here
+                    tierDesc = `This upgrade adds +${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE[evolutionIdOrTier]}% Echo Chance.`;
+                }
+                return `${tierDesc}<br>Current Total: ${currentChance}% chance on ability use to reduce other cooldowns by ${reductionSeconds}s. (Does not affect the used ability).`;
             },
             isTiered: true,
             isMaxed: function(p) { return p && p.temporalEchoChance >= 1.0; },
-            tiers: {
-                common:    { description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.common}%.`,   apply: function(p) { p.temporalEchoChance = Math.min(1.0, (p.temporalEchoChance || 0) + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.common / 100); }},
-                rare:      { description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.rare}%.`,     apply: function(p) { p.temporalEchoChance = Math.min(1.0, (p.temporalEchoChance || 0) + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.rare / 100); }},
-                epic:      { description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.epic}%.`,     apply: function(p) { p.temporalEchoChance = Math.min(1.0, (p.temporalEchoChance || 0) + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.epic / 100); }},
-                legendary: { description: `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.legendary}%.`, apply: function(p) { p.temporalEchoChance = Math.min(1.0, (p.temporalEchoChance || 0) + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.legendary / 100); }}
+            tiers: { // These descriptions are for the tooltip when a specific tier is shown
+                common:    { description: (p, tier) => `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE[tier]}%. (Current: ${Math.round((p?p.temporalEchoChance:0)*100)}%)`,   apply: function(p) { p.temporalEchoChance = Math.min(1.0, (p.temporalEchoChance || 0) + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.common / 100); }},
+                rare:      { description: (p, tier) => `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE[tier]}%. (Current: ${Math.round((p?p.temporalEchoChance:0)*100)}%)`,     apply: function(p) { p.temporalEchoChance = Math.min(1.0, (p.temporalEchoChance || 0) + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.rare / 100); }},
+                epic:      { description: (p, tier) => `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE[tier]}%. (Current: ${Math.round((p?p.temporalEchoChance:0)*100)}%)`,     apply: function(p) { p.temporalEchoChance = Math.min(1.0, (p.temporalEchoChance || 0) + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.epic / 100); }},
+                legendary: { description: (p, tier) => `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE[tier]}%. (Current: ${Math.round((p?p.temporalEchoChance:0)*100)}%)`, apply: function(p) { p.temporalEchoChance = Math.min(1.0, (p.temporalEchoChance || 0) + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.legendary / 100); }}
             },
             getEffectString: function(playerInstance) { return `Current Echo Chance: ${Math.round((playerInstance ? playerInstance.temporalEchoChance : 0) * 100)}%`; },
-            getCardEffectString: function(tier) { return `+${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE[tier]}% Echo Chance`;}
+            getCardEffectString: function(tier) { // This is for the main card display
+                const reductionSeconds = (CONSTANTS.TEMPORAL_ECHO_FIXED_REDUCTION / 1000).toFixed(1);
+                return `+${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE[tier]}% chance: ability use reduces other CDs by ${reductionSeconds}s.`;
+            }
         },
         {
             id: 'streamlinedSystems', classType: 'ability', text: "Streamlined Systems", level: 0, maxLevel: 999,
-            detailedDescription: function(tier) {
-                const reduction = tier ? CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION[tier] : 0;
-                return `Permanently reduces the cooldowns of ALL your current and future abilities by an additional ${reduction}%. Stacks additively.`;
+            detailedDescription: function(playerInstance, evolutionIdOrTier, actualTierIfDifferent) { // Modified to accept playerInstance and tier
+                const currentReduction = playerInstance ? (playerInstance.globalCooldownReduction || 0) * 100 : 0;
+                let tierDesc = "";
+                 if (typeof evolutionIdOrTier === 'string' && CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION[evolutionIdOrTier]) {
+                    tierDesc = `This upgrade adds +${CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION[evolutionIdOrTier]}% Global CD Reduction.`;
+                }
+                return `${tierDesc}<br>Permanently reduces all ability cooldowns. Current Total: ${currentReduction.toFixed(0)}%.`;
             },
             isTiered: true,
             isMaxed: function(p) { return p && p.globalCooldownReduction >= 0.9; },
             tiers: {
-                common:    { description: `Permanently reduce all ability cooldowns by an additional ${CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.common}%.`, apply: function(p) { p.globalCooldownReduction = Math.min(0.90, (p.globalCooldownReduction || 0) + CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.common / 100); if (_dependencies.UIManager) _dependencies.UIManager.updateAbilityCooldownUI(p); }},
-                rare:      { description: `Permanently reduce all ability cooldowns by an additional ${CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.rare}%.`, apply: function(p) { p.globalCooldownReduction = Math.min(0.90, (p.globalCooldownReduction || 0) + CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.rare / 100); if (_dependencies.UIManager) _dependencies.UIManager.updateAbilityCooldownUI(p); }},
-                epic:      { description: `Permanently reduce all ability cooldowns by an additional ${CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.epic}%.`, apply: function(p) { p.globalCooldownReduction = Math.min(0.90, (p.globalCooldownReduction || 0) + CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.epic / 100); if (_dependencies.UIManager) _dependencies.UIManager.updateAbilityCooldownUI(p); }},
-                legendary: { description: `Permanently reduce all ability cooldowns by an additional ${CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.legendary}%.`, apply: function(p) { p.globalCooldownReduction = Math.min(0.90, (p.globalCooldownReduction || 0) + CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.legendary / 100); if (_dependencies.UIManager) _dependencies.UIManager.updateAbilityCooldownUI(p); }}
+                common:    { description: (p, tier) => `Reduce all ability cooldowns by an additional ${CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION[tier]}%.`, apply: function(p) { p.globalCooldownReduction = Math.min(0.90, (p.globalCooldownReduction || 0) + CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.common / 100); if (_dependencies.UIManager) _dependencies.UIManager.updateAbilityCooldownUI(p); }},
+                rare:      { description: (p, tier) => `Reduce all ability cooldowns by an additional ${CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION[tier]}%.`, apply: function(p) { p.globalCooldownReduction = Math.min(0.90, (p.globalCooldownReduction || 0) + CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.rare / 100); if (_dependencies.UIManager) _dependencies.UIManager.updateAbilityCooldownUI(p); }},
+                epic:      { description: (p, tier) => `Reduce all ability cooldowns by an additional ${CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION[tier]}%.`, apply: function(p) { p.globalCooldownReduction = Math.min(0.90, (p.globalCooldownReduction || 0) + CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.epic / 100); if (_dependencies.UIManager) _dependencies.UIManager.updateAbilityCooldownUI(p); }},
+                legendary: { description: (p, tier) => `Reduce all ability cooldowns by an additional ${CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION[tier]}%.`, apply: function(p) { p.globalCooldownReduction = Math.min(0.90, (p.globalCooldownReduction || 0) + CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION.legendary / 100); if (_dependencies.UIManager) _dependencies.UIManager.updateAbilityCooldownUI(p); }}
             },
             getEffectString: function(playerInstance) {
                 return `Current Global CD Reduction: ${( (playerInstance ? playerInstance.globalCooldownReduction : 0) * 100).toFixed(0)}%`;
@@ -288,10 +301,10 @@ export function initializeEvolutionMasterList() {
             isTiered: true,
             isMaxed: function(p) { return false; },
             tiers: {
-                common:    { description: `Multiplies ability damage by ${CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER.common.toFixed(2)}x.`, apply: function(p) { p.abilityDamageMultiplier *= CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER.common; }},
-                rare:      { description: `Multiplies ability damage by ${CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER.rare.toFixed(2)}x.`, apply: function(p) { p.abilityDamageMultiplier *= CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER.rare; }},
-                epic:      { description: `Multiplies ability damage by ${CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER.epic.toFixed(2)}x.`, apply: function(p) { p.abilityDamageMultiplier *= CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER.epic; }},
-                legendary: { description: `Multiplies ability damage by ${CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER.legendary.toFixed(2)}x.`, apply: function(p) { p.abilityDamageMultiplier *= CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER.legendary; }}
+                common:    { description: (p, tier) => `Multiplies ability damage by ${CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER[tier].toFixed(2)}x.`, apply: function(p) { p.abilityDamageMultiplier *= CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER.common; }},
+                rare:      { description: (p, tier) => `Multiplies ability damage by ${CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER[tier].toFixed(2)}x.`, apply: function(p) { p.abilityDamageMultiplier *= CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER.rare; }},
+                epic:      { description: (p, tier) => `Multiplies ability damage by ${CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER[tier].toFixed(2)}x.`, apply: function(p) { p.abilityDamageMultiplier *= CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER.epic; }},
+                legendary: { description: (p, tier) => `Multiplies ability damage by ${CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER[tier].toFixed(2)}x.`, apply: function(p) { p.abilityDamageMultiplier *= CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER.legendary; }}
             },
             getEffectString: function(playerInstance) { return `Current Ability Dmg Multiplier: x${(playerInstance ? playerInstance.abilityDamageMultiplier : 1).toFixed(2)}`; },
             getCardEffectString: function(tier) { return `Ability Dmg x${CONSTANTS.ABILITY_POTENCY_TIER_MULTIPLIER[tier].toFixed(2)}`;}
@@ -302,10 +315,10 @@ export function initializeEvolutionMasterList() {
             isTiered: true,
             isMaxed: function(p) { return p && (p.abilityCritChance !== undefined ? p.abilityCritChance >= 1.0 : false); },
             tiers: {
-                common:    { description: `Increases ability critical hit chance by ${CONSTANTS.ABILITY_CRIT_CHANCE_TIER_BONUS.common*100}%.`, apply: function(p) { p.abilityCritChance = Math.min(1.0, (p.abilityCritChance || 0) + CONSTANTS.ABILITY_CRIT_CHANCE_TIER_BONUS.common); }},
-                rare:      { description: `Increases ability critical hit chance by ${CONSTANTS.ABILITY_CRIT_CHANCE_TIER_BONUS.rare*100}%.`,   apply: function(p) { p.abilityCritChance = Math.min(1.0, (p.abilityCritChance || 0) + CONSTANTS.ABILITY_CRIT_CHANCE_TIER_BONUS.rare);   }},
-                epic:      { description: `Increases ability critical hit chance by ${CONSTANTS.ABILITY_CRIT_CHANCE_TIER_BONUS.epic*100}%.`,   apply: function(p) { p.abilityCritChance = Math.min(1.0, (p.abilityCritChance || 0) + CONSTANTS.ABILITY_CRIT_CHANCE_TIER_BONUS.epic);   }},
-                legendary: { description: `Increases ability critical hit chance by ${CONSTANTS.ABILITY_CRIT_CHANCE_TIER_BONUS.legendary*100}%.`,apply: function(p) { p.abilityCritChance = Math.min(1.0, (p.abilityCritChance || 0) + CONSTANTS.ABILITY_CRIT_CHANCE_TIER_BONUS.legendary);}}
+                common:    { description: (p, tier) => `Increases ability critical hit chance by ${CONSTANTS.ABILITY_CRIT_CHANCE_TIER_BONUS[tier]*100}%.`, apply: function(p) { p.abilityCritChance = Math.min(1.0, (p.abilityCritChance || 0) + CONSTANTS.ABILITY_CRIT_CHANCE_TIER_BONUS.common); }},
+                rare:      { description: (p, tier) => `Increases ability critical hit chance by ${CONSTANTS.ABILITY_CRIT_CHANCE_TIER_BONUS[tier]*100}%.`,   apply: function(p) { p.abilityCritChance = Math.min(1.0, (p.abilityCritChance || 0) + CONSTANTS.ABILITY_CRIT_CHANCE_TIER_BONUS.rare);   }},
+                epic:      { description: (p, tier) => `Increases ability critical hit chance by ${CONSTANTS.ABILITY_CRIT_CHANCE_TIER_BONUS[tier]*100}%.`,   apply: function(p) { p.abilityCritChance = Math.min(1.0, (p.abilityCritChance || 0) + CONSTANTS.ABILITY_CRIT_CHANCE_TIER_BONUS.epic);   }},
+                legendary: { description: (p, tier) => `Increases ability critical hit chance by ${CONSTANTS.ABILITY_CRIT_CHANCE_TIER_BONUS[tier]*100}%.`,apply: function(p) { p.abilityCritChance = Math.min(1.0, (p.abilityCritChance || 0) + CONSTANTS.ABILITY_CRIT_CHANCE_TIER_BONUS.legendary);}}
             },
             getEffectString: function(p) { return `Current Ability Crit Chance: ${( (p && p.abilityCritChance !== undefined ? p.abilityCritChance:0) * 100).toFixed(0)}%`; },
             getCardEffectString: function(tier) { return `+${(CONSTANTS.ABILITY_CRIT_CHANCE_TIER_BONUS[tier]*100).toFixed(0)}% Ability Crit Chance`;}
@@ -316,10 +329,10 @@ export function initializeEvolutionMasterList() {
             isTiered: true,
             isMaxed: function(p) { return false; },
             tiers: {
-                common:    { description: `Increases ability critical damage multiplier by +${CONSTANTS.ABILITY_CRIT_DAMAGE_TIER_BONUS.common*100}%.`, apply: function(p) { p.abilityCritDamageMultiplier = (p.abilityCritDamageMultiplier !== undefined ? p.abilityCritDamageMultiplier : 1.5) + CONSTANTS.ABILITY_CRIT_DAMAGE_TIER_BONUS.common; }},
-                rare:      { description: `Increases ability critical damage multiplier by +${CONSTANTS.ABILITY_CRIT_DAMAGE_TIER_BONUS.rare*100}%.`,   apply: function(p) { p.abilityCritDamageMultiplier = (p.abilityCritDamageMultiplier !== undefined ? p.abilityCritDamageMultiplier : 1.5) + CONSTANTS.ABILITY_CRIT_DAMAGE_TIER_BONUS.rare;   }},
-                epic:      { description: `Increases ability critical damage multiplier by +${CONSTANTS.ABILITY_CRIT_DAMAGE_TIER_BONUS.epic*100}%.`,   apply: function(p) { p.abilityCritDamageMultiplier = (p.abilityCritDamageMultiplier !== undefined ? p.abilityCritDamageMultiplier : 1.5) + CONSTANTS.ABILITY_CRIT_DAMAGE_TIER_BONUS.epic;   }},
-                legendary: { description: `Increases ability critical damage multiplier by +${CONSTANTS.ABILITY_CRIT_DAMAGE_TIER_BONUS.legendary*100}%.`,apply: function(p) { p.abilityCritDamageMultiplier = (p.abilityCritDamageMultiplier !== undefined ? p.abilityCritDamageMultiplier : 1.5) + CONSTANTS.ABILITY_CRIT_DAMAGE_TIER_BONUS.legendary;}}
+                common:    { description: (p, tier) => `Increases ability critical damage multiplier by +${CONSTANTS.ABILITY_CRIT_DAMAGE_TIER_BONUS[tier]*100}%.`, apply: function(p) { p.abilityCritDamageMultiplier = (p.abilityCritDamageMultiplier !== undefined ? p.abilityCritDamageMultiplier : 1.5) + CONSTANTS.ABILITY_CRIT_DAMAGE_TIER_BONUS.common; }},
+                rare:      { description: (p, tier) => `Increases ability critical damage multiplier by +${CONSTANTS.ABILITY_CRIT_DAMAGE_TIER_BONUS[tier]*100}%.`,   apply: function(p) { p.abilityCritDamageMultiplier = (p.abilityCritDamageMultiplier !== undefined ? p.abilityCritDamageMultiplier : 1.5) + CONSTANTS.ABILITY_CRIT_DAMAGE_TIER_BONUS.rare;   }},
+                epic:      { description: (p, tier) => `Increases ability critical damage multiplier by +${CONSTANTS.ABILITY_CRIT_DAMAGE_TIER_BONUS[tier]*100}%.`,   apply: function(p) { p.abilityCritDamageMultiplier = (p.abilityCritDamageMultiplier !== undefined ? p.abilityCritDamageMultiplier : 1.5) + CONSTANTS.ABILITY_CRIT_DAMAGE_TIER_BONUS.epic;   }},
+                legendary: { description: (p, tier) => `Increases ability critical damage multiplier by +${CONSTANTS.ABILITY_CRIT_DAMAGE_TIER_BONUS[tier]*100}%.`,apply: function(p) { p.abilityCritDamageMultiplier = (p.abilityCritDamageMultiplier !== undefined ? p.abilityCritDamageMultiplier : 1.5) + CONSTANTS.ABILITY_CRIT_DAMAGE_TIER_BONUS.legendary;}}
             },
             getEffectString: function(p) { return `Current Ability Crit Dmg: x${(p && p.abilityCritDamageMultiplier !== undefined ? p.abilityCritDamageMultiplier:1.5).toFixed(2)}`; },
             getCardEffectString: function(tier) { return `+${(CONSTANTS.ABILITY_CRIT_DAMAGE_TIER_BONUS[tier]*100).toFixed(0)}% Ability Crit Dmg`;}
@@ -374,28 +387,26 @@ export function generateEvolutionOffers(playerInstance) {
             };
 
             if (originalMasterEvo.isTiered) {
-                const heldTier = frozenSnapshot.rolledTier;
+                const heldTier = frozenSnapshot.rolledTier; // Use the tier from the frozen snapshot
                 if (heldTier && originalMasterEvo.tiers[heldTier]) {
                     const tierSpecificData = originalMasterEvo.tiers[heldTier];
                     reconstructedHeldOffer.rolledTier = heldTier;
-                    const descFunc = typeof tierSpecificData.description === 'function' ? tierSpecificData.description : (typeof originalMasterEvo.detailedDescription === 'function' ? originalMasterEvo.detailedDescription : null);
-                    reconstructedHeldOffer.detailedDescription = descFunc
-                        ? descFunc(playerInstance, heldTier)
-                        : (typeof originalMasterEvo.detailedDescription === 'function'
-                            ? originalMasterEvo.detailedDescription(playerInstance, originalMasterEvo.id)
-                            : (tierSpecificData.description || originalMasterEvo.detailedDescription));
+                    // For detailedDescription, prioritize the top-level function if available, passing the tier
+                    reconstructedHeldOffer.detailedDescription = (typeof originalMasterEvo.detailedDescription === 'function')
+                        ? originalMasterEvo.detailedDescription(playerInstance, heldTier, heldTier)
+                        : (typeof tierSpecificData.description === 'function' ? tierSpecificData.description(playerInstance, heldTier) : tierSpecificData.description);
 
                     reconstructedHeldOffer.applyEffect = tierSpecificData.apply;
                     reconstructedHeldOffer.cardEffectString = (typeof originalMasterEvo.getCardEffectString === 'function')
                                                                 ? originalMasterEvo.getCardEffectString(heldTier, playerInstance)
                                                                 : 'Effect details vary';
                 } else {
-                    isValidAndReconstructable = false;
+                    isValidAndReconstructable = false; 
                 }
-            } else {
+            } else { // Non-tiered frozen evolution
                 reconstructedHeldOffer.rolledTier = null;
                 reconstructedHeldOffer.detailedDescription = typeof originalMasterEvo.detailedDescription === 'function'
-                    ? originalMasterEvo.detailedDescription(playerInstance, originalMasterEvo.id)
+                    ? originalMasterEvo.detailedDescription(playerInstance, originalMasterEvo.id, null)
                     : originalMasterEvo.detailedDescription;
                 reconstructedHeldOffer.applyEffect = originalMasterEvo.apply;
                 reconstructedHeldOffer.cardEffectString = (typeof originalMasterEvo.getCardEffectString === 'function')
@@ -444,8 +455,8 @@ export function generateEvolutionOffers(playerInstance) {
                     rolledTier: baseEvo.isTiered ? rolledTierIfApplicable : null,
                     text: baseEvo.text,
                     detailedDescription: baseEvo.isTiered && tierSpecificData
-                        ? (typeof tierSpecificData.description === 'function' ? tierSpecificData.description(playerInstance, rolledTierIfApplicable) : tierSpecificData.description)
-                        : (typeof baseEvo.detailedDescription === 'function' ? baseEvo.detailedDescription(playerInstance, baseEvo.id) : baseEvo.detailedDescription),
+                        ? (typeof baseEvo.detailedDescription === 'function' ? baseEvo.detailedDescription(playerInstance, rolledTierIfApplicable, rolledTierIfApplicable) : (typeof tierSpecificData.description === 'function' ? tierSpecificData.description(playerInstance, rolledTierIfApplicable) : tierSpecificData.description) )
+                        : (typeof baseEvo.detailedDescription === 'function' ? baseEvo.detailedDescription(playerInstance, baseEvo.id, null) : baseEvo.detailedDescription),
                     applyEffect: baseEvo.isTiered && tierSpecificData ? tierSpecificData.apply : baseEvo.apply,
                     cardEffectString: (typeof baseEvo.getCardEffectString === 'function')
                         ? baseEvo.getCardEffectString(rolledTierIfApplicable, playerInstance)
@@ -454,6 +465,9 @@ export function generateEvolutionOffers(playerInstance) {
                 };
                 offers[i] = offer;
                 filledIndices[i] = true;
+                 if (!offeredBaseIds.includes(offer.baseId)) { // Add to offeredBaseIds only if it's a new base ID
+                    offeredBaseIds.push(offer.baseId);
+                }
             } else {
                 offers[i] = {
                     baseId: `empty_slot_${i}`, classType: 'ability', text:"No More Options", rolledTier: null,
@@ -798,11 +812,10 @@ function confirmEvolutionChoice(uiSelectedChoice, indexOfCardInOffer, playerInst
             if (!playerInstance.acquiredEvolutions) {
                 playerInstance.acquiredEvolutions = [];
             }
-            // Store detailed info for achievements, especially the rolledTier
             playerInstance.acquiredEvolutions.push({
                 id: originalEvo.id,
                 isTiered: originalEvo.isTiered,
-                rolledTier: uiSelectedChoice.rolledTier, // <<< THIS IS THE KEY FIX
+                rolledTier: uiSelectedChoice.rolledTier, 
                 classType: originalEvo.classType 
             });
         }

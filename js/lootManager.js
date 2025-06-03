@@ -53,7 +53,7 @@ export function initializeLootPools(playerInstance, updateBuffIndicatorCallback)
             id: 'aegisPath', 
             type: 'path_buff',
             name: 'Aegis Path',
-            description: `Evolve into a spiked juggernaut, a living battering ram. Colliding with bosses damages and knocks them back. Grants a fortified, spiky appearance. LMB: Hold to charge, release to dash. RMB: AoE Seismic Slam.`, // MODIFIED DESCRIPTION
+            description: `Evolve into a spiked juggernaut, a living battering ram. Colliding with bosses damages and knocks them back. Grants a fortified, spiky appearance. LMB: Hold to charge, release to dash. RMB: AoE Seismic Slam.`, 
             grants_LMB: 'aegisCharge',
             grants_RMB: 'seismicSlam'
         },
@@ -117,7 +117,7 @@ export function presentLootUI(choices, playerInstance, dependencies, isFirstBoss
         return;
     }
 
-    _currentLootUIDependENCIES = dependencies;
+    _currentLootUIDependencies = dependencies; // <<< CORRECTED CASING HERE
 
     const title = isFirstBossLoot ? "Forge Your Path!" : "Salvaged Technology!";
     const description = isFirstBossLoot

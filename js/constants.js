@@ -190,6 +190,7 @@ export const HP_PICKUP_BONUS_PER_LEVEL = 10;
 export const MAX_EVOLUTION_REROLLS = 5;
 export const MAX_EVOLUTION_BLOCKS = 3;
 export const MAX_EVOLUTION_FREEZES_PER_RUN = 3;
+export const TEMPORAL_ECHO_FIXED_REDUCTION = 2000;
 
 
 // ---- Tiered Evolution Values ----
