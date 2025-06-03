@@ -495,7 +495,7 @@ export function getCurrentlyDisplayedOffers() {
 export function presentEvolutionUI(playerInstance, dependencies) {
     if (!playerInstance || !dependencies || !dependencies.UIManager || !dependencies.playSound || !dependencies.onEvolutionCompleteCallback || !dependencies.inputState) {
         console.error("EvolutionManager.presentEvolutionUI: Missing playerInstance or critical dependencies.", {playerInstance, dependencies});
-        if (dependencies && dependencies.onEvolutionCompleteCallback) dependencies.onEvolutionCompleteCallback(null);
+        if (dependencies && dependencies.onEvolutionCompleteCallback) dependencies.onEvolutionCompleteCallback(null, playerInstance);
         return;
     }
 
@@ -795,16 +795,16 @@ function confirmEvolutionChoice(uiSelectedChoice, indexOfCardInOffer, playerInst
         const originalEvo = evolutionChoicesMasterList.find(e => e.id === uiSelectedChoice.baseId);
         if (originalEvo) {
             originalEvo.level = (originalEvo.level || 0) + 1;
-            // <<< SYNERGIST: Store acquired evolution info >>>
             if (!playerInstance.acquiredEvolutions) {
                 playerInstance.acquiredEvolutions = [];
             }
+            // Store detailed info for achievements, especially the rolledTier
             playerInstance.acquiredEvolutions.push({
                 id: originalEvo.id,
-                isTiered: originalEvo.isTiered, // Store if it's a tiered or core evo
-                classType: originalEvo.classType // Optionally store class if needed for other achievements
+                isTiered: originalEvo.isTiered,
+                rolledTier: uiSelectedChoice.rolledTier, // <<< THIS IS THE KEY FIX
+                classType: originalEvo.classType 
             });
-            // <<< END SYNERGIST >>>
         }
     }
 

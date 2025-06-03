@@ -573,16 +573,4 @@ export const allAchievements = [
             type: "event_kinetic_cascade_mage"
         }
     },
-    {
-        id: "true_potential_unlocked_master",
-        name: "True Potential Unlocked",
-        description: "Reach player level 20 (acquire 20 evolution upgrades, excluding initial path choice).",
-        tier: achievementTiers.MASTER,
-        iconPath: "assets/icons/ach_true_potential.png",
-        unlockConditions: {
-            type: "player_stat_gte",
-            stat: "acquiredEvolutions.length",
-            value: 20
-        }
-    },
 ];
