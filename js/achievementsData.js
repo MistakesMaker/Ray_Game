@@ -448,13 +448,13 @@ export const allAchievements = [
     {
         id: "nexus_blitz_t2_master",
         name: "Nexus Blitz: Tier 2 (Master)",
-        description: "Defeat Nexus Weaver Tier 2 within 2 minutes 45 seconds.",
+        description: "Defeat Nexus Weaver Tier 2 within 2 minutes 30 seconds.",
         tier: achievementTiers.MASTER,
         iconPath: "assets/icons/ach_nexus_blitz_t2_master.png",
         unlockConditions: {
             type: "event_nexus_tX_defeated_within_time",
             bossTier: 2,
-            timeLimitMs: 165000
+            timeLimitMs: 150000
         }
     },
     {
@@ -472,25 +472,25 @@ export const allAchievements = [
     {
         id: "nexus_blitz_t4_master",
         name: "Nexus Blitz: Tier 4 (Master)",
-        description: "Defeat Nexus Weaver Tier 4 within 4 minutes 30 seconds.",
+        description: "Defeat Nexus Weaver Tier 4 within 4 minutes.",
         tier: achievementTiers.MASTER,
         iconPath: "assets/icons/ach_nexus_blitz_t4_master.png",
         unlockConditions: {
             type: "event_nexus_tX_defeated_within_time",
             bossTier: 4,
-            timeLimitMs: 270000
+            timeLimitMs: 240000
         }
     },
     {
         id: "nexus_blitz_t5_master",
         name: "Nexus Blitz: Tier 5 (Master)",
-        description: "Defeat Nexus Weaver Tier 5 within 5 minutes 30 seconds.",
+        description: "Defeat Nexus Weaver Tier 5 within 4 minutes 30 seconds.",
         tier: achievementTiers.MASTER,
         iconPath: "assets/icons/ach_nexus_blitz_t5_master.png",
         unlockConditions: {
             type: "event_nexus_tX_defeated_within_time",
             bossTier: 5,
-            timeLimitMs: 330000
+            timeLimitMs: 270000
         }
     },
     {

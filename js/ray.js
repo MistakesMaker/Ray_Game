@@ -26,7 +26,8 @@ import {
     RAY_DAMAGE_TO_PLAYER,
     POST_DAMAGE_IMMUNITY_DURATION,
     SCREEN_SHAKE_DURATION_PLAYER_HIT,
-    SCREEN_SHAKE_MAGNITUDE_PLAYER_HIT
+    SCREEN_SHAKE_MAGNITUDE_PLAYER_HIT,
+    GRAVITY_WELL_SCATTER_RAY_LIFETIME // Added for launched rays
 } from './constants.js';
 import { checkCollision, hexToRgb } from './utils.js';
 import { playSound, stopSound, playerWellDeploySound, playerWellDetonateSound, gravityWellChargeSound } from './audio.js';
@@ -82,6 +83,7 @@ export class Ray {
         this.damageValue = RAY_DAMAGE_TO_PLAYER;
         this.sourceAbility = null;
         this.pathDamageMultiplier = 1.0;
+        this.lifestealPercent = 0; // Added for Bloodpact
     }
 
     reset(x, y, color, dx, dy, globalSpeedMultiplier, playerInstance, maxLifetimeForThisRay,
@@ -95,6 +97,7 @@ export class Ray {
         this.damageValue = RAY_DAMAGE_TO_PLAYER;
         this.sourceAbility = null;
         this.pathDamageMultiplier = 1.0;
+        this.lifestealPercent = 0;
 
         const ownRaySpeedMult = (playerInstance && !isBoss && !isGravityRay) ? playerInstance.ownRaySpeedMultiplier : 1.0;
 
@@ -133,10 +136,11 @@ export class Ray {
         this.gravityStrength = 0;
         this.absorbedRays = [];
         this.isCorruptedByGravityWell = false;
-        this.isCorruptedByPlayerWell = false;
+        this.isCorruptedByPlayerWell = false; // Ensure this is reset
+        this.targetOrbitDistPlayerWell = 0; // Ensure this is reset
+        this.orbitDirPlayerWell = 1; // Ensure this is reset
         this.pierceUsesLeft = (playerInstance && playerInstance.hasTargetPierce && !isBoss && !isGravityRay) ? 1 : 0;
         this.targetOrbitDist = 0; this.orbitDir = 1;
-        this.targetOrbitDistPlayerWell = 0; this.orbitDirPlayerWell = 1;
     }
 
     draw(ctx) {
@@ -496,35 +500,9 @@ export class PlayerGravityWell {
         this.isActive = false; this.isPendingDetonation = false;
         const { targetX, targetY, player } = detonateContext;
 
-        // <<< WELL MASTER Achievement Check >>>
         const launchedRayCount = this.absorbedRays.length;
-        if (player && player.currentPath === 'mage' && launchedRayCount >= 10) {
-            // It's assumed player has a signalAchievementEvent method or it's passed via detonateContext
-            if (player.update && player.update.constructor.name === "Function" && detonateContext.player.signalAchievementEvent) {
-                // This is a bit of a hacky check. Ideally, signalAchievementEvent would be directly on player.
-                // If signalAchievementEvent is part of gameContext passed to player.update,
-                // we need to ensure it's accessible here.
-                // For now, let's assume it might be directly callable on player if we modify player.js
-            }
-            // Prefer signaling via a passed callback if possible
-            if (player && typeof player.activateAbility === 'function' && _mainCallbacks && _mainCallbacks.signalAchievementEvent) { // Check if player object can signal
-                 // This is trying to access main.js's _mainCallbacks, which is not ideal from here.
-                 // The event should be signaled from player.js or gameLogic.js after this detonation.
-                 // For now, we will rely on player.js `activateAbility` to handle this after detonation.
-                 // The signal from player.js would look like:
-                 // gameContext.signalAchievementEvent("player_well_detonated", { launchedRays: launchedRayCount });
-            }
-            // Let's modify player.js's activateAbility to send this event after detonation.
-            // For now, just log it.
-            if (player && player.currentPath === 'mage' && launchedRayCount >= 10) {
-                 // This will be signaled from player.js after this returns.
-                // We will add the event data to the player instance for player.js to pick up.
-                if (!player.eventDataForNextSignal) player.eventDataForNextSignal = {};
-                player.eventDataForNextSignal.player_well_detonated = { launchedRays: launchedRayCount };
-            }
-        }
-        // <<< END WELL MASTER >>>
-
+        // "Well Master" achievement check is now handled in player.js activateAbility
+        // No need to call _mainCallbacks.signalAchievementEvent here directly.
 
         playSound(this.playerWellDetonateSound);
         this.absorbedRays.forEach(ray => {
@@ -544,18 +522,24 @@ export class PlayerGravityWell {
                 }
 
                 ray.speed = boostedSpeed;
-                ray.initialSpeedMultiplier = boostedSpeed / BASE_RAY_SPEED;
+                ray.initialSpeedMultiplier = boostedSpeed / BASE_RAY_SPEED; // Update initial speed for trail and other calcs
 
-                ray.isBossProjectile = false;
-                ray.isGravityWellRay = false;
-                ray.isCorruptedByPlayerWell = false;
+                ray.isBossProjectile = false; // No longer a boss projectile if it was
+                ray.isGravityWellRay = false; // No longer a gravity well ray
+                ray.isCorruptedByPlayerWell = false; // No longer corrupted by this well
                 ray.isCorruptedByGravityWell = false;
                 ray.color = PLAYER_GRAVITY_WELL_ABSORBED_RAY_COLOR;
-                ray.spawnGraceTimer = 50;
+                ray.spawnGraceTimer = 50; // Short grace period to avoid immediate self-collision if player moves to cursor
                 ray.pierceUsesLeft = (player && player.hasTargetPierce) ? 1 : 0;
-                ray.momentumDamageBonusValue = 0;
-                ray.isPlayerAbilityRay = true;
+                ray.momentumDamageBonusValue = 0; // Reset momentum
+                ray.isPlayerAbilityRay = true; // Mark as an ability ray
                 ray.sourceAbility = 'miniGravityWell';
+                ray.lifeTimer = GRAVITY_WELL_SCATTER_RAY_LIFETIME; // Give it new life
+                ray.maxLifetime = GRAVITY_WELL_SCATTER_RAY_LIFETIME;
+                ray.state = 'moving'; // Ensure it's in moving state
+                ray.wallBounceCount = 0; // Reset bounces
+                ray.opacity = 1; // Ensure full opacity
+                ray.trail = []; // Clear old trail
             }
         });
         this.absorbedRays = [];
