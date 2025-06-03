@@ -5,7 +5,7 @@ export const achievementTiers = {
     MEDIUM: "Medium",
     HARD: "Hard",
     MASTER: "Master",
-    GRANDMASTER: "Grandmaster"
+    GRANDMASTER: "Grandmaster" // Kept for structure
 };
 
 export const allAchievements = [
@@ -286,14 +286,39 @@ export const allAchievements = [
 
     // --- Hard Tier ---
     {
-        id: "true_survivor_hard",
-        name: "True Survivor",
-        description: "Reach a score of 5,000.",
+        id: "nexus_blitz_t1_hard", 
+        name: "Nexus Blitz: Tier 1 (Hard)",
+        description: "Defeat Nexus Weaver Tier 1 within 2 minutes.",
         tier: achievementTiers.HARD,
-        iconPath: "assets/icons/ach_true_survivor.png",
+        iconPath: "assets/icons/ach_nexus_blitz_t1_hard.png",
         unlockConditions: {
-            type: "gamestate_score_gte",
-            value: 5000
+            type: "event_nexus_tX_defeated_within_time",
+            bossTier: 1,
+            timeLimitMs: 120000 
+        }
+    },
+    {
+        id: "nexus_blitz_t2_hard", 
+        name: "Nexus Blitz: Tier 2 (Hard)",
+        description: "Defeat Nexus Weaver Tier 2 within 3 minutes 15 seconds.",
+        tier: achievementTiers.HARD,
+        iconPath: "assets/icons/ach_nexus_blitz_t2_hard.png",
+        unlockConditions: {
+            type: "event_nexus_tX_defeated_within_time",
+            bossTier: 2,
+            timeLimitMs: 195000 
+        }
+    },
+    {
+        id: "nexus_blitz_t3_hard", 
+        name: "Nexus Blitz: Tier 3 (Hard)",
+        description: "Defeat Nexus Weaver Tier 3 within 4 minutes 30 seconds.",
+        tier: achievementTiers.HARD,
+        iconPath: "assets/icons/ach_nexus_blitz_t3_hard.png",
+        unlockConditions: {
+            type: "event_nexus_tX_defeated_within_time",
+            bossTier: 3,
+            timeLimitMs: 270000 
         }
     },
     {
@@ -311,7 +336,7 @@ export const allAchievements = [
         name: "Glass Cannon Connoisseur",
         description: "Defeat a Tier 6 standard boss without acquiring any \"Tank\" class evolution upgrades.",
         tier: achievementTiers.HARD,
-        iconPath: "assets/icons/ach_glass_cannon.png", // Placeholder
+        iconPath: "assets/icons/ach_glass_cannon.png",
         unlockConditions: {
             type: "event_standard_boss_tX_defeated_no_class_evo",
             bossTier: 6,
@@ -319,37 +344,13 @@ export const allAchievements = [
         }
     },
     {
-        id: "speed_demon_nexus_t1_hard",
-        name: "Speed Demon: Nexus T1",
-        description: "Defeat Nexus Weaver Tier 1 within 2 minutes.",
-        tier: achievementTiers.HARD,
-        iconPath: "assets/icons/ach_speed_demon_t1.png",
-        unlockConditions: {
-            type: "event_nexus_tX_defeated_within_time",
-            bossTier: 1,
-            timeLimitMs: 120000
-        }
-    },
-    {
-        id: "speed_demon_nexus_t2_hard", // You had T3 in description, but T2 in name/time. Assuming T2 for this one.
-        name: "Speed Demon: Nexus T2",
-        description: "Defeat Nexus Weaver Tier 2 within 3 minutes.",
-        tier: achievementTiers.HARD,
-        iconPath: "assets/icons/ach_speed_demon_t2.png",
-        unlockConditions: {
-            type: "event_nexus_tX_defeated_within_time",
-            bossTier: 2,
-            timeLimitMs: 180000
-        }
-    },
-    {
         id: "flawless_victory_x3_hard",
         name: "Flawless Victory x3",
         description: "Defeat 3 different bosses flawlessly in a single run.",
         tier: achievementTiers.HARD,
-        iconPath: "assets/icons/ach_flawless_x3.png", // Placeholder
+        iconPath: "assets/icons/ach_flawless_x3.png",
         unlockConditions: {
-            type: "event_multi_unique_boss_flawless",
+            type: "event_multi_unique_boss_flawless_any_type", // Changed to use the new specific event
             count: 3
         }
     },
@@ -358,7 +359,7 @@ export const allAchievements = [
         name: "Legendary Hoarder",
         description: "Acquire 3 different Legendary tier evolution upgrades in a single run.",
         tier: achievementTiers.HARD,
-        iconPath: "assets/icons/ach_legendary_hoarder.png", // Placeholder
+        iconPath: "assets/icons/ach_legendary_hoarder.png",
         unlockConditions: {
             type: "player_unique_legendary_evolutions_gte",
             value: 3
@@ -369,53 +370,219 @@ export const allAchievements = [
         name: "True Mage",
         description: "As Mage, defeat Nexus Weaver Tier 2 using only Omega Laser and Mini Gravity Well for damage.",
         tier: achievementTiers.HARD,
-        iconPath: "assets/icons/ach_true_mage.png", // Placeholder
+        iconPath: "assets/icons/ach_true_mage.png",
         unlockConditions: {
             type: "path_boss_ability_only_kill",
             path: "mage",
-            bossKey: "nexusWeaver", // specific boss
+            bossKey: "nexusWeaver",
             bossTier: 2,
-            allowedAbilities: ["omegaLaser", "miniGravityWell"] // IDs of abilities
+            allowedAbilities: ["omegaLaser", "miniGravityWell"]
         }
     },
     {
         id: "true_aegis_hard",
         name: "True Aegis",
-        description: "As Aegis, defeat Nexus Weaver Tier 2 using only Aegis Charge and Seismic Slam for damage.",
+        description: "As Aegis, defeat Nexus Weaver Tier 2 using only Aegis Charge/Passive and Seismic Slam for damage.",
         tier: achievementTiers.HARD,
-        iconPath: "assets/icons/ach_true_aegis.png", // Placeholder
+        iconPath: "assets/icons/ach_true_aegis.png",
         unlockConditions: {
             type: "path_boss_ability_only_kill",
             path: "aegis",
             bossKey: "nexusWeaver",
             bossTier: 2,
-            allowedAbilities: ["aegisCharge", "seismicSlam"]
+            allowedAbilities: ["aegisCharge", "seismicSlam", "aegisPassive"]
         }
     },
     {
         id: "true_berserker_hard",
         name: "True Berserker",
-        description: "As Berserker, defeat Nexus Weaver Tier 2 while Bloodpact & Savage Howl buffs are active for the final blow.",
+        description: "As Berserker, defeat Nexus Weaver Tier 2 while Bloodpact & Savage Howl buffs are active.",
         tier: achievementTiers.HARD,
-        iconPath: "assets/icons/ach_true_berserker.png", // Placeholder
+        iconPath: "assets/icons/ach_true_berserker.png",
         unlockConditions: {
             type: "path_boss_buffed_kill",
             path: "berserker",
             bossKey: "nexusWeaver",
             bossTier: 2,
-            requiredBuffs: ["bloodpact", "savageHowl"] // internal buff names/flags
+            requiredBuffs: ["bloodpact", "savageHowl"]
         }
     },
     {
-        id: "max_efficiency_hard", // Was 27
+        id: "max_efficiency_hard",
         name: "Max Efficiency",
-        description: "Defeat any Tier 5 boss with more than 90% HP remaining.",
+        description: "Defeat any Tier 5 boss with more than 75% HP remaining.",
         tier: achievementTiers.HARD,
         iconPath: "assets/icons/ach_max_efficiency.png",
         unlockConditions: {
             type: "event_tX_boss_defeated_high_hp",
             bossTier: 5,
-            minHpPercent: 0.90
+            minHpPercent: 0.75
+        }
+    },
+
+
+    // --- Master Tier ---
+    {
+        id: "omega_survivor_master",
+        name: "Omega Survivor",
+        description: "Reach a Survival score of 15,000.",
+        tier: achievementTiers.MASTER,
+        iconPath: "assets/icons/ach_omega_survivor.png",
+        unlockConditions: {
+            type: "gamestate_score_gte",
+            value: 15000
+        }
+    },
+    {
+        id: "nexus_blitz_t1_master",
+        name: "Nexus Blitz: Tier 1 (Master)",
+        description: "Defeat Nexus Weaver Tier 1 within 1 minute 30 seconds.",
+        tier: achievementTiers.MASTER,
+        iconPath: "assets/icons/ach_nexus_blitz_t1_master.png",
+        unlockConditions: {
+            type: "event_nexus_tX_defeated_within_time",
+            bossTier: 1,
+            timeLimitMs: 90000
+        }
+    },
+    {
+        id: "nexus_blitz_t2_master",
+        name: "Nexus Blitz: Tier 2 (Master)",
+        description: "Defeat Nexus Weaver Tier 2 within 2 minutes 45 seconds.",
+        tier: achievementTiers.MASTER,
+        iconPath: "assets/icons/ach_nexus_blitz_t2_master.png",
+        unlockConditions: {
+            type: "event_nexus_tX_defeated_within_time",
+            bossTier: 2,
+            timeLimitMs: 165000
+        }
+    },
+    {
+        id: "nexus_blitz_t3_master",
+        name: "Nexus Blitz: Tier 3 (Master)",
+        description: "Defeat Nexus Weaver Tier 3 within 3 minutes 30 seconds.",
+        tier: achievementTiers.MASTER,
+        iconPath: "assets/icons/ach_nexus_blitz_t3_master.png",
+        unlockConditions: {
+            type: "event_nexus_tX_defeated_within_time",
+            bossTier: 3,
+            timeLimitMs: 210000
+        }
+    },
+    {
+        id: "nexus_blitz_t4_master",
+        name: "Nexus Blitz: Tier 4 (Master)",
+        description: "Defeat Nexus Weaver Tier 4 within 4 minutes 30 seconds.",
+        tier: achievementTiers.MASTER,
+        iconPath: "assets/icons/ach_nexus_blitz_t4_master.png",
+        unlockConditions: {
+            type: "event_nexus_tX_defeated_within_time",
+            bossTier: 4,
+            timeLimitMs: 270000
+        }
+    },
+    {
+        id: "nexus_blitz_t5_master",
+        name: "Nexus Blitz: Tier 5 (Master)",
+        description: "Defeat Nexus Weaver Tier 5 within 5 minutes 30 seconds.",
+        tier: achievementTiers.MASTER,
+        iconPath: "assets/icons/ach_nexus_blitz_t5_master.png",
+        unlockConditions: {
+            type: "event_nexus_tX_defeated_within_time",
+            bossTier: 5,
+            timeLimitMs: 330000
+        }
+    },
+    {
+        id: "pacifist_lord_master",
+        name: "The Pacifist Lord",
+        description: "Defeat Nexus Weaver Tier 3 without destroying any of its summoned minions during that specific fight.",
+        tier: achievementTiers.MASTER,
+        iconPath: "assets/icons/ach_pacifist_lord.png",
+        unlockConditions: {
+            type: "event_nexus_t3_defeated_no_minions_killed"
+        }
+    },
+    {
+        id: "flawless_gauntlet_master",
+        name: "Flawless Gauntlet",
+        description: "Defeat all 3 different standard boss types (Chaser, Reflector, Singularity) flawlessly in a single run.",
+        tier: achievementTiers.MASTER,
+        iconPath: "assets/icons/ach_flawless_gauntlet.png",
+        unlockConditions: {
+            type: "event_multi_unique_standard_boss_flawless",
+            count: 3
+        }
+    },
+    {
+        id: "collector_supreme_master",
+        name: "Collector Supreme",
+        description: "Acquire 5 different Legendary tier evolution upgrades in a single run.",
+        tier: achievementTiers.MASTER,
+        iconPath: "assets/icons/ach_collector_supreme.png",
+        unlockConditions: {
+            type: "player_unique_legendary_evolutions_gte",
+            value: 5
+        }
+    },
+    {
+        id: "apex_predator_master",
+        name: "Apex Predator",
+        description: "As Berserker, defeat Nexus Weaver Tier 5 while Bloodpact & Savage Howl are active.",
+        tier: achievementTiers.MASTER,
+        iconPath: "assets/icons/ach_apex_predator.png",
+        unlockConditions: {
+            type: "path_boss_buffed_kill",
+            path: "berserker",
+            bossKey: "nexusWeaver",
+            bossTier: 5,
+            requiredBuffs: ["bloodpact", "savageHowl"]
+        }
+    },
+    {
+        id: "unpicker_master",
+        name: "The Unpicker",
+        description: "Defeat Nexus Weaver Tier 3 without picking up any Heart or Bonus Point pickups.",
+        tier: achievementTiers.MASTER,
+        iconPath: "assets/icons/ach_unpicker.png",
+        unlockConditions: {
+            type: "event_nexus_t3_defeated_no_pickups"
+        }
+    },
+    {
+        id: "sustained_fury_master",
+        name: "Sustained Fury",
+        description: "As Berserker, maintain over 50% Berserker Rage bonus for 2 continuous minutes.",
+        tier: achievementTiers.MASTER,
+        iconPath: "assets/icons/ach_sustained_fury.png",
+        unlockConditions: {
+            type: "player_stat_duration_gte",
+            stat: "berserkerRageHighDurationTimer",
+            statThreshold: 50, // This refers to the rage percentage for the timer in player.js
+            durationMs: 120000, // 2 minutes
+            path: "berserker"
+        }
+    },
+    {
+        id: "kinetic_cascade_master",
+        name: "Kinetic Cascade",
+        description: "As Mage, have Kinetic Conversion empower 3 different abilities (Omega Laser, Mini Gravity Well, any one numeric ability) within 30s.",
+        tier: achievementTiers.MASTER,
+        iconPath: "assets/icons/ach_kinetic_cascade.png",
+        unlockConditions: {
+            type: "event_kinetic_cascade_mage"
+        }
+    },
+    {
+        id: "true_potential_unlocked_master",
+        name: "True Potential Unlocked",
+        description: "Reach player level 20 (acquire 20 evolution upgrades, excluding initial path choice).",
+        tier: achievementTiers.MASTER,
+        iconPath: "assets/icons/ach_true_potential.png",
+        unlockConditions: {
+            type: "player_stat_gte",
+            stat: "acquiredEvolutions.length",
+            value: 20
         }
     },
 ];

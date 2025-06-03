@@ -436,7 +436,7 @@ function orchestrateScreenChange(screenToShow) {
     else if (screenToShow === freeUpgradeScreen) GameState.setGamePausedForFreeUpgrade(true);
     else if (screenToShow === lootChoiceScreen) GameState.setGamePausedForLootChoice(true);
     else if (screenToShow === pauseScreen) GameState.setGamePausedByEsc(true);
-    else if (screenToShow === startScreen || screenToShow === settingsScreen || screenToShow === gameOverScreen || screenToShow === detailedHighScoresScreen || screenToShow === uiAchievementsScreen) { // Added achievementsScreen
+    else if (screenToShow === startScreen || screenToShow === settingsScreen || screenToShow === gameOverScreen || screenToShow === detailedHighScoresScreen || screenToShow === uiAchievementsScreen) { 
         shouldStopCoreGameLoop = true;
     } else if (screenToShow === null) {
         GameState.setGamePausedForEvolution(false); GameState.setGamePausedForFreeUpgrade(false);
@@ -480,7 +480,7 @@ function initGame() {
         getAbilityContextForPlayer: getAbilityContextForPlayerFuncFromGameLogic,
         updateShootInterval: updateShootIntervalAndGameState,
         handleFullHealthHeartPickup: handleFullHealthHeartPickupInternal,
-        signalAchievementEvent: (eventName, eventData = {}) => {
+        signalAchievementEvent: (eventName, eventData = {}) => { // Ensure this is correctly assigned
             eventFlagsForAchievements[eventName] = true;
             if (eventData && Object.keys(eventData).length > 0) {
                 eventFlagsForAchievements[eventName + "_data"] = eventData;
@@ -790,14 +790,14 @@ const gameContextForEventListeners = {
     getCurrentActiveScreen: UIManager.getCurrentActiveScreen,
     getSettingsScreenElement: () => settingsScreen,
     getDetailedHighScoresScreenElement: () => detailedHighScoresScreen,
-    getAchievementsScreenElement: () => uiAchievementsScreen, // Added for Esc key
+    getAchievementsScreenElement: () => uiAchievementsScreen, 
     isEvolutionScreenActive: () => UIManager.getCurrentActiveScreen() === evolutionScreen,
     isFreezeModeActive: () => { const currentPlayer = gameLogicGetPlayerFunc ? gameLogicGetPlayerFunc() : null; return (currentPlayer ? currentPlayer.isFreezeModeActive : false);},
     callbacks: {
         startGame: initGame,
         showSettingsScreenFromStart: () => { UIManager.setPreviousScreenForSettings(startScreen); orchestrateScreenChange(settingsScreen); },
         viewDetailedHighScores: () => { showDetailedHighScores(); },
-        viewAchievements: () => { showAchievementsScreen(); }, // <<< NEW CALLBACK
+        viewAchievements: () => { showAchievementsScreen(); },
         toggleSound: () => { toggleSoundEnabled(); applyMusicPlayStateWrapper(); },
         updateMusicVolume, updateSfxVolume: updateSpecificSfxVolume,
         goBackFromSettings: () => {
@@ -820,7 +820,7 @@ const gameContextForEventListeners = {
             if (uiPausePlayerStatsPanel) uiPausePlayerStatsPanel.style.display = 'none';
             showStartScreenWithUpdatesInternal();
         },
-        goBackFromAchievements: () => { // <<< NEW CALLBACK for achievements screen back button
+        goBackFromAchievements: () => { 
             showStartScreenWithUpdatesInternal();
         },
         resumeGameFromPause: togglePauseMenu, togglePauseMenu: togglePauseMenu,

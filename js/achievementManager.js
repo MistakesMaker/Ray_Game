@@ -72,7 +72,7 @@ function evaluateCondition(achievement, gameContext) {
     const gameState = gameContext.GameState;
     const conditions = achievement.unlockConditions;
     const initialCharges = gameContext.initialEvoScreenCharges || { rerolls: -1, blocks: -1, freezes: -1 };
-    const constants = gameContext.CONSTANTS || CONSTANTS_MODULE;
+    const constants = gameContext.CONSTANTS || CONSTANTS_MODULE; // Ensure constants are available
 
     switch (conditions.type) {
         case "player_stat_gte":
@@ -116,7 +116,7 @@ function evaluateCondition(achievement, gameContext) {
             }
             break;
 
-        case "boss_defeat_condition": // Used for Resourceful Fighter
+        case "boss_defeat_condition":
             if (gameContext.eventFlags && gameContext.eventFlags.boss_defeat_no_abilities) {
                 const eventData = gameContext.eventFlags.boss_defeat_no_abilities_data || {};
                 if (eventData.noAbilitiesUsedFromBossManager !== conditions.noAbilitiesUsed) return false;
@@ -231,9 +231,16 @@ function evaluateCondition(achievement, gameContext) {
             }
             return false;
 
-        case "event_multi_unique_boss_flawless":
-             if (gameContext.eventFlags && gameContext.eventFlags.multi_unique_boss_flawless) {
-                const eventData = gameContext.eventFlags.multi_unique_boss_flawless_data || {};
+        case "event_multi_unique_standard_boss_flawless": // For "Flawless Gauntlet (Master)"
+             if (gameContext.eventFlags && gameContext.eventFlags.multi_unique_standard_boss_flawless) {
+                const eventData = gameContext.eventFlags.multi_unique_standard_boss_flawless_data || {};
+                return eventData.uniqueFlawlessBossTypes >= conditions.count;
+            }
+            return false;
+        
+        case "event_multi_unique_boss_flawless_any_type": // For "Flawless Victory x3 (Hard)"
+            if (gameContext.eventFlags && gameContext.eventFlags.multi_unique_boss_flawless_any_type) {
+                const eventData = gameContext.eventFlags.multi_unique_boss_flawless_any_type_data || {};
                 return eventData.uniqueFlawlessBossTypes >= conditions.count;
             }
             return false;
@@ -246,15 +253,17 @@ function evaluateCondition(achievement, gameContext) {
             }
             return false;
 
+        case "event_nexus_t3_defeated_no_minions_killed":
+            return !!(gameContext.eventFlags && gameContext.eventFlags.nexus_t3_defeated_no_minions_killed);
+
         case "path_boss_ability_only_kill":
             if (player.currentPath === conditions.path && gameContext.eventFlags && gameContext.eventFlags.path_boss_ability_only_kill) {
                 const eventData = gameContext.eventFlags.path_boss_ability_only_kill_data || {};
-                return eventData.bossKey === conditions.bossKey &&
-                       eventData.bossTier === conditions.bossTier &&
-                       eventData.onlyAllowedAbilitiesUsed === true &&
-                       Array.isArray(conditions.allowedAbilities) &&
-                       Array.isArray(eventData.abilitiesUsed) &&
-                       eventData.abilitiesUsed.every(usedAb => conditions.allowedAbilities.includes(usedAb));
+                if (eventData.path !== conditions.path || eventData.bossKey !== conditions.bossKey || eventData.bossTier !== conditions.bossTier) {
+                    return false;
+                }
+                return eventData.onlyAllowedAbilitiesUsed === true &&
+                       (Array.isArray(eventData.abilitiesUsed) && eventData.abilitiesUsed.length > 0);
             }
             return false;
 
@@ -263,13 +272,29 @@ function evaluateCondition(achievement, gameContext) {
                 const eventData = gameContext.eventFlags.path_boss_buffed_kill_data || {};
                 if (eventData.bossKey === conditions.bossKey && eventData.bossTier === conditions.bossTier) {
                     return conditions.requiredBuffs.every(buffName => {
-                        if (buffName === "bloodpact") return eventData.bloodpactActive;
-                        if (buffName === "savageHowl") return eventData.savageHowlActive;
-                        return false; // Unknown buff requirement
+                        if (buffName === "bloodpact") return eventData.bloodpactActive === true;
+                        if (buffName === "savageHowl") return eventData.savageHowlActive === true;
+                        return false;
                     });
                 }
             }
             return false;
+
+        case "event_nexus_t3_defeated_no_pickups":
+            if (gameContext.eventFlags && gameContext.eventFlags.nexus_t3_defeated_no_pickups) {
+                return player.heartsCollectedThisRun === 0 && player.bonusPointsCollectedThisRun === 0;
+            }
+            return false;
+
+        case "player_stat_duration_gte":
+            if (conditions.path && player.currentPath !== conditions.path) return false;
+            if (player.hasOwnProperty(conditions.stat) && typeof player[conditions.stat] === 'number') {
+                return player[conditions.stat] >= conditions.durationMs;
+            }
+            return false;
+
+        case "event_kinetic_cascade_mage":
+            return !!(gameContext.eventFlags && gameContext.eventFlags.kinetic_cascade_mage);
 
     }
     return false;
@@ -307,9 +332,13 @@ export function checkAllAchievements(gameContext) {
             "tX_boss_defeated_high_hp",
             "nexus_weaver_defeated_no_abilities_strict",
             "standard_boss_tX_defeated_no_class_evo",
-            "multi_unique_boss_flawless",
+            "multi_unique_standard_boss_flawless",
+            "multi_unique_boss_flawless_any_type", // New flag for any boss type
+            "nexus_t3_defeated_no_minions_killed",
             "path_boss_ability_only_kill",
-            "path_boss_buffed_kill"
+            "path_boss_buffed_kill",
+            "nexus_t3_defeated_no_pickups",
+            "kinetic_cascade_mage",
         ];
         flagsToReset.forEach(flagName => {
             if (gameContext.eventFlags.hasOwnProperty(flagName)) {

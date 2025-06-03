@@ -123,6 +123,7 @@ export class Player {
         this.hasAegisPathHelm = false;
         this.berserkerPermanentRayDamageMultiplier = 1.0;
         this.berserkerRagePercentage = 0;
+        this.berserkerRageHighDurationTimer = 0;
         this.aegisRamCooldownTimer = 0;
 
         this.activeAbilities = {
@@ -207,6 +208,10 @@ export class Player {
         this.damageTakenThisBossFight = 0;
         this.teleportTimestamps = [];
         this.eventDataForNextSignal = {};
+        this.heartsCollectedThisRun = 0; // For The Unpicker achievement
+        this.bonusPointsCollectedThisRun = 0; // For The Unpicker achievement
+        this.nexusMinionsKilledThisNexusT3Fight = 0; // For Pacifist Lord achievement
+        this.recentKineticBoosts = []; // For Kinetic Cascade achievement
 
 
         this.update = (gameContext) => {
@@ -374,6 +379,18 @@ export class Player {
                      if (this.savageHowlAttackSpeedBuffTimer > 0) { this.savageHowlAttackSpeedBuffTimer -= dt; mouseAbilityUIUpdateNeeded = true; if (this.savageHowlAttackSpeedBuffTimer <= 0) this.isSavageHowlAttackSpeedBuffActive = false;}
                      if (this.savageHowlCooldownTimer > 0) {let ecm = Math.max(0.1, 1.0 - this.globalCooldownReduction); this.savageHowlCooldownTimer -= dt/ecm; mouseAbilityUIUpdateNeeded = true; if(this.savageHowlCooldownTimer < 0) this.savageHowlCooldownTimer=0;}
                 }
+                if (this.berserkerRagePercentage > 50) {
+                    this.berserkerRageHighDurationTimer += dt;
+                    if (this.berserkerRageHighDurationTimer >= 120000 && signalAchievementEvent) { // 2 minutes
+                        signalAchievementEvent("sustained_fury_berserker", { // Using a generic event for now
+                            path: "berserker",
+                            stat: "berserkerRageHighDurationTimer",
+                            durationMs: this.berserkerRageHighDurationTimer
+                        });
+                    }
+                } else {
+                    this.berserkerRageHighDurationTimer = 0;
+                }
             }
 
 
@@ -429,7 +446,9 @@ export class Player {
                 if (playerIsActuallyMoving) {
                     this.kineticCharge = Math.min(100, this.kineticCharge + this.baseKineticChargeRate * (dt / 1000));
                 }
+                // Kinetic Cascade check moved to consumeKineticChargeForDamageBoost
             }
+
 
             if (this.currentPath === 'berserker') {
                 const missingHpPercentage = Math.max(0, (this.maxHp - this.hp) / this.maxHp);
@@ -524,7 +543,7 @@ export class Player {
                             );
 
                             if (this.kineticConversionLevel > 0 && this.kineticCharge >= this.kineticChargeConsumption) {
-                                const damageMultiplier = this.consumeKineticChargeForDamageBoost();
+                                const damageMultiplier = this.consumeKineticChargeForDamageBoost('primary_fire'); // For Kinetic Cascade
                                 ray.momentumDamageBonusValue = (ray.momentumDamageBonusValue || 0) + (damageMultiplier - 1);
                                  if (ui && ui.updateKineticChargeUI) {
                                     let maxPotencyBonusAtFullCharge = this.initialKineticDamageBonus;
@@ -660,6 +679,7 @@ export class Player {
         this.hasAegisPathHelm = false;
         this.berserkerPermanentRayDamageMultiplier = 1.0;
         this.berserkerRagePercentage = 0;
+        this.berserkerRageHighDurationTimer = 0;
         this.aegisRamCooldownTimer = 0;
 
         this.activeAbilities = { '1': null, '2': null, '3': null };
@@ -704,8 +724,17 @@ export class Player {
         this.damageTakenThisBossFight = 0;
         this.teleportTimestamps = [];
         this.eventDataForNextSignal = {};
+        this.heartsCollectedThisRun = 0;
+        this.bonusPointsCollectedThisRun = 0;
+        this.nexusMinionsKilledThisNexusT3Fight = 0;
+        this.recentKineticBoosts = [];
     }
 
+    incrementNexusMinionsKilledThisFight() {
+        this.nexusMinionsKilledThisNexusT3Fight = (this.nexusMinionsKilledThisNexusT3Fight || 0) + 1;
+    }
+
+    // ... (drawHpBar, draw, drawFromSnapshot methods remain unchanged)
     drawHpBar(ctx) {
         if (!this || typeof this.hp === 'undefined' || typeof this.maxHp === 'undefined' || typeof this.radius === 'undefined' || isNaN(this.radius)) {
             return;
@@ -1279,7 +1308,7 @@ export class Player {
         if (updateHealthDisplayCallback) updateHealthDisplayCallback(this.hp, this.maxHp);
     }
 
-    consumeKineticChargeForDamageBoost() {
+    consumeKineticChargeForDamageBoost(abilityType = 'unknown') {
         if (this.kineticCharge <= 0 || this.kineticConversionLevel <= 0) return 1.0;
         let chargeToConsume = Math.min(this.kineticCharge, this.kineticChargeConsumption);
         let effectScale = chargeToConsume / this.kineticChargeConsumption;
@@ -1290,6 +1319,31 @@ export class Player {
         let finalDamageMultiplier = 1.0 + currentPotencyBonus;
 
         this.kineticCharge -= chargeToConsume;
+
+        if (this.currentPath === 'mage' && abilityType !== 'unknown' && finalDamageMultiplier > 1.0) {
+            this.recentKineticBoosts.push({ type: abilityType, timestamp: Date.now() });
+            if (this.recentKineticBoosts.length > 15) {
+                this.recentKineticBoosts.shift();
+            }
+            
+            // Check for Kinetic Cascade achievement here
+            const now = Date.now();
+            const recentBoostsFiltered = this.recentKineticBoosts.filter(boost => now - boost.timestamp < 30000);
+            let typesPresent = new Set();
+            recentBoostsFiltered.forEach(b => {
+                if (b.type === 'omegaLaser_LMB_Mage') typesPresent.add('LMB');
+                else if (b.type === 'numeric_miniGravityWell_detonate') typesPresent.add('RMB_Well'); // Assuming Mini Gravity Well is numeric slot 2
+                else if (b.type.startsWith('numeric_') && b.type !== 'numeric_miniGravityWell_detonate') typesPresent.add('Numeric');
+            });
+
+            if (typesPresent.size >= 3) {
+                if (GameState && GameState.isGameRunning && GameState.isGameRunning() && _mainCallbacks && _mainCallbacks.signalAchievementEvent) {
+                     _mainCallbacks.signalAchievementEvent("event_kinetic_cascade_mage");
+                }
+                this.recentKineticBoosts = []; // Reset after achieving
+            }
+        }
+
         return finalDamageMultiplier;
     }
 
@@ -1346,7 +1400,7 @@ export class Player {
 
         if (ability.id === 'miniGravityWell') {
             if (this.activeMiniWell && this.activeMiniWell.isActive) {
-                this.currentGravityWellKineticBoost = this.consumeKineticChargeForDamageBoost();
+                this.currentGravityWellKineticBoost = this.consumeKineticChargeForDamageBoost(`numeric_${ability.id}_detonate`);
                 this.activeMiniWell.detonate({ targetX: abilityContext.mouseX, targetY: abilityContext.mouseY, player: this });
                 ability.cooldownTimer = effectiveCooldownToSet; ability.justBecameReady = false; abilityUsedSuccessfully = true;
 
@@ -1358,16 +1412,19 @@ export class Player {
             } else if (ability.cooldownTimer <= 0) {
                 this.deployMiniGravityWell(ability.duration, abilityContext.decoysArray, abilityContext.mouseX, abilityContext.mouseY);
                 if (this.activeMiniWell) { abilityUsedSuccessfully = true; ability.cooldownTimer = effectiveCooldownToSet; ability.justBecameReady = false; }
+                if (abilityUsedSuccessfully && this.kineticCharge >= this.kineticChargeConsumption) this.consumeKineticChargeForDamageBoost(`numeric_${ability.id}_deploy`);
             }
         } else if (ability.cooldownTimer <= 0) {
             switch (ability.id) {
                 case 'teleport':
                     this.doTeleport(abilityContext.bossDefeatEffectsArray, abilityContext.mouseX, abilityContext.mouseY, abilityContext.canvasWidth, abilityContext.canvasHeight, targets, signalAchievementEvent);
                     ability.cooldownTimer = effectiveCooldownToSet; abilityUsedSuccessfully = true;
+                     if (abilityUsedSuccessfully && this.kineticCharge >= this.kineticChargeConsumption) this.consumeKineticChargeForDamageBoost(`numeric_${ability.id}`);
                     break;
                 case 'empBurst':
                     this.triggerEmpBurst(abilityContext.bossDefeatEffectsArray, abilityContext.allRays, abilityContext.screenShakeParams, abilityContext.canvasWidth, abilityContext.canvasHeight, activeBosses);
                     ability.cooldownTimer = effectiveCooldownToSet; abilityUsedSuccessfully = true;
+                    if (abilityUsedSuccessfully && this.kineticCharge >= this.kineticChargeConsumption) this.consumeKineticChargeForDamageBoost(`numeric_${ability.id}`);
                     break;
             }
              if(abilityUsedSuccessfully) ability.justBecameReady = false;
@@ -1483,7 +1540,7 @@ export class Player {
             this.isFiringOmegaLaser = true; this.omegaLaserTimer = this.omegaLaserDuration; this.omegaLaserCurrentTickTimer = 0;
             playSound(omegaLaserSound, true);
             if(abilityContext.activeBuffNotificationsArray) abilityContext.activeBuffNotificationsArray.push({ text: `Omega Laser Firing!`, timer: this.omegaLaserDuration });
-            this.currentOmegaLaserKineticBoost = this.consumeKineticChargeForDamageBoost();
+            this.currentOmegaLaserKineticBoost = this.consumeKineticChargeForDamageBoost('omegaLaser_LMB_Mage');
             this.procTemporalEcho('omegaLaser_LMB_Mage', abilityContext);
             if (abilityContext && abilityContext.updateAbilityCooldownCallback) abilityContext.updateAbilityCooldownCallback(this);
         }
@@ -1668,7 +1725,6 @@ export class Player {
             activeBossesArray.forEach(boss => {
                 if (boss && boss.health > 0 && isLineSegmentIntersectingCircle(beamStartX, beamStartY, beamEndX, beamEndY, boss.x, boss.y, boss.radius + this.omegaLaserWidth / 2)) {
                     if (typeof boss.takeDamage === 'function') {
-                        // Pass context for damage source tracking
                         const dmgDone = boss.takeDamage(finalDamagePerTick, null, this, {isAbility: true, abilityType: 'omegaLaser'});
                         if(dmgDone > 0) this.totalDamageDealt += dmgDone;
                     }
@@ -1689,7 +1745,6 @@ export class Player {
             activeBossesArray.forEach(boss => {
                 if (Math.hypot(this.x - boss.x, this.y - boss.y) < AEGIS_CHARGE_AOE_RADIUS + boss.radius) {
                     if (boss.takeDamage) {
-                        // Pass context for damage source tracking
                         const dmgDone = boss.takeDamage(baseDamage, null, this, {isAbility: true, abilityType: 'aegisCharge'});
                         if (dmgDone > 0) {
                              this.totalDamageDealt += dmgDone;
