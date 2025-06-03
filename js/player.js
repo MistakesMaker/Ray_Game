@@ -58,7 +58,7 @@ const AEGIS_RAM_COOLDOWN = 1000;
 // Aegis Charge Visual Constants
 const AEGIS_CHARGE_INDICATOR_RADIUS_OFFSET = 8;
 const AEGIS_CHARGE_INDICATOR_LINE_WIDTH = 5;
-const AEGIS_CHARGE_INDICATOR_COLOR_CHARGING = 'rgba(100, 180, 255, 0.7)';
+const AEGIS_CHARGE_INDICATOR_COLOR_CHARGING = 'rgba(100, 180, 255, 0.7)'; // Default if no immune colors
 const AEGIS_CHARGE_INDICATOR_COLOR_FULL = 'rgba(255, 215, 0, 0.9)';
 const AEGIS_CHARGE_READY_PULSE_COLOR = 'rgba(100, 180, 255, 0.3)';
 
@@ -208,10 +208,10 @@ export class Player {
         this.damageTakenThisBossFight = 0;
         this.teleportTimestamps = [];
         this.eventDataForNextSignal = {};
-        this.heartsCollectedThisRun = 0; // For The Unpicker achievement
-        this.bonusPointsCollectedThisRun = 0; // For The Unpicker achievement
-        this.nexusMinionsKilledThisNexusT3Fight = 0; // For Pacifist Lord achievement
-        this.recentKineticBoosts = []; // For Kinetic Cascade achievement
+        this.heartsCollectedThisRun = 0; 
+        this.bonusPointsCollectedThisRun = 0; 
+        this.nexusMinionsKilledThisNexusT3Fight = 0; 
+        this.recentKineticBoosts = []; 
 
 
         this.update = (gameContext) => {
@@ -382,7 +382,7 @@ export class Player {
                 if (this.berserkerRagePercentage > 50) {
                     this.berserkerRageHighDurationTimer += dt;
                     if (this.berserkerRageHighDurationTimer >= 120000 && signalAchievementEvent) { // 2 minutes
-                        signalAchievementEvent("sustained_fury_berserker", { // Using a generic event for now
+                        signalAchievementEvent("sustained_fury_berserker", { 
                             path: "berserker",
                             stat: "berserkerRageHighDurationTimer",
                             durationMs: this.berserkerRageHighDurationTimer
@@ -730,11 +730,10 @@ export class Player {
         this.recentKineticBoosts = [];
     }
 
-    incrementNexusMinionsKilledThisFight() {
+    incrementNexusMinionsKilledThisFight() { 
         this.nexusMinionsKilledThisNexusT3Fight = (this.nexusMinionsKilledThisNexusT3Fight || 0) + 1;
     }
 
-    // ... (drawHpBar, draw, drawFromSnapshot methods remain unchanged)
     drawHpBar(ctx) {
         if (!this || typeof this.hp === 'undefined' || typeof this.maxHp === 'undefined' || typeof this.radius === 'undefined' || isNaN(this.radius)) {
             return;
@@ -864,30 +863,56 @@ export class Player {
         }
         ctx.restore();
 
+        // MODIFIED Aegis Charge Indicator
         if (this.currentPath === 'aegis' && this.hasAegisCharge) {
             const indicatorVisualRadius = this.radius + AEGIS_CHARGE_INDICATOR_RADIUS_OFFSET;
-            if (this.isChargingAegisCharge) {
+            ctx.lineWidth = AEGIS_CHARGE_INDICATOR_LINE_WIDTH;
+            const now = Date.now(); // Ensure 'now' is defined for pulse animations
+
+            if (this.isChargingAegisCharge) { // Player is actively holding down LMB to charge
                 const chargeProgress = Math.min(1, this.aegisChargeCurrentChargeTime / AEGIS_CHARGE_MAX_CHARGE_TIME);
                 const endAngle = -Math.PI / 2 + (chargeProgress * Math.PI * 2);
+                
+                if (this.immuneColorsList.length > 0) {
+                    const numColors = this.immuneColorsList.length;
+                    const segmentAngleTotal = endAngle - (-Math.PI / 2); // Total angle of the charge bar so far
+                    const segmentAnglePerColor = segmentAngleTotal / numColors;
+                    let currentSegmentStartAngle = -Math.PI / 2;
 
-                ctx.beginPath();
-                ctx.arc(0, 0, indicatorVisualRadius, -Math.PI / 2, endAngle);
-                ctx.strokeStyle = chargeProgress >= 1 ? AEGIS_CHARGE_INDICATOR_COLOR_FULL : AEGIS_CHARGE_INDICATOR_COLOR_CHARGING;
-                ctx.lineWidth = AEGIS_CHARGE_INDICATOR_LINE_WIDTH;
-                ctx.stroke();
+                    for (let i = 0; i < numColors; i++) {
+                        const color = this.immuneColorsList[i];
+                        const segmentEnd = currentSegmentStartAngle + segmentAnglePerColor;
+                        
+                        // Draw segment only if it has a positive angle
+                        if (segmentEnd > currentSegmentStartAngle) {
+                            ctx.beginPath();
+                            ctx.arc(0, 0, indicatorVisualRadius, currentSegmentStartAngle, segmentEnd);
+                            ctx.strokeStyle = chargeProgress >= 1 ? AEGIS_CHARGE_INDICATOR_COLOR_FULL : color;
+                            ctx.stroke();
+                        }
+                        currentSegmentStartAngle = segmentEnd;
+                         if (currentSegmentStartAngle >= endAngle - 0.001) break; // Epsilon for float precision
+                    }
+                } else { // Default color if no immunities
+                    ctx.beginPath();
+                    ctx.arc(0, 0, indicatorVisualRadius, -Math.PI / 2, endAngle);
+                    ctx.strokeStyle = chargeProgress >= 1 ? AEGIS_CHARGE_INDICATOR_COLOR_FULL : AEGIS_CHARGE_INDICATOR_COLOR_CHARGING;
+                    ctx.stroke();
+                }
 
-                if (chargeProgress >= 1) {
+                if (chargeProgress >= 1) { // Full charge pulse (gold)
                     ctx.beginPath();
                     ctx.arc(0, 0, indicatorVisualRadius, 0, Math.PI * 2);
                     ctx.strokeStyle = `rgba(255, 215, 0, ${0.5 + Math.abs(Math.sin(now / 150)) * 0.4})`;
-                    ctx.lineWidth = AEGIS_CHARGE_INDICATOR_LINE_WIDTH + 2;
+                    ctx.lineWidth = AEGIS_CHARGE_INDICATOR_LINE_WIDTH + 2; // Slightly thicker pulse
                     ctx.stroke();
                 }
-            } else if (this.aegisChargeCooldownTimer <= 0 && !this.isAegisChargingDash) {
+            } else if (this.aegisChargeCooldownTimer <= 0 && !this.isAegisChargingDash) { // Ready to use (idle pulse)
                 ctx.beginPath();
                 ctx.arc(0, 0, indicatorVisualRadius, 0, Math.PI * 2);
-                ctx.strokeStyle = `rgba(100, 180, 255, ${0.15 + Math.abs(Math.sin(now / 300)) * 0.15})`;
-                ctx.lineWidth = AEGIS_CHARGE_INDICATOR_LINE_WIDTH -1;
+                // Use the original simpler ready pulse color
+                ctx.strokeStyle = `rgba(100, 180, 255, ${0.15 + Math.abs(Math.sin(now / 300)) * 0.15})`; 
+                ctx.lineWidth = AEGIS_CHARGE_INDICATOR_LINE_WIDTH - 1;
                 ctx.stroke();
             }
         }
@@ -1322,17 +1347,16 @@ export class Player {
 
         if (this.currentPath === 'mage' && abilityType !== 'unknown' && finalDamageMultiplier > 1.0) {
             this.recentKineticBoosts.push({ type: abilityType, timestamp: Date.now() });
-            if (this.recentKineticBoosts.length > 15) {
+            if (this.recentKineticBoosts.length > 15) { 
                 this.recentKineticBoosts.shift();
             }
             
-            // Check for Kinetic Cascade achievement here
             const now = Date.now();
             const recentBoostsFiltered = this.recentKineticBoosts.filter(boost => now - boost.timestamp < 30000);
             let typesPresent = new Set();
             recentBoostsFiltered.forEach(b => {
                 if (b.type === 'omegaLaser_LMB_Mage') typesPresent.add('LMB');
-                else if (b.type === 'numeric_miniGravityWell_detonate') typesPresent.add('RMB_Well'); // Assuming Mini Gravity Well is numeric slot 2
+                else if (b.type === 'numeric_miniGravityWell_detonate') typesPresent.add('RMB_Well'); 
                 else if (b.type.startsWith('numeric_') && b.type !== 'numeric_miniGravityWell_detonate') typesPresent.add('Numeric');
             });
 
@@ -1340,7 +1364,7 @@ export class Player {
                 if (GameState && GameState.isGameRunning && GameState.isGameRunning() && _mainCallbacks && _mainCallbacks.signalAchievementEvent) {
                      _mainCallbacks.signalAchievementEvent("event_kinetic_cascade_mage");
                 }
-                this.recentKineticBoosts = []; // Reset after achieving
+                this.recentKineticBoosts = []; 
             }
         }
 
