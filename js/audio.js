@@ -150,7 +150,8 @@ export function applyMusicPlayState(
             isPausedForPopup ||
             (currentVisibleScreen && currentVisibleScreen.id === 'startScreen') ||
             (currentVisibleScreen && currentVisibleScreen.id === 'settingsScreen') ||
-            (currentVisibleScreen && currentVisibleScreen.id === 'detailedHighScoresScreen')
+            (currentVisibleScreen && currentVisibleScreen.id === 'detailedHighScoresScreen') ||
+            (currentVisibleScreen && currentVisibleScreen.id === 'achievementsScreen') // <<< ADDED THIS LINE
         );
 
     if (shouldPlayMusic) {
