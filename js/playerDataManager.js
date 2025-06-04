@@ -48,7 +48,7 @@ function getFormattedAbilitiesForStats(playerInstance, bossLootPoolRef) {
             mouseAbilities.push({
                 name: "Aegis Charge (LMB)",
                 description: `CD: ${(effectiveCooldown / 1000).toFixed(1)}s, Max Charge: ${(CONSTANTS.AEGIS_CHARGE_MAX_CHARGE_TIME / 1000).toFixed(1)}s`,
-                damage: `Impact AoE`, // Damage scales, complex to show simply
+                damage: `Impact AoE`, 
                 isMouseAbility: true
             });
         }
@@ -103,7 +103,6 @@ function getFormattedAbilitiesForStats(playerInstance, bossLootPoolRef) {
                     let baseCooldown = definition.cooldown;
                     let currentEffectDescription = "";
 
-                    // Mage path Ultimate Configuration increases cooldowns of numeric abilities
                     if (playerInstance.currentPath === 'mage') {
                         baseCooldown *= 1.5;
                     }
@@ -161,7 +160,9 @@ export function createFinalStatsSnapshot(playerInstance, bossTiers, bossLootPool
     if (!playerInstance) {
         const defaultRunStats = { timesHit: 0, totalDamageDealt: 0, gameplayTime: 0 };
         const defaultPlayerCoreStats = {
-            hp: PLAYER_MAX_HP, maxHp: PLAYER_MAX_HP, finalRadius: PLAYER_BASE_RADIUS,
+            hp: PLAYER_MAX_HP, maxHp: PLAYER_MAX_HP, 
+            hpRegenPerTick: CONSTANTS.HP_REGEN_BASE_AMOUNT || 1, // Default base regen
+            finalRadius: PLAYER_BASE_RADIUS,
             damageTakenMultiplier: 1.0,
             rayDamageBonus: 0, chainReactionChance: 0,
             rayCritChance: 0, rayCritDamageMultiplier: 1.5,
@@ -197,9 +198,13 @@ export function createFinalStatsSnapshot(playerInstance, bossTiers, bossLootPool
         totalDamageDealt: playerInstance.totalDamageDealt,
         gameplayTime: GameState.getGameplayTimeElapsed()
     };
+
+    const currentHpRegen = (playerInstance.baseHpRegenAmount + playerInstance.hpRegenBonusFromEvolution) * playerInstance.hpRegenPathMultiplier;
+
     const playerCoreStats = {
         hp: playerInstance.hp,
         maxHp: playerInstance.maxHp,
+        hpRegenPerTick: currentHpRegen, // <<< ADDED HP REGEN
         finalRadius: playerInstance.radius,
         damageTakenMultiplier: playerInstance.damageTakenMultiplier,
         rayDamageBonus: playerInstance.rayDamageBonus || 0,
@@ -234,6 +239,14 @@ export function createFinalStatsSnapshot(playerInstance, bossTiers, bossLootPool
             }
         }
     });
+    // Explicitly add Vitality Surge's effect string if it has levels, as it might not be caught by the generic loop
+    if (playerInstance.hpRegenBonusFromEvolution > 0 && !playerCoreStats.evolutions["Vitality Surge"]) {
+        const vitalityEvo = masterEvolutionListWithFunctions.find(e => e.id === 'vitalitySurge');
+        if(vitalityEvo && typeof vitalityEvo.getEffectString === 'function') {
+            playerCoreStats.evolutions["Vitality Surge"] = vitalityEvo.getEffectString(playerInstance);
+        }
+    }
+
 
     const immunities = [...playerInstance.immuneColorsList];
     const gear = prepareGearForStats(playerInstance, bossLootPoolRef, lootManagerRef);

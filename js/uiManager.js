@@ -18,7 +18,7 @@ import {
     evolutionOptionsContainer,
     closeFreeUpgradeButton, freeUpgradeOptionContainer,
     lootOptionsContainer, abilityCooldownUI, evolutionTooltip,
-    pausePlayerStatsPanel, // Correctly destructured here
+    pausePlayerStatsPanel, 
     kineticChargeUIElement, kineticChargeBarFillElement, kineticChargeTextElement,
     berserkerRageUIElement, berserkerRageBarFillElement, berserkerRageTextElement,
     uiHighScoreContainer,
@@ -444,13 +444,12 @@ export function showScreen(screenElementToShow) {
     if (screenElementToShow === importedDetailedHighScoresScreen) {
         if (statsPanelWrapper && pausePlayerStatsPanel && pausePlayerStatsPanel.parentElement !== statsPanelWrapper) {
             statsPanelWrapper.innerHTML = '';
-            statsPanelWrapper.appendChild(pausePlayerStatsPanel); // Use the destructured pausePlayerStatsPanel
+            statsPanelWrapper.appendChild(pausePlayerStatsPanel); 
         }
         startOrUpdatePreviewAnimation(null);
     } else {
-        // Ensure pausePlayerStatsPanel is defined before trying to access parentElement or appendChild
         if (pausePlayerStatsPanel && pausePlayerStatsPanel.parentElement !== document.body) {
-             document.body.appendChild(pausePlayerStatsPanel); // Use the destructured pausePlayerStatsPanel
+             document.body.appendChild(pausePlayerStatsPanel); 
         }
         if (screenElementToShow !== importedPauseScreen && screenElementToShow !== importedGameOverScreen) {
             if (pausePlayerStatsPanel) pausePlayerStatsPanel.style.display = 'none';
@@ -1009,7 +1008,9 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText) {
             gameplayTime: statsSnapshot.gameplayTimeData
         };
         playerCoreStats = {
-            hp: oldPlayerData.hp, maxHp: oldPlayerData.maxHp, finalRadius: oldPlayerData.finalRadius,
+            hp: oldPlayerData.hp, maxHp: oldPlayerData.maxHp, 
+            hpRegenPerTick: (oldPlayerData.baseHpRegenAmount || 1) + (oldPlayerData.hpRegenBonusFromEvolution || 0) * (oldPlayerData.hpRegenPathMultiplier || 1.0),
+            finalRadius: oldPlayerData.finalRadius,
             damageTakenMultiplier: oldPlayerData.damageTakenMultiplier !== undefined ? oldPlayerData.damageTakenMultiplier : 1.0,
             rayDamageBonus: oldPlayerData.rayDamageBonus || 0,
             chainReactionChance: oldPlayerData.chainReactionChance || 0,
@@ -1084,6 +1085,7 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText) {
 
     let coreHTML = '';
     coreHTML += `<p><span class="stat-label">Max HP:</span><span class="stat-value">${formatInt(playerCoreStats.maxHp)}</span></p>`;
+    coreHTML += `<p><span class="stat-label">HP Regen:</span><span class="stat-value">${formatNum(playerCoreStats.hpRegenPerTick || 0, 1)}/tick</span></p>`; // <<< ADDED HP REGEN DISPLAY
     coreHTML += `<p><span class="stat-label">Player Size:</span><span class="stat-value">${formatNum(playerCoreStats.finalRadius)}</span></p>`;
     coreHTML += `<p><span class="stat-label">Damage Reduction:</span><span class="stat-value">${formatPercent(1 - (playerCoreStats.damageTakenMultiplier !== undefined ? playerCoreStats.damageTakenMultiplier : 1.0))}</span></p>`;
     coreHTML += `<p><span class="stat-label">Ray Damage Bonus:</span><span class="stat-value">${formatNum(playerCoreStats.rayDamageBonus || 0)}</span></p>`;
@@ -1100,8 +1102,8 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText) {
         if(playerCoreStats.evolutions["System Overcharge"]){
             coreHTML += `<p><span class="stat-label">System Overcharge:</span><span class="stat-value">${playerCoreStats.evolutions["System Overcharge"]}</span></p>`;
         }
-        if(playerCoreStats.evolutions["Vitality Surge"]){
-            coreHTML += `<p><span class="stat-label">Vitality Surge:</span><span class="stat-value">${playerCoreStats.evolutions["Vitality Surge"]}</span></p>`;
+        if(playerCoreStats.evolutions["Vitality Surge"]){ // This might be redundant if hpRegenPerTick already includes it, but can be kept for clarity of the evo itself
+            coreHTML += `<p><span class="stat-label">Vitality Surge Evo:</span><span class="stat-value">${playerCoreStats.evolutions["Vitality Surge"]}</span></p>`;
         }
         if (typeof playerCoreStats.evolutions["Evasive Maneuver"] === 'number') {
             coreHTML += `<p><span class="stat-label">Evasive Maneuver:</span><span class="stat-value">Taken x${playerCoreStats.evolutions["Evasive Maneuver"]}</span></p>`;
