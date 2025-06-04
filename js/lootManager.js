@@ -53,7 +53,7 @@ export function initializeLootPools(playerInstance, updateBuffIndicatorCallback)
             id: 'aegisPath', 
             type: 'path_buff',
             name: 'Aegis Path',
-            description: `Evolve into a spiked juggernaut, a living battering ram. Colliding with bosses damages and knocks them back. Grants a fortified, spiky appearance. LMB: Hold to charge, release to dash. RMB: AoE Seismic Slam.`, 
+            description: `Evolve into a spiked juggernaut, a living battering ram. HP Regeneration is 50% more effective. Colliding with bosses damages and knocks them back. Grants a fortified, spiky appearance. LMB: Hold to charge, release to dash. RMB: AoE Seismic Slam.`, // MODIFIED DESCRIPTION
             grants_LMB: 'aegisCharge',
             grants_RMB: 'seismicSlam'
         },
@@ -117,7 +117,7 @@ export function presentLootUI(choices, playerInstance, dependencies, isFirstBoss
         return;
     }
 
-    _currentLootUIDependencies = dependencies; // <<< CORRECTED CASING HERE
+    _currentLootUIDependencies = dependencies;
 
     const title = isFirstBossLoot ? "Forge Your Path!" : "Salvaged Technology!";
     const description = isFirstBossLoot
@@ -194,7 +194,8 @@ function confirmPathSelection(chosenPathBuff, playerInstance) {
     playerInstance.hasBloodpact = false;
     playerInstance.hasSavageHowl = false;
     
-    playerInstance.berserkerPermanentRayDamageMultiplier = 1.0; // Reset permanent multiplier
+    playerInstance.berserkerPermanentRayDamageMultiplier = 1.0; 
+    playerInstance.hpRegenPathMultiplier = 1.0; // Reset for all paths first
 
     // Reset Kinetic Conversion before setting for Mage
     playerInstance.kineticConversionLevel = 0;
@@ -207,12 +208,13 @@ function confirmPathSelection(chosenPathBuff, playerInstance) {
     if (chosenPathBuff.id === 'aegisPath') {
         playerInstance.currentPath = 'aegis';
         playerInstance.hasAegisPathHelm = true;
+        playerInstance.hpRegenPathMultiplier = 1.5; // <<< SET HP REGEN BOOST FOR AEGIS
         if (chosenPathBuff.grants_LMB === 'aegisCharge') playerInstance.hasAegisCharge = true;
         if (chosenPathBuff.grants_RMB === 'seismicSlam') playerInstance.hasSeismicSlam = true;
     } else if (chosenPathBuff.id === 'berserkersEcho') {
         playerInstance.currentPath = 'berserker';
         playerInstance.hasBerserkersEchoHelm = true;
-        playerInstance.berserkerPermanentRayDamageMultiplier = 1.5; // Apply permanent multiplier
+        playerInstance.berserkerPermanentRayDamageMultiplier = 1.5; 
         if (chosenPathBuff.grants_LMB === 'bloodpact') playerInstance.hasBloodpact = true;
         if (chosenPathBuff.grants_RMB === 'savageHowl') playerInstance.hasSavageHowl = true;
     } else if (chosenPathBuff.id === 'ultimateConfiguration') {
@@ -224,8 +226,8 @@ function confirmPathSelection(chosenPathBuff, playerInstance) {
         playerInstance.kineticConversionLevel = 1; 
         playerInstance.baseKineticChargeRate = CONSTANTS.KINETIC_BASE_CHARGE_RATE;
         playerInstance.initialKineticDamageBonus = CONSTANTS.KINETIC_INITIAL_DAMAGE_BONUS;
-        playerInstance.magePathTimeElapsed = 0; // Start timer for scaling
-        playerInstance.kineticConversionScaleTimer = 0; // Start timer for scaling interval
+        playerInstance.magePathTimeElapsed = 0; 
+        playerInstance.kineticConversionScaleTimer = 0; 
         
     } else {
         console.error("[LootManager] Unknown path ID chosen during confirmation:", chosenPathBuff.id);

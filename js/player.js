@@ -1,7 +1,7 @@
 // js/player.js
 import {
     PLAYER_BASE_RADIUS, MIN_PLAYER_BASE_RADIUS, PLAYER_BASE_COLOR, PLAYER_MAX_HP,
-    RAY_DAMAGE_TO_PLAYER, HP_REGEN_NO_DAMAGE_THRESHOLD, HP_REGEN_INTERVAL, PLAYER_SPEED_BASE,
+    RAY_DAMAGE_TO_PLAYER, HP_REGEN_PER_PICKUP, HP_REGEN_NO_DAMAGE_THRESHOLD, HP_REGEN_INTERVAL, PLAYER_SPEED_BASE,
     PLAYER_AIM_INDICATOR_LENGTH, TELEPORT_IMMUNITY_DURATION,
     OMEGA_LASER_DURATION, OMEGA_LASER_COOLDOWN, OMEGA_LASER_TICK_INTERVAL, OMEGA_LASER_DAMAGE_PER_TICK,
     OMEGA_LASER_RANGE, OMEGA_LASER_WIDTH,
@@ -58,7 +58,7 @@ const AEGIS_RAM_COOLDOWN = 1000;
 // Aegis Charge Visual Constants
 const AEGIS_CHARGE_INDICATOR_RADIUS_OFFSET = 8;
 const AEGIS_CHARGE_INDICATOR_LINE_WIDTH = 5;
-const AEGIS_CHARGE_INDICATOR_COLOR_CHARGING = 'rgba(100, 180, 255, 0.7)'; // Default if no immune colors
+const AEGIS_CHARGE_INDICATOR_COLOR_CHARGING = 'rgba(100, 180, 255, 0.7)'; 
 const AEGIS_CHARGE_INDICATOR_COLOR_FULL = 'rgba(255, 215, 0, 0.9)';
 const AEGIS_CHARGE_READY_PULSE_COLOR = 'rgba(100, 180, 255, 0.3)';
 
@@ -114,6 +114,7 @@ export class Player {
         this.timeSinceLastHit = Number.MAX_SAFE_INTEGER;
         this.hpRegenTimer = 0; this.baseHpRegenAmount = 1;
         this.hpRegenBonusFromEvolution = 0;
+        this.hpRegenPathMultiplier = 1.0; 
         this.acquiredBossUpgrades = [];
         this.acquiredEvolutions = [];
 
@@ -381,7 +382,7 @@ export class Player {
                 }
                 if (this.berserkerRagePercentage > 50) {
                     this.berserkerRageHighDurationTimer += dt;
-                    if (this.berserkerRageHighDurationTimer >= 120000 && signalAchievementEvent) { // 2 minutes
+                    if (this.berserkerRageHighDurationTimer >= 120000 && signalAchievementEvent) { 
                         signalAchievementEvent("sustained_fury_berserker", { 
                             path: "berserker",
                             stat: "berserkerRageHighDurationTimer",
@@ -446,7 +447,6 @@ export class Player {
                 if (playerIsActuallyMoving) {
                     this.kineticCharge = Math.min(100, this.kineticCharge + this.baseKineticChargeRate * (dt / 1000));
                 }
-                // Kinetic Cascade check moved to consumeKineticChargeForDamageBoost
             }
 
 
@@ -543,7 +543,7 @@ export class Player {
                             );
 
                             if (this.kineticConversionLevel > 0 && this.kineticCharge >= this.kineticChargeConsumption) {
-                                const damageMultiplier = this.consumeKineticChargeForDamageBoost('primary_fire'); // For Kinetic Cascade
+                                const damageMultiplier = this.consumeKineticChargeForDamageBoost('primary_fire'); 
                                 ray.momentumDamageBonusValue = (ray.momentumDamageBonusValue || 0) + (damageMultiplier - 1);
                                  if (ui && ui.updateKineticChargeUI) {
                                     let maxPotencyBonusAtFullCharge = this.initialKineticDamageBonus;
@@ -566,7 +566,8 @@ export class Player {
                 this.hpRegenTimer += dt;
                 if (this.hpRegenTimer >= HP_REGEN_INTERVAL) {
                     this.hpRegenTimer -= HP_REGEN_INTERVAL;
-                    this.gainHealth(this.baseHpRegenAmount + this.hpRegenBonusFromEvolution, updateHealthDisplayCallback);
+                    const regenAmount = (this.baseHpRegenAmount + this.hpRegenBonusFromEvolution) * this.hpRegenPathMultiplier;
+                    this.gainHealth(regenAmount, updateHealthDisplayCallback);
                 }
             }
         };
@@ -574,12 +575,12 @@ export class Player {
         this.handleAegisCollisionWithBoss = (boss, gameContext) => {
             if (!this.hasAegisPathHelm || !boss || boss.health <= 0 || this.currentPath !== 'aegis') return;
 
-            if (this.aegisRamCooldownTimer > 0) {
-                return;
+            if (this.aegisRamCooldownTimer > 0) { 
+                return false; 
             }
             this.aegisRamCooldownTimer = AEGIS_RAM_COOLDOWN;
 
-            if (boss.lastHitByAegisTimer && (Date.now() - boss.lastHitByAegisTimer < 200) ) return;
+            if (boss.lastHitByAegisTimer && (Date.now() - boss.lastHitByAegisTimer < 200) ) return false;
 
             let collisionDamage = AEGIS_PATH_BASE_COLLISION_DAMAGE;
             collisionDamage += (this.maxHp * AEGIS_PATH_MAX_HP_SCALING_FACTOR);
@@ -611,9 +612,12 @@ export class Player {
                 if (typeof boss.recoilVelX === 'number' && typeof boss.recoilVelY === 'number') {
                     boss.recoilVelX += Math.cos(angleToBoss) * knockbackForce;
                     boss.recoilVelY += Math.sin(angleToBoss) * knockbackForce;
-                    if (typeof boss.playerCollisionStunTimer === 'number' && typeof boss.PLAYER_COLLISION_STUN_DURATION === 'number') {
-                        boss.playerCollisionStunTimer = Math.max(boss.playerCollisionStunTimer, boss.PLAYER_COLLISION_STUN_DURATION * 0.3);
+                    if (typeof boss.playerCollisionStunTimer === 'number' && typeof boss.PLAYER_COLLISION_STUN_DURATION === 'number') { 
+                        boss.playerCollisionStunTimer = Math.max(boss.playerCollisionStunTimer, (boss.PLAYER_COLLISION_STUN_DURATION || boss.AEGIS_PASSIVE_BOSS_STUN_DURATION || 200) * 0.3);
                         if(typeof boss.speed === 'number') boss.speed = 0;
+                    } else if (typeof boss.playerCollisionStunTimer === 'number' && typeof boss.AEGIS_PASSIVE_BOSS_STUN_DURATION === 'number') { 
+                         boss.playerCollisionStunTimer = Math.max(boss.playerCollisionStunTimer, boss.AEGIS_PASSIVE_BOSS_STUN_DURATION);
+                         if(typeof boss.speed === 'number') boss.speed = 0;
                     }
                 } else {
                     boss.x += Math.cos(angleToBoss) * knockbackForce * 0.1;
@@ -624,6 +628,7 @@ export class Player {
             const angleFromBoss = Math.atan2(this.y - boss.y, this.x - boss.x);
             this.velX += Math.cos(angleFromBoss) * AEGIS_PATH_BOSS_KNOCKBACK_FORCE * AEGIS_PATH_PLAYER_SELF_KNOCKBACK_FACTOR;
             this.velY += Math.sin(angleFromBoss) * AEGIS_PATH_BOSS_KNOCKBACK_FORCE * AEGIS_PATH_PLAYER_SELF_KNOCKBACK_FACTOR;
+            return true; 
         };
     }
 
@@ -671,6 +676,7 @@ export class Player {
         this.timeSinceLastHit = Number.MAX_SAFE_INTEGER;
         this.hpRegenTimer = 0;
         this.hpRegenBonusFromEvolution = 0;
+        this.hpRegenPathMultiplier = 1.0; 
         this.acquiredBossUpgrades = [];
 
         this.currentPath = null;
@@ -760,7 +766,7 @@ export class Player {
                 postDamageImmunityTimer: postDamageTimerFromCtx = 0,
                 CONSTANTS: gameDrawConstants = CONSTANTS
               } = gameContext;
-        const now = Date.now();
+        const now = Date.now(); 
         this.naniteAnimTimer = this.naniteAnimTimer || now;
         this.momentumAnimTimer = this.momentumAnimTimer || now;
         this.ablativeAnimTimer = this.ablativeAnimTimer || now;
@@ -863,19 +869,18 @@ export class Player {
         }
         ctx.restore();
 
-        // MODIFIED Aegis Charge Indicator
         if (this.currentPath === 'aegis' && this.hasAegisCharge) {
             const indicatorVisualRadius = this.radius + AEGIS_CHARGE_INDICATOR_RADIUS_OFFSET;
             ctx.lineWidth = AEGIS_CHARGE_INDICATOR_LINE_WIDTH;
-            const now = Date.now(); // Ensure 'now' is defined for pulse animations
+            // const now = Date.now(); // Already defined
 
-            if (this.isChargingAegisCharge) { // Player is actively holding down LMB to charge
+            if (this.isChargingAegisCharge) { 
                 const chargeProgress = Math.min(1, this.aegisChargeCurrentChargeTime / AEGIS_CHARGE_MAX_CHARGE_TIME);
-                const endAngle = -Math.PI / 2 + (chargeProgress * Math.PI * 2);
+                const endAngleProgress = -Math.PI / 2 + (chargeProgress * Math.PI * 2); // Renamed to avoid conflict
                 
                 if (this.immuneColorsList.length > 0) {
                     const numColors = this.immuneColorsList.length;
-                    const segmentAngleTotal = endAngle - (-Math.PI / 2); // Total angle of the charge bar so far
+                    const segmentAngleTotal = endAngleProgress - (-Math.PI / 2); 
                     const segmentAnglePerColor = segmentAngleTotal / numColors;
                     let currentSegmentStartAngle = -Math.PI / 2;
 
@@ -883,36 +888,42 @@ export class Player {
                         const color = this.immuneColorsList[i];
                         const segmentEnd = currentSegmentStartAngle + segmentAnglePerColor;
                         
-                        // Draw segment only if it has a positive angle
                         if (segmentEnd > currentSegmentStartAngle) {
                             ctx.beginPath();
-                            ctx.arc(0, 0, indicatorVisualRadius, currentSegmentStartAngle, segmentEnd);
+                            ctx.arc(0, 0, indicatorVisualRadius, currentSegmentStartAngle, Math.min(endAngleProgress, segmentEnd));
                             ctx.strokeStyle = chargeProgress >= 1 ? AEGIS_CHARGE_INDICATOR_COLOR_FULL : color;
                             ctx.stroke();
                         }
                         currentSegmentStartAngle = segmentEnd;
-                         if (currentSegmentStartAngle >= endAngle - 0.001) break; // Epsilon for float precision
+                         if (currentSegmentStartAngle >= endAngleProgress - 0.001) break; 
                     }
-                } else { // Default color if no immunities
+                    // If charge isn't full and there's remaining arc because colors didn't perfectly fill up to endAngleProgress
+                    if (chargeProgress < 1 && currentSegmentStartAngle < endAngleProgress) { 
+                        ctx.beginPath();
+                        ctx.arc(0, 0, indicatorVisualRadius, currentSegmentStartAngle, endAngleProgress); 
+                        ctx.strokeStyle = AEGIS_CHARGE_INDICATOR_COLOR_CHARGING;
+                        ctx.stroke();
+                    }
+
+                } else { 
                     ctx.beginPath();
-                    ctx.arc(0, 0, indicatorVisualRadius, -Math.PI / 2, endAngle);
+                    ctx.arc(0, 0, indicatorVisualRadius, -Math.PI / 2, endAngleProgress);
                     ctx.strokeStyle = chargeProgress >= 1 ? AEGIS_CHARGE_INDICATOR_COLOR_FULL : AEGIS_CHARGE_INDICATOR_COLOR_CHARGING;
                     ctx.stroke();
                 }
 
-                if (chargeProgress >= 1) { // Full charge pulse (gold)
+                if (chargeProgress >= 1) { 
                     ctx.beginPath();
                     ctx.arc(0, 0, indicatorVisualRadius, 0, Math.PI * 2);
                     ctx.strokeStyle = `rgba(255, 215, 0, ${0.5 + Math.abs(Math.sin(now / 150)) * 0.4})`;
-                    ctx.lineWidth = AEGIS_CHARGE_INDICATOR_LINE_WIDTH + 2; // Slightly thicker pulse
+                    ctx.lineWidth = AEGIS_CHARGE_INDICATOR_LINE_WIDTH + 2; 
                     ctx.stroke();
                 }
-            } else if (this.aegisChargeCooldownTimer <= 0 && !this.isAegisChargingDash) { // Ready to use (idle pulse)
+            } else if (this.aegisChargeCooldownTimer <= 0 && !this.isAegisChargingDash) { 
                 ctx.beginPath();
                 ctx.arc(0, 0, indicatorVisualRadius, 0, Math.PI * 2);
-                // Use the original simpler ready pulse color
                 ctx.strokeStyle = `rgba(100, 180, 255, ${0.15 + Math.abs(Math.sin(now / 300)) * 0.15})`; 
-                ctx.lineWidth = AEGIS_CHARGE_INDICATOR_LINE_WIDTH - 1;
+                ctx.lineWidth = AEGIS_CHARGE_INDICATOR_LINE_WIDTH -1;
                 ctx.stroke();
             }
         }
@@ -1233,19 +1244,18 @@ export class Player {
             effectiveDamageTakenMultiplier *= (1 - AEGIS_CHARGE_DR_DURING_DASH);
         }
 
+        // Aegis path is immune to direct boss BODY collision damage if this function is called for it.
+        // Projectiles/AoE will still pass through.
         if (this.hasAegisPathHelm && this.currentPath === 'aegis' &&
-            this.aegisRamCooldownTimer <= 0 &&
-            typeof hittingRayOrAmount === 'object' &&
-            hittingRayOrAmount !== null &&
-            hittingRayOrAmount.constructor && hittingRayOrAmount.constructor.name !== 'Ray' &&
-            typeof hittingRayOrAmount.tier === 'number' &&
-            typeof hittingRayOrAmount.dx === 'undefined')
-        {
-            return 0;
+            typeof hittingRayOrAmount === 'object' && hittingRayOrAmount !== null &&
+            !(hittingRayOrAmount instanceof Ray) && // Check if it's NOT a Ray (i.e., it's a boss body)
+            typeof hittingRayOrAmount.tier === 'number' // Further indication it's a boss
+           ) {
+            return 0; // Aegis takes no damage from direct boss body collision
         }
 
         if (this.isShieldOvercharging && this.currentPath === 'mage') {
-            if (typeof hittingRayOrAmount === 'object' && hittingRayOrAmount !== null) {
+            if (typeof hittingRayOrAmount === 'object' && hittingRayOrAmount !== null && hittingRayOrAmount instanceof Ray) {
                 const hittingRay = hittingRayOrAmount;
                 const isOwnFreshRay = !hittingRay.isBossProjectile && !hittingRay.isCorruptedByGravityWell && !hittingRay.isCorruptedByPlayerWell && hittingRay.spawnGraceTimer > (RAY_SPAWN_GRACE_PERIOD - 100);
                 if (!isOwnFreshRay) {
@@ -1260,7 +1270,7 @@ export class Player {
 
 
         if (postPopupTimerFromCtx > 0 || postDamageTimerFromCtx > 0 || (this.teleporting && this.teleportEffectTimer > 0)) {
-            if (typeof hittingRayOrAmount === 'object' && hittingRayOrAmount !== null) {
+            if (typeof hittingRayOrAmount === 'object' && hittingRayOrAmount !== null && hittingRayOrAmount instanceof Ray) {
                 const hittingRay = hittingRayOrAmount;
                 if (!hittingRay.isBossProjectile && !hittingRay.isCorruptedByGravityWell && !hittingRay.isCorruptedByPlayerWell) hittingRay.isActive = false;
             }
@@ -1270,13 +1280,13 @@ export class Player {
         this.timeSinceLastHit = 0; this.timesHit++;
         let damageToTake; let hittingRayObject = null;
 
-        if (typeof hittingRayOrAmount === 'object' && hittingRayOrAmount !== null) {
+        if (typeof hittingRayOrAmount === 'object' && hittingRayOrAmount !== null && hittingRayOrAmount instanceof Ray) {
             hittingRayObject = hittingRayOrAmount;
             damageToTake = hittingRayObject.damageValue !== undefined ? hittingRayObject.damageValue : RAY_DAMAGE_TO_PLAYER;
-        } else if (typeof hittingRayOrAmount === 'number') {
+        } else if (typeof hittingRayOrAmount === 'number') { // Direct damage amount (e.g. from Pulse Nova)
             damageToTake = hittingRayOrAmount;
-        } else {
-            damageToTake = RAY_DAMAGE_TO_PLAYER;
+        } else { // Fallback, should ideally not happen if called with a boss object that's not a Ray
+            damageToTake = RAY_DAMAGE_TO_PLAYER; 
         }
 
         damageToTake *= effectiveDamageTakenMultiplier;
@@ -1361,7 +1371,11 @@ export class Player {
             });
 
             if (typesPresent.size >= 3) {
-                if (GameState && GameState.isGameRunning && GameState.isGameRunning() && _mainCallbacks && _mainCallbacks.signalAchievementEvent) {
+                // Access _mainCallbacks through a passed context or a globally accessible way if absolutely necessary
+                // For now, assuming signalAchievementEvent is part of a gameContext passed to player.update
+                if (gameContextForEventListeners && gameContextForEventListeners.callbacks && gameContextForEventListeners.callbacks.signalAchievementEvent) { // This might not be accessible here
+                     gameContextForEventListeners.callbacks.signalAchievementEvent("event_kinetic_cascade_mage");
+                } else if (_mainCallbacks && _mainCallbacks.signalAchievementEvent) { // Check if main.js _mainCallbacks is accessible (not ideal)
                      _mainCallbacks.signalAchievementEvent("event_kinetic_cascade_mage");
                 }
                 this.recentKineticBoosts = []; 
