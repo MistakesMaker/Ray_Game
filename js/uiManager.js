@@ -12,13 +12,13 @@ import {
     countdownOverlay as importedCountdownOverlay,
     lootChoiceScreen as importedLootChoiceScreen,
     detailedHighScoresScreen as importedDetailedHighScoresScreen,
-    achievementsScreen as importedAchievementsScreen, // New
-    achievementTierSelectorContainer as importedAchievementTierSelectorContainer, // New
-    achievementsListContainer as importedAchievementsListContainer, // New
+    achievementsScreen as importedAchievementsScreen, 
+    achievementTierSelectorContainer as importedAchievementTierSelectorContainer, 
+    achievementsListContainer as importedAchievementsListContainer, 
     evolutionOptionsContainer,
     closeFreeUpgradeButton, freeUpgradeOptionContainer,
     lootOptionsContainer, abilityCooldownUI, evolutionTooltip,
-    pausePlayerStatsPanel,
+    pausePlayerStatsPanel, // Correctly destructured here
     kineticChargeUIElement, kineticChargeBarFillElement, kineticChargeTextElement,
     berserkerRageUIElement, berserkerRageBarFillElement, berserkerRageTextElement,
     uiHighScoreContainer,
@@ -26,8 +26,8 @@ import {
     blockInfoSpan, toggleBlockModeButton,
     toggleFreezeModeButton, freezeInfoSpan,
     detailedScoresList,
-    statsImmunitiesContainer, // Used in updatePauseScreenStatsDisplay
-    statsBossTiersDiv, // Used in updatePauseScreenStatsDisplay
+    statsImmunitiesContainer, 
+    statsBossTiersDiv, 
     buffIndicatorContainer, survivalBonusIndicator, activeBuffIndicator,
     highScoreCategorySelect,
     playerPreviewCanvas,
@@ -36,7 +36,7 @@ import {
 } from './ui.js';
 import { getReadableColorName as getReadableColorNameFromUtils } from './utils.js';
 import { Player } from './player.js';
-import { achievementTiers } from './achievementsData.js'; // Import achievementTiers
+import { achievementTiers } from './achievementsData.js'; 
 
 // --- UI State ---
 let localPreviousScreenForSettings = null;
@@ -55,7 +55,7 @@ const ALL_SCREENS_FOR_SHOW_SCREEN = [
     importedStartScreen, importedSettingsScreen, importedGameOverScreen,
     importedEvolutionScreen, importedFreeUpgradeScreen, importedPauseScreen,
     importedCountdownOverlay, importedLootChoiceScreen, importedDetailedHighScoresScreen,
-    importedAchievementsScreen // Added new screen
+    importedAchievementsScreen 
 ];
 
 export function formatMillisecondsToTime(ms) {
@@ -444,12 +444,13 @@ export function showScreen(screenElementToShow) {
     if (screenElementToShow === importedDetailedHighScoresScreen) {
         if (statsPanelWrapper && pausePlayerStatsPanel && pausePlayerStatsPanel.parentElement !== statsPanelWrapper) {
             statsPanelWrapper.innerHTML = '';
-            statsPanelWrapper.appendChild(pausePlayerStatsPanel);
+            statsPanelWrapper.appendChild(pausePlayerStatsPanel); // Use the destructured pausePlayerStatsPanel
         }
         startOrUpdatePreviewAnimation(null);
     } else {
+        // Ensure pausePlayerStatsPanel is defined before trying to access parentElement or appendChild
         if (pausePlayerStatsPanel && pausePlayerStatsPanel.parentElement !== document.body) {
-             document.body.appendChild(pausePlayerStatsPanel);
+             document.body.appendChild(pausePlayerStatsPanel); // Use the destructured pausePlayerStatsPanel
         }
         if (screenElementToShow !== importedPauseScreen && screenElementToShow !== importedGameOverScreen) {
             if (pausePlayerStatsPanel) pausePlayerStatsPanel.style.display = 'none';
@@ -469,7 +470,7 @@ export function showScreen(screenElementToShow) {
                                      screenElementToShow === importedLootChoiceScreen ||
                                      screenElementToShow === importedCountdownOverlay ||
                                      (screenElementToShow === importedSettingsScreen && localPreviousScreenForSettings === importedPauseScreen) ||
-                                     (screenElementToShow === importedAchievementsScreen); // Show canvas behind achievements
+                                     (screenElementToShow === importedAchievementsScreen); 
             gameCanvasElement.style.display = showCanvasBehind ? 'block' : 'none';
         }
     }
@@ -549,7 +550,10 @@ export function populateEvolutionOptionsUI(
         blockInfoSpan.textContent = `Blocks left: ${playerInstance.evolutionBlocksRemaining !== undefined ? playerInstance.evolutionBlocksRemaining : 0}/${maxBlocks}`;
     }
     if (toggleFreezeModeButton && freezeInfoSpan) {
-        toggleFreezeModeButton.disabled = (playerInstance.evolutionFreezesRemaining <= 0 && !playerInstance.isFreezeModeActive && !playerInstance.frozenEvolutionChoice) || playerInstance.isBlockModeActive;
+        toggleFreezeModeButton.disabled = playerInstance.isBlockModeActive ||
+                                          (playerInstance.evolutionFreezesRemaining <= 0 && 
+                                           !playerInstance.isFreezeModeActive && 
+                                           !playerInstance.frozenEvolutionChoice);
 
         toggleFreezeModeButton.classList.remove('freeze-mode-active', 'has-frozen-choice');
         if (playerInstance.isFreezeModeActive) {
@@ -560,10 +564,10 @@ export function populateEvolutionOptionsUI(
                 if (playerInstance.hasUsedFreezeForCurrentOffers) {
                     toggleFreezeModeButton.textContent = "Unfreeze Current (F)";
                     toggleFreezeModeButton.classList.add('has-frozen-choice');
-                } else {
+                } else { 
                     toggleFreezeModeButton.textContent = `Enable Freeze (F)`;
                 }
-            } else {
+            } else { 
                 toggleFreezeModeButton.textContent = `Enable Freeze (F)`;
             }
         }
@@ -881,7 +885,7 @@ export function displayAchievementsScreenUI(allAchievementsWithStatus, onBackCal
     importedAchievementTierSelectorContainer.innerHTML = '';
     importedAchievementsListContainer.innerHTML = '';
 
-    const tiers = Object.values(achievementTiers); // Get all tier names like ["Easy", "Medium", ...]
+    const tiers = Object.values(achievementTiers); 
 
     const renderAchievementsForTier = (selectedTier) => {
         importedAchievementsListContainer.innerHTML = '';
@@ -895,7 +899,7 @@ export function displayAchievementsScreenUI(allAchievementsWithStatus, onBackCal
             return;
         }
 
-        filteredAchievements.sort((a,b) => { // Sort by unlocked first, then by name
+        filteredAchievements.sort((a,b) => { 
             if (a.isUnlocked && !b.isUnlocked) return -1;
             if (!a.isUnlocked && b.isUnlocked) return 1;
             return a.name.localeCompare(b.name);
@@ -911,12 +915,12 @@ export function displayAchievementsScreenUI(allAchievementsWithStatus, onBackCal
             const iconDiv = document.createElement('div');
             iconDiv.classList.add('achievement-icon');
             if (ach.isUnlocked) {
-                iconDiv.textContent = '✔️'; // Simple check for unlocked
+                iconDiv.textContent = '✔️'; 
                 iconDiv.style.color = '#ffcc66';
             } else {
-                iconDiv.textContent = '❓'; // Question mark for locked
+                iconDiv.textContent = '❓'; 
             }
-            // TODO: Later, set background image from ach.iconPath if available
+            
 
             const detailsDiv = document.createElement('div');
             detailsDiv.classList.add('achievement-details');
@@ -966,7 +970,7 @@ export function displayAchievementsScreenUI(allAchievementsWithStatus, onBackCal
 
     const backButton = document.getElementById('backToMainMenuFromAchievementsButton');
     if (backButton) {
-        // Re-bind to avoid multiple listeners if this function is called again
+        
         const newBackButton = backButton.cloneNode(true);
         backButton.parentNode.replaceChild(newBackButton, backButton);
         newBackButton.onclick = onBackCallback;
@@ -980,11 +984,10 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText) {
     const statsGearUl = document.getElementById('statsGearList');
     const statsAbilitiesCombinedDiv = document.getElementById('statsAbilities');
 
-    // Title logic for pause screen vs detailed high scores
     const runStatsHeader = document.getElementById('runStatsHeader');
-    if (pausePlayerStatsPanel.parentElement === statsPanelWrapper && panelTitleText) { // We are in detailed high scores mode
-        if (runStatsHeader) runStatsHeader.textContent = panelTitleText; // Change title
-    } else if (runStatsHeader) { // Default pause screen title
+    if (pausePlayerStatsPanel.parentElement === statsPanelWrapper && panelTitleText) { 
+        if (runStatsHeader) runStatsHeader.textContent = panelTitleText; 
+    } else if (runStatsHeader) { 
         runStatsHeader.textContent = "📊 Run Information";
     }
 
@@ -1173,7 +1176,7 @@ export function updatePauseScreenStatsDisplay(statsSnapshot, panelTitleText) {
         if (abilitiesHeaderElement && abilitiesHeaderElement.parentNode) {
             abilitiesHeaderElement.parentNode.insertBefore(blockedHeader, abilitiesHeaderElement);
             abilitiesHeaderElement.parentNode.insertBefore(blockedListUl, abilitiesHeaderElement);
-        } else if (statsImmunitiesContainer.parentNode) { // Fallback if abilities header itself is missing
+        } else if (statsImmunitiesContainer.parentNode) { 
             statsImmunitiesContainer.parentNode.appendChild(blockedHeader);
             statsImmunitiesContainer.parentNode.appendChild(blockedListUl);
         }
