@@ -45,7 +45,7 @@ class MinionBase {
         if (this.hitFlashTimer > 0 && Math.floor(this.hitFlashTimer / this.HIT_FLASH_BLINK_INTERVAL_MINION) % 2 === 0) {
             effectiveColor = '#FFFFFF'; 
         } else if (this.isFeared) {
-            effectiveColor = 'rgba(255, 0, 255, 0.9)'; // Slightly more opaque fear for minions
+            effectiveColor = 'rgba(255, 0, 255, 0.9)'; 
         }
 
 
@@ -318,7 +318,7 @@ export class NexusWeaverBoss extends BossNPC {
             CONSTANTS.NEXUS_WEAVER_BASE_HP,
             CONSTANTS.NEXUS_WEAVER_HP_PER_TIER_FACTOR,
             CONSTANTS.NEXUS_WEAVER_RADIUS_BASE + tier * CONSTANTS.NEXUS_WEAVER_RADIUS_PER_TIER,
-            CONSTANTS.NEXUS_WEAVER_COLOR // This should be a solid color string e.g., '#4B0082'
+            CONSTANTS.NEXUS_WEAVER_COLOR 
         );
         this.baseSpeed = CONSTANTS.NEXUS_WEAVER_BASE_SPEED + tier * CONSTANTS.NEXUS_WEAVER_SPEED_PER_TIER;
         this.speed = this.baseSpeed;
@@ -340,6 +340,12 @@ export class NexusWeaverBoss extends BossNPC {
 
         this._lastDamageSourcePlayer = false;
         this._lastDamageTimestamp = 0;
+        
+        this.playerCollisionStunTimer = 0; // Nexus has its own stun timer, not from BossNPC default
+        this.recoilVelX = 0;
+        this.recoilVelY = 0;
+        this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE = 1; // Very slight recoil, it's a big boss
+        this.AEGIS_PASSIVE_BOSS_STUN_DURATION = 50; // Very short stun
     }
 
     lastDamageSourcePlayer() {
@@ -349,45 +355,41 @@ export class NexusWeaverBoss extends BossNPC {
 
     draw(ctx) {
         if (!ctx) return;
-        let mainBodyFillColor = this.color; // Start with base color
-        let mainBodyStrokeColor = 'rgba(200, 100, 255, 0.7)'; // Default stroke
-        let facetFillColor = '#FF00FF'; // Default highlight for facets
+        let mainBodyFillColor = this.color; 
+        let mainBodyStrokeColor = 'rgba(200, 100, 255, 0.7)'; 
+        let facetFillColor = '#FF00FF'; 
 
-        // State-based color changes
         if (this.hitFlashTimer > 0 && Math.floor(this.hitFlashTimer / this.HIT_FLASH_BLINK_INTERVAL) % 2 === 0) {
-            mainBodyFillColor = '#FFFFFF'; // White flash for body
-            facetFillColor = '#FFFFFF';    // Facets also flash white
+            mainBodyFillColor = '#FFFFFF'; 
+            facetFillColor = '#FFFFFF';    
         } else if (this.isFeared) {
-            mainBodyFillColor = 'rgba(200, 0, 200, 0.85)'; // Darker, solid magenta for feared body
-            facetFillColor = 'rgba(255, 100, 255, 0.9)';   // Lighter magenta for feared facets
+            mainBodyFillColor = 'rgba(200, 0, 200, 0.85)'; 
+            facetFillColor = 'rgba(255, 100, 255, 0.9)';  
             mainBodyStrokeColor = 'rgba(255, 0, 255, 0.9)';
         } else if (this.bleedTimer > 0 && Math.floor(this.bleedTimer / 100) % 2 === 0) {
-            mainBodyFillColor = '#300052'; // Darker purple for bleed
+            mainBodyFillColor = '#300052'; 
         } else if (this.hitStunTimer > 0 || this.playerCollisionStunTimer > 0) {
-            mainBodyFillColor = `rgba(100, 100, 200, 0.9)`; // Solid-ish stun color
+            mainBodyFillColor = `rgba(100, 100, 200, 0.9)`; 
         }
 
         ctx.save();
         ctx.translate(this.x, this.y);
 
-        // Spawn Tell Glow (this is an additive effect, so semi-transparent is okay here)
         if (this.isSpawning && this.spawnTellTimer > 0 && !this.isFeared) { 
             const spawnProgress = 1 - (this.spawnTellTimer / this.spawnTellDuration);
             const glowRadius = this.radius + 10 + spawnProgress * 20;
-            const glowAlpha = 0.15 + spawnProgress * 0.35; // Make it a bit more subtle
+            const glowAlpha = 0.15 + spawnProgress * 0.35; 
             ctx.beginPath();
             ctx.arc(0, 0, glowRadius, 0, Math.PI * 2);
             ctx.fillStyle = `rgba(255, 0, 255, ${glowAlpha})`; 
             ctx.fill();
         }
 
-        // Main Body - Ensure this is drawn with a solid color mostly
         ctx.beginPath();
         ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
         ctx.fillStyle = mainBodyFillColor; 
         ctx.fill();
 
-        // Facets
         const numFacets = 5 + this.tier;
         for (let i = 0; i < numFacets; i++) {
             const angle = (i / numFacets) * Math.PI * 2 + (Date.now() * 0.0001 * (i % 2 === 0 ? 1 : -1));
@@ -398,20 +400,17 @@ export class NexusWeaverBoss extends BossNPC {
             ctx.save();
             ctx.translate(facetX, facetY);
             ctx.rotate(angle + Math.PI / 4);
-            // Use the determined facetFillColor, if spawning and not feared, make it more vibrant pink
             ctx.fillStyle = (this.isSpawning && !this.isFeared && !(this.hitFlashTimer > 0)) ? `rgba(255,100,255,0.95)` : facetFillColor;
             ctx.fillRect(-facetSize / 2, -facetSize / 2, facetSize, facetSize);
             ctx.restore();
         }
-        // Main body stroke
         ctx.strokeStyle = mainBodyStrokeColor;
         ctx.lineWidth = 2 + this.tier * 0.5;
         ctx.stroke(); 
         ctx.restore();
 
-        super.draw(ctx); // Draws health bar and base fear visual (which is a STROKED circle)
+        super.draw(ctx); 
 
-        // Pulse Nova visual (only stroked)
         if (this.pulseNovaActive && !this.isFeared) {
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.pulseNovaCurrentRadius, 0, Math.PI * 2);
@@ -419,7 +418,7 @@ export class NexusWeaverBoss extends BossNPC {
             let alphaProgress = this.pulseNovaTimer / CONSTANTS.PULSE_NOVA_DURATION; 
             alphaProgress = Math.max(0, Math.min(1, alphaProgress)); 
             
-            ctx.strokeStyle = `rgba(255, 100, 255, ${alphaProgress * 0.9})`; // Make stroke quite visible
+            ctx.strokeStyle = `rgba(255, 100, 255, ${alphaProgress * 0.9})`; 
             
             const expansionProgress = 1 - alphaProgress; 
             let lineWidth;
@@ -429,7 +428,7 @@ export class NexusWeaverBoss extends BossNPC {
                 lineWidth = 1.5 + (expansionProgress - 0.85) * 15; 
             }
             ctx.lineWidth = lineWidth; 
-            ctx.stroke(); // Only stroke, no fill for the nova wave
+            ctx.stroke(); 
         }
         this.activeMinions.forEach(minion => minion.draw(ctx));
     }
@@ -500,15 +499,26 @@ export class NexusWeaverBoss extends BossNPC {
             this.activeMinions = [];
             return;
         }
+         const normalizedDtFactor = dt / (1000 / 60) || 1;
 
         if (this.isFeared) {
             this.isSpawning = false;
             this.spawnTellTimer = 0;
             this.pulseNovaActive = false;
             this.pulseNovaTimer = 0;
-        } else {
-            const normalizedDtFactor = dt / (1000 / 60) || 1;
-            if (this.hitStunTimer <= 0 && this.playerCollisionStunTimer <= 0) {
+        } else if (this.playerCollisionStunTimer > 0) { // Handle boss's own stun from Aegis passive
+            this.playerCollisionStunTimer -= dt;
+            this.x += this.recoilVelX * normalizedDtFactor;
+            this.y += this.recoilVelY * normalizedDtFactor;
+            this.recoilVelX *= 0.85; // Damping for Nexus
+            this.recoilVelY *= 0.85;
+            if (Math.abs(this.recoilVelX) < 0.01) this.recoilVelX = 0;
+            if (Math.abs(this.recoilVelY) < 0.01) this.recoilVelY = 0;
+            if (this.playerCollisionStunTimer <= 0) {
+                this.speed = this.baseSpeed;
+            }
+        } else { // Normal behavior when not feared and not stunned by player collision
+            if (this.hitStunTimer <= 0) {
                 const angleToPlayer = Math.atan2(playerInstance.y - this.y, playerInstance.x - this.x);
                 const distToPlayer = Math.hypot(playerInstance.x - this.x, playerInstance.y - this.y);
                 let targetSpeed = this.speed;
@@ -549,12 +559,12 @@ export class NexusWeaverBoss extends BossNPC {
                 } else {
                     const distToPlayerNova = Math.hypot(playerInstance.x - this.x, playerInstance.y - this.y);
                     const effectivePlayerRadiusForNova = playerInstance.radius * 0.8;
-                    const novaEdgeOuter = this.pulseNovaCurrentRadius + effectivePlayerRadiusForNova;
                     const expansionProgress = 1 - (this.pulseNovaTimer / CONSTANTS.PULSE_NOVA_DURATION);
                     let currentNovaWaveThickness = Math.max(1, 12 - (expansionProgress * 12));
                      if (expansionProgress >= 0.85) {
                          currentNovaWaveThickness = 1.5 + (expansionProgress - 0.85) * 15;
                      }
+                    const novaEdgeOuter = this.pulseNovaCurrentRadius + effectivePlayerRadiusForNova + (currentNovaWaveThickness * 0.5);
                     const novaEdgeInner = this.pulseNovaCurrentRadius - effectivePlayerRadiusForNova - (currentNovaWaveThickness * 0.5); 
                     
                     if (distToPlayerNova < novaEdgeOuter && distToPlayerNova > novaEdgeInner) {
@@ -587,27 +597,48 @@ export class NexusWeaverBoss extends BossNPC {
             }
         }
 
+        // Player collision with Nexus Weaver main body
         if (checkCollision(this, playerInstance)) {
             const playerIsTeleporting = (playerInstance.teleporting && playerInstance.teleportEffectTimer > 0);
             const playerIsCurrentlyShieldOvercharging = isPlayerShieldOvercharging;
             const playerIsDamageImmuneFromRecentHit = (postDamageImmunityTimer !== undefined && postDamageImmunityTimer > 0);
-            const canPlayerInteract = !playerIsTeleporting && !playerIsCurrentlyShieldOvercharging;
+            const canPlayerPhysicallyInteract = !playerIsTeleporting && !playerIsCurrentlyShieldOvercharging;
             
-            if (canPlayerInteract) {
-                if (playerInstance.hasAegisPathHelm && playerInstance.aegisRamCooldownTimer <= 0) {
-                    if (gameContext && gameContext.playerCollidedWithBoss !== undefined) {
-                        gameContext.playerCollidedWithBoss = this;
+            if (canPlayerPhysicallyInteract) {
+                if (playerInstance.hasAegisPathHelm) {
+                    // Player is Aegis Path
+                    const pushAngleBoss = Math.atan2(this.y - playerInstance.y, this.x - playerInstance.x);
+                    const overlap = (this.radius + playerInstance.radius) - Math.hypot(this.x - playerInstance.x, this.y - playerInstance.y);
+                    if (overlap > 0) {
+                        this.x += Math.cos(pushAngleBoss) * overlap * 0.5;
+                        this.y += Math.sin(pushAngleBoss) * overlap * 0.5;
+                    }
+
+                    if (playerInstance.aegisRamCooldownTimer <= 0) {
+                        if (gameContext && gameContext.playerCollidedWithBoss !== undefined) {
+                            gameContext.playerCollidedWithBoss = { boss: this, type: "aegisOffensiveRam" };
+                        }
+                    } else {
+                        this.recoilVelX += Math.cos(pushAngleBoss) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE;
+                        this.recoilVelY += Math.sin(pushAngleBoss) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE;
+                        this.playerCollisionStunTimer = Math.max(this.playerCollisionStunTimer, this.AEGIS_PASSIVE_BOSS_STUN_DURATION);
+                        this.speed = 0;
+                        const playerPushAngle = Math.atan2(playerInstance.y - this.y, playerInstance.x - this.x);
+                        playerInstance.velX += Math.cos(playerPushAngle) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE * 0.3; // Nexus is big, less pushback on player
+                        playerInstance.velY += Math.sin(playerPushAngle) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE * 0.3;
                     }
                 } else {
-                    // Player is NOT Aegis OR Aegis Ram IS ON COOLDOWN
-                    // Standard collision damage & knockback logic for the player
+                    // Player is NOT Aegis Path
                     if (!playerIsDamageImmuneFromRecentHit && this.playerCollisionStunTimer <= 0 && !this.isFeared) {
                         if(gameContext && gameContext.playerCollidedWithBoss !== undefined) {
-                            gameContext.playerCollidedWithBoss = this;
+                             gameContext.playerCollidedWithBoss = { boss: this, type: "standardPlayerDamage" };
                         }
-                        // Nexus Weaver itself doesn't have a strong recoil/stun from player collision
-                        // like Chaser or Mirror Shield, its defense is minions and nova.
-                        // Player will take damage via gameLogic's handling of playerCollidedWithBoss.
+                        // Nexus doesn't get significantly recoiled by standard player collision
+                        const pushAngleBoss = Math.atan2(this.y - playerInstance.y, this.x - playerInstance.x);
+                        this.recoilVelX = Math.cos(pushAngleBoss) * PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.1; // Minimal recoil
+                        this.recoilVelY = Math.sin(pushAngleBoss) * PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.1;
+                        this.playerCollisionStunTimer = 100; // Short stun
+                        this.speed = 0;
                     }
                 }
             }

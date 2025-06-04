@@ -2,7 +2,7 @@
 import { BossNPC } from './bossBase.js';
 import { 
     PLAYER_BOUNCE_FORCE_FROM_BOSS, BASE_RAY_SPEED, REFLECTED_RAY_SPEED_MULTIPLIER, 
-    REFLECTED_RAY_COLOR, REFLECTED_RAY_LIFETIME_AFTER_REFLECTION, RAY_DAMAGE_TO_PLAYER // Import RAY_DAMAGE_TO_PLAYER
+    REFLECTED_RAY_COLOR, REFLECTED_RAY_LIFETIME_AFTER_REFLECTION, RAY_DAMAGE_TO_PLAYER
 } from './constants.js';
 import { checkCollision } from './utils.js';
 
@@ -12,7 +12,7 @@ export class MirrorShieldBoss extends BossNPC {
         this.shieldAngle = Math.random() * Math.PI * 2;
         this.shieldWidthAngle = Math.PI; 
         this.rotationSpeed = 0.008 + tier * 0.0015;
-        this.hitBodyFlash = false; // True if body is hit, false if shield is hit
+        this.hitBodyFlash = false; 
         this.baseSpeed = 0.35 + tier * 0.025;
         this.speed = this.baseSpeed;
         this.hitStunSlowFactor = 0.05; 
@@ -24,6 +24,8 @@ export class MirrorShieldBoss extends BossNPC {
         this.PLAYER_COLLISION_STUN_DURATION_MIRROR = 200; 
         this.recoilVelX = 0;
         this.recoilVelY = 0;
+        this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE = 1.5; // Mirror shield is a bit more hefty
+        this.AEGIS_PASSIVE_BOSS_STUN_DURATION = 80;
     }
 
     draw(ctx) {
@@ -31,12 +33,11 @@ export class MirrorShieldBoss extends BossNPC {
         let bodyEffectiveColor = this.color;
         let shieldEffectiveColor = 'rgba(180, 180, 255, 0.7)';
 
-        // Flash white on any hit (shield or body)
         if (this.hitFlashTimer > 0 && Math.floor(this.hitFlashTimer / this.HIT_FLASH_BLINK_INTERVAL) % 2 === 0) {
-            if (this.hitBodyFlash) { // If body was the part hit
+            if (this.hitBodyFlash) { 
                 bodyEffectiveColor = '#FFFFFF';
-            } else { // Shield was hit
-                shieldEffectiveColor = `rgba(255, 255, 255, ${0.8 + 0.2 * Math.sin(this.hitFlashTimer * 0.15)})`; // Brighter, more solid flash for shield
+            } else { 
+                shieldEffectiveColor = `rgba(255, 255, 255, ${0.8 + 0.2 * Math.sin(this.hitFlashTimer * 0.15)})`; 
             }
         } else if (this.isFeared) {
             bodyEffectiveColor = 'rgba(255, 0, 255, 0.6)';
@@ -68,7 +69,6 @@ export class MirrorShieldBoss extends BossNPC {
 
         ctx.restore();
         super.draw(ctx); 
-        // this.hitBodyFlash is reset in takeDamage, not here, to ensure correct flash source
     }
 
     update(playerInstance, gameContext) {
@@ -123,38 +123,46 @@ export class MirrorShieldBoss extends BossNPC {
             const playerIsTeleporting = (playerInstance.teleporting && playerInstance.teleportEffectTimer > 0);
             const playerIsCurrentlyShieldOvercharging = isPlayerShieldOvercharging; 
             const playerIsDamageImmuneFromRecentHit = (postDamageImmunityTimer !== undefined && postDamageImmunityTimer > 0);
-
-            const canPlayerInteract = !playerIsTeleporting && !playerIsCurrentlyShieldOvercharging;
+            const canPlayerPhysicallyInteract = !playerIsTeleporting && !playerIsCurrentlyShieldOvercharging;
             
-            if (canPlayerInteract) {
-                // Check if player is Aegis AND Aegis Ram is OFF cooldown
-                if (playerInstance.hasAegisPathHelm && playerInstance.aegisRamCooldownTimer <= 0) {
-                    if (gameContext && gameContext.playerCollidedWithBoss !== undefined) {
-                        // Signal to gameLogic that an Aegis ram-ready collision occurred.
-                        gameContext.playerCollidedWithBoss = this; 
+            if (canPlayerPhysicallyInteract) {
+                if (playerInstance.hasAegisPathHelm) {
+                    // Player is Aegis Path
+                    const pushAngleBoss = Math.atan2(this.y - playerInstance.y, this.x - playerInstance.x);
+                     const overlap = (this.radius + playerInstance.radius) - Math.hypot(this.x - playerInstance.x, this.y - playerInstance.y);
+                    if (overlap > 0) {
+                        this.x += Math.cos(pushAngleBoss) * overlap * 0.5;
+                        this.y += Math.sin(pushAngleBoss) * overlap * 0.5;
+                    }
+
+                    if (playerInstance.aegisRamCooldownTimer <= 0) {
+                        // Aegis offensive ram is ready
+                        if (gameContext && gameContext.playerCollidedWithBoss !== undefined) {
+                            gameContext.playerCollidedWithBoss = { boss: this, type: "aegisOffensiveRam" };
+                        }
+                    } else {
+                        // Aegis offensive ram is on COOLDOWN. Player takes NO damage from this body collision.
+                        // Boss still gets a slight recoil.
+                        this.recoilVelX += Math.cos(pushAngleBoss) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE;
+                        this.recoilVelY += Math.sin(pushAngleBoss) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE;
+                        this.playerCollisionStunTimer = Math.max(this.playerCollisionStunTimer, this.AEGIS_PASSIVE_BOSS_STUN_DURATION);
+                        this.speed = 0; 
+                        const playerPushAngle = Math.atan2(playerInstance.y - this.y, playerInstance.x - this.x);
+                        playerInstance.velX += Math.cos(playerPushAngle) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE * 0.5;
+                        playerInstance.velY += Math.sin(playerPushAngle) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE * 0.5;
                     }
                 } else {
-                    // Player is NOT Aegis OR Aegis Ram IS ON COOLDOWN
-                    // Standard collision damage & knockback logic for the player
+                    // Player is NOT Aegis Path - Standard collision damage & knockback logic
                     if (!playerIsDamageImmuneFromRecentHit && this.playerCollisionStunTimer <= 0 && !this.isFeared) { 
                         if(gameContext && gameContext.playerCollidedWithBoss !== undefined) {
-                            gameContext.playerCollidedWithBoss = this; 
+                             gameContext.playerCollidedWithBoss = { boss: this, type: "standardPlayerDamage" };
                         }
-
-                        const dist = Math.sqrt((this.x - playerInstance.x) ** 2 + (this.y - playerInstance.y) ** 2);
-                        const overlap = (this.radius + playerInstance.radius) - dist;
-
-                        if (overlap > 0) {
-                            const pushAngleBoss = Math.atan2(this.y - playerInstance.y, this.x - playerInstance.x);
-                            const immediatePush = overlap * 0.3;
-                            this.x += Math.cos(pushAngleBoss) * immediatePush;
-                            this.y += Math.sin(pushAngleBoss) * immediatePush;
-
-                            const recoilForce = PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.3; 
-                            this.recoilVelX = Math.cos(pushAngleBoss) * recoilForce;
-                            this.recoilVelY = Math.sin(pushAngleBoss) * recoilForce;
-                            this.playerCollisionStunTimer = this.PLAYER_COLLISION_STUN_DURATION_MIRROR;
-                        }
+                        // Boss also gets recoiled
+                        const pushAngleBoss = Math.atan2(this.y - playerInstance.y, this.x - playerInstance.x);
+                        this.recoilVelX = Math.cos(pushAngleBoss) * PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.3;
+                        this.recoilVelY = Math.sin(pushAngleBoss) * PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.3;
+                        this.playerCollisionStunTimer = this.PLAYER_COLLISION_STUN_DURATION_MIRROR;
+                        this.speed = 0;
                     }
                 }
             }
@@ -165,8 +173,8 @@ export class MirrorShieldBoss extends BossNPC {
         if (this.health <= 0) return 0; 
 
         if (!ray) { 
-            this.hitBodyFlash = true; // Assume non-ray damage hits body
-            this.hitFlashTimer = this.HIT_FLASH_DURATION; // Set flash timer for body hit
+            this.hitBodyFlash = true; 
+            this.hitFlashTimer = this.HIT_FLASH_DURATION; 
             return super.takeDamage(amount, null, playerInstance, bossTakeDamageContext);
         }
 
@@ -177,7 +185,7 @@ export class MirrorShieldBoss extends BossNPC {
         const distanceToCenter = Math.sqrt((ray.x - this.x) ** 2 + (ray.y - this.y) ** 2);
 
         if (Math.abs(angleToRay - normalizedShieldAngle) <= this.shieldWidthAngle / 2 && distanceToCenter > this.radius * 0.8) {
-            this.hitFlashTimer = this.HIT_FLASH_DURATION; // Set flash timer for shield hit
+            this.hitFlashTimer = this.HIT_FLASH_DURATION; 
             this.hitBodyFlash = false; 
 
             const normalAngle = this.shieldAngle; 
@@ -197,7 +205,7 @@ export class MirrorShieldBoss extends BossNPC {
                 ray.initialSpeedMultiplier = REFLECTED_RAY_SPEED_MULTIPLIER; 
                 ray.color = REFLECTED_RAY_COLOR;
                 ray.isBossProjectile = true; 
-                ray.damageValue = RAY_DAMAGE_TO_PLAYER; // IMPORTANT: Reset damage to standard for reflected rays
+                ray.damageValue = RAY_DAMAGE_TO_PLAYER; 
                 ray.spawnGraceTimer = 50; 
                 ray.maxLifetime = REFLECTED_RAY_LIFETIME_AFTER_REFLECTION;
                 ray.lifeTimer = ray.maxLifetime;
@@ -212,8 +220,8 @@ export class MirrorShieldBoss extends BossNPC {
                 return 0; 
             }
         } else { 
-            this.hitBodyFlash = true; // Ray hit body
-            this.hitFlashTimer = this.HIT_FLASH_DURATION; // Set flash timer for body hit
+            this.hitBodyFlash = true; 
+            this.hitFlashTimer = this.HIT_FLASH_DURATION; 
             const damageDealt = super.takeDamage(amount, ray, playerInstance, bossTakeDamageContext); 
             ray.isActive = false; 
             return damageDealt; 

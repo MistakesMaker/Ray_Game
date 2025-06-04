@@ -36,7 +36,7 @@ import {
     gameOverScreen,
     settingsScreen,
     detailedHighScoresScreen,
-    achievementsScreen as uiAchievementsScreen, // Added for orchestrateScreenChange
+    achievementsScreen as uiAchievementsScreen, 
     evolutionScreen,
     freeUpgradeScreen,
     lootChoiceScreen,
@@ -168,6 +168,38 @@ function getGameContextForAchievements() {
         eventFlags: eventFlagsForAchievements,
         initialEvoScreenCharges: initialEvoScreenCharges,
         CONSTANTS: CONSTANTS
+    };
+}
+
+// Helper to get full context for player methods if needed
+function getGameContextForPlayerUpdate() {
+    return {
+        dt: 0, // Should be set by caller if time-dependent
+        keys: inputState.keys,
+        mouseX: inputState.mouseX,
+        mouseY: inputState.mouseY,
+        canvasWidth: gameCanvasElement.width,
+        canvasHeight: gameCanvasElement.height,
+        targets: gameLogicGetRaysFunc ? gameLogicGetRaysFunc().filter(r => r.isTarget) : [], // Example, adjust as needed
+        activeBosses: gameLogicGetBossManagerFunc ? gameLogicGetBossManagerFunc().activeBosses : [],
+        currentGrowthFactor: GameState.getCurrentPlayerRadiusGrowthFactor(),
+        currentEffectiveDefaultGrowthFactor: GameState.getCurrentEffectiveDefaultGrowthFactor(),
+        updateHealthDisplayCallback: UIManager.updateHealthDisplay,
+        updateAbilityCooldownCallback: UIManager.updateAbilityCooldownUI,
+        isAnyPauseActiveCallback: GameState.isAnyPauseActive,
+        getBossManager: gameLogicGetBossManagerFunc,
+        decoysArray: gameLogicGetDecoysFunc ? gameLogicGetDecoysFunc() : [],
+        bossDefeatEffectsArray: gameLogicGetBossDefeatEffectsFunc ? gameLogicGetBossDefeatEffectsFunc() : [],
+        allRays: gameLogicGetRaysFunc ? gameLogicGetRaysFunc() : [],
+        screenShakeParams: gameLogicGetScreenShakeParamsFunc ? gameLogicGetScreenShakeParamsFunc() : {},
+        activeBuffNotificationsArray: gameLogicGetActiveBuffsFunc ? gameLogicGetActiveBuffsFunc() : [],
+        score: GameState.getScore(),
+        evolutionChoices: EvolutionManager.getEvolutionMasterList(),
+        ui: UIManager,
+        CONSTANTS: CONSTANTS,
+        endGameCallback: endGameInternal,
+        updateScoreCallback: (amount) => { GameState.incrementScore(amount); UIManager.updateScoreDisplay(GameState.getScore()); if (gameContextForEventListeners.callbacks.checkForNewColorUnlock) gameContextForEventListeners.callbacks.checkForNewColorUnlock(); },
+        signalAchievementEvent: gameContextForEventListeners.callbacks.signalAchievementEvent
     };
 }
 
@@ -480,7 +512,7 @@ function initGame() {
         getAbilityContextForPlayer: getAbilityContextForPlayerFuncFromGameLogic,
         updateShootInterval: updateShootIntervalAndGameState,
         handleFullHealthHeartPickup: handleFullHealthHeartPickupInternal,
-        signalAchievementEvent: (eventName, eventData = {}) => { // Ensure this is correctly assigned
+        signalAchievementEvent: (eventName, eventData = {}) => { 
             eventFlagsForAchievements[eventName] = true;
             if (eventData && Object.keys(eventData).length > 0) {
                 eventFlagsForAchievements[eventName + "_data"] = eventData;
@@ -718,14 +750,12 @@ function showDetailedHighScores() {
     );
 }
 
-// --- NEW: Function to show Achievements Screen ---
 function showAchievementsScreen() {
     const achievementsData = AchievementManager.getAllAchievementsWithStatus();
-    orchestrateScreenChange(uiAchievementsScreen); // Use uiAchievementsScreen from ui.js
+    orchestrateScreenChange(uiAchievementsScreen); 
     UIManager.displayAchievementsScreenUI(
         achievementsData,
         () => {
-            // Back to main menu callback
             showStartScreenWithUpdatesInternal();
         }
     );
@@ -851,35 +881,66 @@ const gameContextForEventListeners = {
             }
         },
         redrawEvolutionOptions: redrawEvolutionOptionsInternal,
-        onPlayerBossCollision: (bossThatHit) => {
+        onPlayerBossCollision: (collisionData) => { // collisionData = { boss: bossThatHit, type: "aegisOffensiveRam" | "standardPlayerDamage" }
             const cp = gameLogicGetPlayerFunc();
-            if (cp && !cp.isShieldOvercharging && (!cp.teleporting || cp.teleportEffectTimer <= 0) && GameState.getPostDamageImmunityTimer() <= 0) {
-                let damageAmount = bossThatHit.tier * 5;
-                if (cp.hasAegisPathHelm && cp.aegisRamCooldownTimer <=0) {
-                     damageAmount = 0;
+            if (!cp) return;
+        
+            const bossThatHit = collisionData.boss;
+        
+            if (collisionData.type === "aegisOffensiveRam") {
+                if (cp.hasAegisPathHelm && typeof cp.handleAegisCollisionWithBoss === 'function') {
+                    cp.handleAegisCollisionWithBoss(bossThatHit, getGameContextForPlayerUpdate());
                 }
-
-                if (damageAmount > 0) {
+                // Aegis player takes no body damage from a successful offensive ram signal
+            } else if (collisionData.type === "standardPlayerDamage") {
+                if (!cp.isShieldOvercharging && (!cp.teleporting || cp.teleportEffectTimer <= 0) && GameState.getPostDamageImmunityTimer() <= 0) {
+                    let damageAmount = bossThatHit.tier * 5; // Example base damage
+                    
                     const dmgDealt = cp.takeDamage(
                         damageAmount,
-                        { postPopupImmunityTimer: GameState.getPostPopupImmunityTimer(), postDamageImmunityTimer: GameState.getPostDamageImmunityTimer(), score: GameState.getScore(), updateHealthDisplayCallback:UIManager.updateHealthDisplay, endGameCallback:endGameInternal, updateScoreCallback: (amt) => { GameState.incrementScore(amt); UIManager.updateScoreDisplay(GameState.getScore()); checkForNewColorUnlock(); AchievementManager.checkAllAchievements(getGameContextForAchievements()); }, checkForNewColorCallback: checkForNewColorUnlock, activeBuffNotificationsArray: gameLogicGetActiveBuffsFunc ? gameLogicGetActiveBuffsFunc() : [], CONSTANTS: CONSTANTS, signalAchievementEvent: gameContextForEventListeners.callbacks.signalAchievementEvent },
+                        { // gameContext for takeDamage
+                            postPopupImmunityTimer: GameState.getPostPopupImmunityTimer(), 
+                            postDamageImmunityTimer: GameState.getPostDamageImmunityTimer(), 
+                            score: GameState.getScore(), 
+                            updateHealthDisplayCallback: UIManager.updateHealthDisplay, 
+                            endGameCallback: endGameInternal, 
+                            updateScoreCallback: (amt) => { GameState.incrementScore(amt); UIManager.updateScoreDisplay(GameState.getScore()); if (gameContextForEventListeners.callbacks.checkForNewColorUnlock) gameContextForEventListeners.callbacks.checkForNewColorUnlock(); },
+                            signalAchievementEvent: gameContextForEventListeners.callbacks.signalAchievementEvent,
+                            getBossManager: gameLogicGetBossManagerFunc
+                        },
                         { screenShakeParams: gameLogicGetScreenShakeParamsFunc ? gameLogicGetScreenShakeParamsFunc() : {} }
                     );
-                    if (dmgDealt > 0) GameState.setPostDamageImmunityTimer(CONSTANTS.POST_DAMAGE_IMMUNITY_DURATION);
+                    if (dmgDealt > 0) {
+                        GameState.setPostDamageImmunityTimer(CONSTANTS.POST_DAMAGE_IMMUNITY_DURATION);
+                        // Standard player bounce back
+                        const collisionAnglePlayer = Math.atan2(cp.y - bossThatHit.y, cp.x - bossThatHit.x);
+                        cp.velX = Math.cos(collisionAnglePlayer) * CONSTANTS.PLAYER_BOUNCE_FORCE_FROM_BOSS;
+                        cp.velY = Math.sin(collisionAnglePlayer) * CONSTANTS.PLAYER_BOUNCE_FORCE_FROM_BOSS;
+                    }
                 }
             }
+            // If player is Aegis and ram is on cooldown, the boss script handles minor recoil,
+            // and this callback isn't invoked with a type that causes player damage from body collision.
         },
         onPlayerMinionCollision: (minionThatHit) => {
             const cp = gameLogicGetPlayerFunc();
              if (cp && !cp.isShieldOvercharging && (!cp.teleporting || cp.teleportEffectTimer <= 0) && GameState.getPostDamageImmunityTimer() <= 0) {
-                const dmgDealt = cp.takeDamage(minionThatHit.damage, { postPopupImmunityTimer: GameState.getPostPopupImmunityTimer(), postDamageImmunityTimer: GameState.getPostDamageImmunityTimer(), score: GameState.getScore(), updateHealthDisplayCallback:UIManager.updateHealthDisplay, endGameCallback:endGameInternal, updateScoreCallback: (amt) => { GameState.incrementScore(amt); UIManager.updateScoreDisplay(GameState.getScore()); checkForNewColorUnlock(); AchievementManager.checkAllAchievements(getGameContextForAchievements()); }, checkForNewColorCallback: checkForNewColorUnlock, activeBuffNotificationsArray: gameLogicGetActiveBuffsFunc ? gameLogicGetActiveBuffsFunc() : [], CONSTANTS: CONSTANTS, signalAchievementEvent: gameContextForEventListeners.callbacks.signalAchievementEvent }, { screenShakeParams: gameLogicGetScreenShakeParamsFunc ? gameLogicGetScreenShakeParamsFunc() : {} });
+                const dmgDealt = cp.takeDamage(minionThatHit.damage, 
+                    { /* gameContext for takeDamage */ 
+                        postPopupImmunityTimer: GameState.getPostPopupImmunityTimer(), postDamageImmunityTimer: GameState.getPostDamageImmunityTimer(), score: GameState.getScore(), updateHealthDisplayCallback:UIManager.updateHealthDisplay, endGameCallback:endGameInternal, updateScoreCallback: (amt) => { GameState.incrementScore(amt); UIManager.updateScoreDisplay(GameState.getScore()); if(gameContextForEventListeners.callbacks.checkForNewColorUnlock) gameContextForEventListeners.callbacks.checkForNewColorUnlock(); }, signalAchievementEvent: gameContextForEventListeners.callbacks.signalAchievementEvent, getBossManager: gameLogicGetBossManagerFunc
+                    }, 
+                    { screenShakeParams: gameLogicGetScreenShakeParamsFunc ? gameLogicGetScreenShakeParamsFunc() : {} });
                 if (dmgDealt > 0) GameState.setPostDamageImmunityTimer(CONSTANTS.POST_DAMAGE_IMMUNITY_DURATION);
             }
         },
         onPlayerBossAttackCollision: (attackData) => {
             const cp = gameLogicGetPlayerFunc();
              if (cp && !cp.isShieldOvercharging && (!cp.teleporting || cp.teleportEffectTimer <= 0) && GameState.getPostDamageImmunityTimer() <= 0) {
-                const dmgDealt = cp.takeDamage(attackData.damage, { postPopupImmunityTimer: GameState.getPostPopupImmunityTimer(), postDamageImmunityTimer: GameState.getPostDamageImmunityTimer(), score: GameState.getScore(), updateHealthDisplayCallback:UIManager.updateHealthDisplay, endGameCallback:endGameInternal, updateScoreCallback: (amt) => { GameState.incrementScore(amt); UIManager.updateScoreDisplay(GameState.getScore()); checkForNewColorUnlock(); AchievementManager.checkAllAchievements(getGameContextForAchievements()); }, checkForNewColorCallback: checkForNewColorUnlock, activeBuffNotificationsArray: gameLogicGetActiveBuffsFunc ? gameLogicGetActiveBuffsFunc() : [], CONSTANTS: CONSTANTS, signalAchievementEvent: gameContextForEventListeners.callbacks.signalAchievementEvent }, { screenShakeParams: gameLogicGetScreenShakeParamsFunc ? gameLogicGetScreenShakeParamsFunc() : {} });
+                const dmgDealt = cp.takeDamage(attackData.damage, 
+                    { /* gameContext for takeDamage */ 
+                        postPopupImmunityTimer: GameState.getPostPopupImmunityTimer(), postDamageImmunityTimer: GameState.getPostDamageImmunityTimer(), score: GameState.getScore(), updateHealthDisplayCallback:UIManager.updateHealthDisplay, endGameCallback:endGameInternal, updateScoreCallback: (amt) => { GameState.incrementScore(amt); UIManager.updateScoreDisplay(GameState.getScore()); if(gameContextForEventListeners.callbacks.checkForNewColorUnlock) gameContextForEventListeners.callbacks.checkForNewColorUnlock(); }, signalAchievementEvent: gameContextForEventListeners.callbacks.signalAchievementEvent, getBossManager: gameLogicGetBossManagerFunc
+                    }, 
+                    { screenShakeParams: gameLogicGetScreenShakeParamsFunc ? gameLogicGetScreenShakeParamsFunc() : {} });
                 if (dmgDealt > 0) GameState.setPostDamageImmunityTimer(CONSTANTS.POST_DAMAGE_IMMUNITY_DURATION);
             }
         },
@@ -970,7 +1031,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     initGameLoop(GameState.isGameOver, GameState.isGameRunning, GameState.isAnyPauseActive);
     setCanvasDimensions();
 
-    // Re-bind High Scores button to ensure it's the latest version
     const viewHighScoresBtn = document.getElementById('viewHighScoresButton');
     if (viewHighScoresBtn) {
         const newBtn = viewHighScoresBtn.cloneNode(true);
@@ -978,13 +1038,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         newBtn.addEventListener('click', () => gameContextForEventListeners.callbacks.viewDetailedHighScores());
     }
 
-    // Bind new Achievements button
     const viewAchievementsBtn = document.getElementById('viewAchievementsButton');
     if (viewAchievementsBtn && gameContextForEventListeners.callbacks.viewAchievements) {
         viewAchievementsBtn.addEventListener('click', gameContextForEventListeners.callbacks.viewAchievements);
     }
 
-    // Bind back button for achievements screen
     const backButtonAchievements = document.getElementById('backToMainMenuFromAchievementsButton');
     if (backButtonAchievements && gameContextForEventListeners.callbacks.goBackFromAchievements) {
         backButtonAchievements.addEventListener('click', gameContextForEventListeners.callbacks.goBackFromAchievements);
