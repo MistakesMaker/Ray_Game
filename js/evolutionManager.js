@@ -54,8 +54,8 @@ function generateSingleNewOffer(playerInstance, existingOfferBaseIds, additional
             rolledTier: baseEvo.isTiered ? rolledTierIfApplicable : null,
             text: baseEvo.text,
             detailedDescription: baseEvo.isTiered && tierSpecificData
-                ? (typeof tierSpecificData.description === 'function' ? tierSpecificData.description(playerInstance, rolledTierIfApplicable) : tierSpecificData.description)
-                : (typeof baseEvo.detailedDescription === 'function' ? baseEvo.detailedDescription(playerInstance, baseEvo.id, null) : baseEvo.detailedDescription), // Pass null for tier if not tiered
+                ? (typeof baseEvo.detailedDescription === 'function' ? baseEvo.detailedDescription(playerInstance, rolledTierIfApplicable, rolledTierIfApplicable) : (typeof tierSpecificData.description === 'function' ? tierSpecificData.description(playerInstance, rolledTierIfApplicable) : tierSpecificData.description) )
+                : (typeof baseEvo.detailedDescription === 'function' ? baseEvo.detailedDescription(playerInstance, baseEvo.id, null) : baseEvo.detailedDescription),
             applyEffect: baseEvo.isTiered && tierSpecificData ? tierSpecificData.apply : baseEvo.apply,
             cardEffectString: (typeof baseEvo.getCardEffectString === 'function')
                 ? baseEvo.getCardEffectString(rolledTierIfApplicable, playerInstance)
@@ -79,7 +79,6 @@ export function initializeEvolutionMasterList() {
     const maxColorImmunities = allColors ? allColors.length - CONSTANTS.INITIAL_RAY_COLORS.length : 0;
 
     evolutionChoicesMasterList = [
-        // ... (other evolutions remain the same) ...
         {
             id:'colorImmunity', classType: 'tank', text:"Chameleon Plating", level:0,
             maxLevel: maxColorImmunities,
@@ -248,33 +247,34 @@ export function initializeEvolutionMasterList() {
         },
         {
             id: 'temporalEcho', classType: 'ability', text: "Temporal Echo", level: 0, maxLevel: 999,
-            // This top-level detailedDescription is for the tooltip (Shift-hover)
             detailedDescription: function(playerInstance, evolutionIdOrTier, actualTierIfDifferent) {
                 const currentChance = playerInstance ? Math.round(playerInstance.temporalEchoChance * 100) : 0;
-                const reductionSeconds = (CONSTANTS.TEMPORAL_ECHO_FIXED_REDUCTION / 1000).toFixed(1);
+                const reductionAmount = CONSTANTS.TEMPORAL_ECHO_FIXED_REDUCTION; 
+                const reductionSeconds = reductionAmount ? (reductionAmount / 1000).toFixed(1) : 'N/A';
+                
                 let tierDesc = "";
-                if (typeof evolutionIdOrTier === 'string' && CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE[evolutionIdOrTier]) { // evolutionIdOrTier is actually the tier string here
+                if (typeof evolutionIdOrTier === 'string' && CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE && CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE[evolutionIdOrTier]) { 
                     tierDesc = `This upgrade adds +${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE[evolutionIdOrTier]}% Echo Chance.`;
                 }
                 return `${tierDesc}<br>Current Total: ${currentChance}% chance on ability use to reduce other cooldowns by ${reductionSeconds}s. (Does not affect the used ability).`;
             },
             isTiered: true,
             isMaxed: function(p) { return p && p.temporalEchoChance >= 1.0; },
-            tiers: { // These descriptions are for the tooltip when a specific tier is shown
+            tiers: { 
                 common:    { description: (p, tier) => `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE[tier]}%. (Current: ${Math.round((p?p.temporalEchoChance:0)*100)}%)`,   apply: function(p) { p.temporalEchoChance = Math.min(1.0, (p.temporalEchoChance || 0) + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.common / 100); }},
                 rare:      { description: (p, tier) => `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE[tier]}%. (Current: ${Math.round((p?p.temporalEchoChance:0)*100)}%)`,     apply: function(p) { p.temporalEchoChance = Math.min(1.0, (p.temporalEchoChance || 0) + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.rare / 100); }},
                 epic:      { description: (p, tier) => `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE[tier]}%. (Current: ${Math.round((p?p.temporalEchoChance:0)*100)}%)`,     apply: function(p) { p.temporalEchoChance = Math.min(1.0, (p.temporalEchoChance || 0) + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.epic / 100); }},
                 legendary: { description: (p, tier) => `Increases echo chance by ${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE[tier]}%. (Current: ${Math.round((p?p.temporalEchoChance:0)*100)}%)`, apply: function(p) { p.temporalEchoChance = Math.min(1.0, (p.temporalEchoChance || 0) + CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE.legendary / 100); }}
             },
             getEffectString: function(playerInstance) { return `Current Echo Chance: ${Math.round((playerInstance ? playerInstance.temporalEchoChance : 0) * 100)}%`; },
-            getCardEffectString: function(tier) { // This is for the main card display
+            getCardEffectString: function(tier) { 
                 const reductionSeconds = (CONSTANTS.TEMPORAL_ECHO_FIXED_REDUCTION / 1000).toFixed(1);
                 return `+${CONSTANTS.TEMPORAL_ECHO_TIER_CHANCE[tier]}% chance: ability use reduces other CDs by ${reductionSeconds}s.`;
             }
         },
         {
             id: 'streamlinedSystems', classType: 'ability', text: "Streamlined Systems", level: 0, maxLevel: 999,
-            detailedDescription: function(playerInstance, evolutionIdOrTier, actualTierIfDifferent) { // Modified to accept playerInstance and tier
+            detailedDescription: function(playerInstance, evolutionIdOrTier, actualTierIfDifferent) { 
                 const currentReduction = playerInstance ? (playerInstance.globalCooldownReduction || 0) * 100 : 0;
                 let tierDesc = "";
                  if (typeof evolutionIdOrTier === 'string' && CONSTANTS.STREAMLINED_SYSTEMS_TIER_REDUCTION[evolutionIdOrTier]) {
@@ -387,11 +387,10 @@ export function generateEvolutionOffers(playerInstance) {
             };
 
             if (originalMasterEvo.isTiered) {
-                const heldTier = frozenSnapshot.rolledTier; // Use the tier from the frozen snapshot
+                const heldTier = frozenSnapshot.rolledTier; 
                 if (heldTier && originalMasterEvo.tiers[heldTier]) {
                     const tierSpecificData = originalMasterEvo.tiers[heldTier];
                     reconstructedHeldOffer.rolledTier = heldTier;
-                    // For detailedDescription, prioritize the top-level function if available, passing the tier
                     reconstructedHeldOffer.detailedDescription = (typeof originalMasterEvo.detailedDescription === 'function')
                         ? originalMasterEvo.detailedDescription(playerInstance, heldTier, heldTier)
                         : (typeof tierSpecificData.description === 'function' ? tierSpecificData.description(playerInstance, heldTier) : tierSpecificData.description);
@@ -403,7 +402,7 @@ export function generateEvolutionOffers(playerInstance) {
                 } else {
                     isValidAndReconstructable = false; 
                 }
-            } else { // Non-tiered frozen evolution
+            } else { 
                 reconstructedHeldOffer.rolledTier = null;
                 reconstructedHeldOffer.detailedDescription = typeof originalMasterEvo.detailedDescription === 'function'
                     ? originalMasterEvo.detailedDescription(playerInstance, originalMasterEvo.id, null)
@@ -465,7 +464,7 @@ export function generateEvolutionOffers(playerInstance) {
                 };
                 offers[i] = offer;
                 filledIndices[i] = true;
-                 if (!offeredBaseIds.includes(offer.baseId)) { // Add to offeredBaseIds only if it's a new base ID
+                 if (!offeredBaseIds.includes(offer.baseId)) { 
                     offeredBaseIds.push(offer.baseId);
                 }
             } else {
@@ -561,6 +560,7 @@ export function handleEvolutionReRoll(playerInstance) {
         return;
     }
     playerInstance.evolutionReRollsRemaining--;
+    playerInstance.rerollsUsedThisRun = true; // Track usage for achievement
     if (_dependencies.playSound) _dependencies.playSound(_dependencies.audioEvolutionSound);
 
     if (playerInstance.frozenEvolutionChoice && playerInstance.hasUsedFreezeForCurrentOffers) {
@@ -657,6 +657,7 @@ function handleFreezeSelection(uiSelectedChoiceToFreeze, indexOfCardInOffer, pla
             if (playerInstance.evolutionFreezesRemaining > 0) {
                 playerInstance.evolutionFreezesRemaining--;
                 playerInstance.hasUsedFreezeForCurrentOffers = true;
+                playerInstance.freezesUsedThisRun = true; // Track usage
                 if (_dependencies.playSound) _dependencies.playSound(_dependencies.audioEvolutionSound);
             } else {
                  if (_dependencies.playSound) _dependencies.playSound(_dependencies.audioTargetHitSound);
@@ -670,6 +671,7 @@ function handleFreezeSelection(uiSelectedChoiceToFreeze, indexOfCardInOffer, pla
             }
 
             playerInstance.evolutionFreezesRemaining--;
+            playerInstance.freezesUsedThisRun = true; // Track usage
             const { originalEvolution, ...restOfChoiceData } = uiSelectedChoiceToFreeze;
             playerInstance.frozenEvolutionChoice = {
                 choiceData: { ...restOfChoiceData, baseId: originalEvolution.id },
@@ -726,6 +728,7 @@ function handleBlockActionOnCard(baseIdToBlock, playerInstance) {
 
     playerInstance.blockedEvolutionIds.push(baseIdToBlock);
     playerInstance.evolutionBlocksRemaining--;
+    playerInstance.blocksUsedThisRun = true; // Track usage
     _isBlockModeActiveManager = false; playerInstance.isBlockModeActive = false;
     if (_dependencies.playSound) _dependencies.playSound(_dependencies.audioUpgradeSound);
 

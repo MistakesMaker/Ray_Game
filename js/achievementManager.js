@@ -1,23 +1,37 @@
 // js/achievementManager.js
 import { allAchievements as achievementDefinitions } from './achievementsData.js';
 import * as UIManager from './uiManager.js';
-import * as CONSTANTS_MODULE from './constants.js'; // Import all constants for dynamic access
+import * as CONSTANTS_MODULE from './constants.js'; 
 
 const UNLOCKED_ACHIEVEMENTS_STORAGE_KEY = 'lightBlasterOmega_unlockedAchievements_v1';
+const MAX_BOSS_TIERS_DEFEATED_KEY = 'lightBlasterOmega_maxBossTiersDefeated_v1'; 
 
 let processedAchievements = [];
 let newAchievementsThisSession = new Set();
+let maxBossTiersDefeated = { 
+    chaser: 0,
+    reflector: 0,
+    singularity: 0
+};
 
 export function initializeAchievements() {
     let unlockedIds = [];
     try {
-        const stored = localStorage.getItem(UNLOCKED_ACHIEVEMENTS_STORAGE_KEY);
-        if (stored) {
-            unlockedIds = JSON.parse(stored);
+        const storedUnlocked = localStorage.getItem(UNLOCKED_ACHIEVEMENTS_STORAGE_KEY);
+        if (storedUnlocked) {
+            unlockedIds = JSON.parse(storedUnlocked);
+        }
+        const storedMaxTiers = localStorage.getItem(MAX_BOSS_TIERS_DEFEATED_KEY);
+        if (storedMaxTiers) {
+            const parsedTiers = JSON.parse(storedMaxTiers);
+            if (parsedTiers.chaser && typeof parsedTiers.chaser === 'number') maxBossTiersDefeated.chaser = parsedTiers.chaser;
+            if (parsedTiers.reflector && typeof parsedTiers.reflector === 'number') maxBossTiersDefeated.reflector = parsedTiers.reflector;
+            if (parsedTiers.singularity && typeof parsedTiers.singularity === 'number') maxBossTiersDefeated.singularity = parsedTiers.singularity;
         }
     } catch (e) {
-        console.error("Error parsing unlocked achievements from localStorage:", e);
+        console.error("Error parsing achievements/boss tiers from localStorage:", e);
         unlockedIds = [];
+        maxBossTiersDefeated = { chaser: 0, reflector: 0, singularity: 0 };
     }
 
     processedAchievements = achievementDefinitions.map(def => ({
@@ -26,6 +40,20 @@ export function initializeAchievements() {
     }));
     newAchievementsThisSession.clear();
 }
+
+function updateMaxBossTierDefeated(bossKey, tier) {
+    if (maxBossTiersDefeated.hasOwnProperty(bossKey)) {
+        if (tier > maxBossTiersDefeated[bossKey]) {
+            maxBossTiersDefeated[bossKey] = tier;
+            try {
+                localStorage.setItem(MAX_BOSS_TIERS_DEFEATED_KEY, JSON.stringify(maxBossTiersDefeated));
+            } catch (e) {
+                console.error("Error saving max boss tiers to localStorage:", e);
+            }
+        }
+    }
+}
+
 
 export function isAchievementUnlocked(achievementId) {
     const achievement = processedAchievements.find(ach => ach.id === achievementId);
@@ -72,7 +100,7 @@ function evaluateCondition(achievement, gameContext) {
     const gameState = gameContext.GameState;
     const conditions = achievement.unlockConditions;
     const initialCharges = gameContext.initialEvoScreenCharges || { rerolls: -1, blocks: -1, freezes: -1 };
-    const constants = gameContext.CONSTANTS || CONSTANTS_MODULE; // Ensure constants are available
+    const constants = gameContext.CONSTANTS || CONSTANTS_MODULE; 
 
     switch (conditions.type) {
         case "player_stat_gte":
@@ -142,8 +170,12 @@ function evaluateCondition(achievement, gameContext) {
                    usedThisScreen === maxPossibleForInteraction &&
                    currentRunTotalRemaining === expectedValueAfterUse;
 
-        case "event_teleport_kill_target":
-            return !!(gameContext.eventFlags && gameContext.eventFlags.teleport_kill_target);
+        case "event_aegis_teleport_impact_kill": // For "Warp Slam"
+            if (gameContext.eventFlags && gameContext.eventFlags.event_aegis_teleport_impact_kill) {
+                // The achievement definition also has `path: "aegis"` which will be implicitly checked if path is part of the condition object
+                return player.currentPath === conditions.path; 
+            }
+            return false;
 
         case "path_ability_specific_count":
             if (player.currentPath === conditions.path) {
@@ -163,6 +195,13 @@ function evaluateCondition(achievement, gameContext) {
 
         case "event_nexus_weaver_defeated_first_time_run":
             return !!(gameContext.eventFlags && gameContext.eventFlags.nexus_weaver_defeated_first_time_run);
+        
+        case "event_nexus_weaver_defeated": 
+            if (gameContext.eventFlags && gameContext.eventFlags.event_nexus_weaver_defeated) { 
+                const eventData = gameContext.eventFlags.event_nexus_weaver_defeated_data || {};
+                return eventData.bossTier === conditions.bossTier;
+            }
+            return false;
 
         case "event_boss_defeated_flawless":
             return !!(gameContext.eventFlags && gameContext.eventFlags.boss_defeated_flawless);
@@ -201,7 +240,11 @@ function evaluateCondition(achievement, gameContext) {
         case "event_momentum_ray_hit_high_damage":
             if (gameContext.eventFlags && gameContext.eventFlags.momentum_ray_hit_high_damage) {
                 const eventData = gameContext.eventFlags.momentum_ray_hit_high_damage_data || {};
-                return eventData.damageDealt >= conditions.minDamage && eventData.momentumBonus > 0;
+                let requiredDamage = conditions.minDamage;
+                if (achievement.id === "one_shot_wonder_gm") { 
+                    requiredDamage = 50; 
+                }
+                return eventData.damageDealt >= requiredDamage && eventData.momentumBonus > 0;
             }
             return false;
 
@@ -231,14 +274,14 @@ function evaluateCondition(achievement, gameContext) {
             }
             return false;
 
-        case "event_multi_unique_standard_boss_flawless": // For "Flawless Gauntlet (Master)"
-             if (gameContext.eventFlags && gameContext.eventFlags.multi_unique_standard_boss_flawless) {
+        case "event_multi_unique_standard_boss_flawless": 
+             if (gameContext.eventFlags && gameContext.eventFlags.multi_unique_standard_boss_flawless) { 
                 const eventData = gameContext.eventFlags.multi_unique_standard_boss_flawless_data || {};
                 return eventData.uniqueFlawlessBossTypes >= conditions.count;
             }
             return false;
         
-        case "event_multi_unique_boss_flawless_any_type": // For "Flawless Victory x3 (Hard)"
+        case "event_multi_unique_boss_flawless_any_type":
             if (gameContext.eventFlags && gameContext.eventFlags.multi_unique_boss_flawless_any_type) {
                 const eventData = gameContext.eventFlags.multi_unique_boss_flawless_any_type_data || {};
                 return eventData.uniqueFlawlessBossTypes >= conditions.count;
@@ -262,12 +305,18 @@ function evaluateCondition(achievement, gameContext) {
                 if (eventData.path !== conditions.path || eventData.bossKey !== conditions.bossKey || eventData.bossTier !== conditions.bossTier) {
                     return false;
                 }
+                if (achievement.id === "archmage_ascendant_gm") { 
+                    return eventData.onlyAllowedAbilitiesUsed === true &&
+                           Array.isArray(eventData.abilitiesUsed) &&
+                           eventData.abilitiesUsed.length === 1 &&
+                           eventData.abilitiesUsed[0] === "omegaLaser";
+                }
                 return eventData.onlyAllowedAbilitiesUsed === true &&
                        (Array.isArray(eventData.abilitiesUsed) && eventData.abilitiesUsed.length > 0);
             }
             return false;
 
-        case "path_boss_buffed_kill":
+        case "path_boss_buffed_kill": 
             if (player.currentPath === conditions.path && gameContext.eventFlags && gameContext.eventFlags.path_boss_buffed_kill) {
                 const eventData = gameContext.eventFlags.path_boss_buffed_kill_data || {};
                 if (eventData.bossKey === conditions.bossKey && eventData.bossTier === conditions.bossTier) {
@@ -277,6 +326,15 @@ function evaluateCondition(achievement, gameContext) {
                         return false;
                     });
                 }
+            }
+            return false;
+        
+        case "event_berserker_boss_high_rage_kill": 
+            if (player.currentPath === 'berserker' && gameContext.eventFlags && gameContext.eventFlags.event_berserker_boss_high_rage_kill) {
+                const eventData = gameContext.eventFlags.event_berserker_boss_high_rage_kill_data || {};
+                return eventData.bossKey === conditions.bossKey && 
+                       eventData.bossTier === conditions.bossTier &&
+                       eventData.maintainedHighRageEntireFight === true; 
             }
             return false;
 
@@ -296,6 +354,30 @@ function evaluateCondition(achievement, gameContext) {
         case "event_kinetic_cascade_mage":
             return !!(gameContext.eventFlags && gameContext.eventFlags.kinetic_cascade_mage);
 
+        case "event_nexus_tX_defeated_flawless_run":
+            if (gameContext.eventFlags && gameContext.eventFlags.event_nexus_tX_defeated_flawless_run) {
+                const eventData = gameContext.eventFlags.event_nexus_tX_defeated_flawless_run_data || {};
+                return eventData.bossTier === conditions.bossTier && player.timesHit === 0;
+            }
+            return false;
+
+        case "event_nexus_tX_defeated_no_evo_interaction_use":
+            if (gameContext.eventFlags && gameContext.eventFlags.event_nexus_tX_defeated_no_evo_interaction_use) {
+                const eventData = gameContext.eventFlags.event_nexus_tX_defeated_no_evo_interaction_use_data || {};
+                return eventData.bossTier === conditions.bossTier &&
+                       !player.rerollsUsedThisRun &&
+                       !player.blocksUsedThisRun &&
+                       !player.freezesUsedThisRun;
+            }
+            return false;
+        
+        case "event_any_standard_boss_tier_X_defeated": 
+            if (gameContext.eventFlags && gameContext.eventFlags.event_any_standard_boss_tier_X_defeated) {
+                const eventData = gameContext.eventFlags.event_any_standard_boss_tier_X_defeated_data || {};
+                return eventData.bossTier >= conditions.minTier;
+            }
+            return false;
+
     }
     return false;
 }
@@ -303,7 +385,7 @@ function evaluateCondition(achievement, gameContext) {
 export function checkAllAchievements(gameContext) {
     if (!processedAchievements || processedAchievements.length === 0) return;
     if (!gameContext || !gameContext.player || !gameContext.GameState) return;
-
+    
     processedAchievements.forEach(achievement => {
         if (!achievement.isUnlocked) {
             if (evaluateCondition(achievement, gameContext)) {
@@ -316,10 +398,11 @@ export function checkAllAchievements(gameContext) {
         const flagsToReset = [
             "heart_pickup_full_hp",
             "player_hp_critical_after_hit",
-            "teleport_kill_target",
+            "event_aegis_teleport_impact_kill", 
             "shield_siphon_mage",
             "aegis_passive_collision_damage_boss",
             "nexus_weaver_defeated_first_time_run",
+            "event_nexus_weaver_defeated", 
             "boss_defeat_no_abilities",
             "ray_hit_boss_after_bounces",
             "boss_defeated_flawless",
@@ -332,14 +415,27 @@ export function checkAllAchievements(gameContext) {
             "tX_boss_defeated_high_hp",
             "nexus_weaver_defeated_no_abilities_strict",
             "standard_boss_tX_defeated_no_class_evo",
-            "multi_unique_standard_boss_flawless",
-            "multi_unique_boss_flawless_any_type", // New flag for any boss type
-            "nexus_t3_defeated_no_minions_killed",
+            "multi_unique_standard_boss_flawless", 
+            "multi_unique_boss_flawless_any_type",
+            "nexus_t3_defeated_no_minions_killed", 
             "path_boss_ability_only_kill",
             "path_boss_buffed_kill",
-            "nexus_t3_defeated_no_pickups",
-            "kinetic_cascade_mage",
+            "event_berserker_boss_high_rage_kill", 
+            "nexus_t3_defeated_no_pickups",        
+            "kinetic_cascade_mage",    
+            "event_nexus_tX_defeated_flawless_run", 
+            "event_nexus_tX_defeated_no_evo_interaction_use", 
+            "event_any_standard_boss_tier_X_defeated" 
         ];
+        // Remove the old "teleport_kill_target" if it's no longer used for anything else.
+        // For now, I'll keep it in case some other logic (not related to Warp Slam) might use it.
+        // If you are sure it's fully replaced, you can remove it from flagsToReset.
+        if (flagsToReset.includes("teleport_kill_target")) { // Only remove if it was there
+            const oldTeleportIndex = flagsToReset.indexOf("teleport_kill_target");
+            if (oldTeleportIndex > -1) flagsToReset.splice(oldTeleportIndex, 1);
+        }
+
+
         flagsToReset.forEach(flagName => {
             if (gameContext.eventFlags.hasOwnProperty(flagName)) {
                 gameContext.eventFlags[flagName] = false;

@@ -50,8 +50,8 @@ import {
     upgradeSound as audioUpgradeSound,
 } from './audio.js';
 import { PlayerGravityWell, Ray } from './ray.js';
-import { NexusWeaverBoss } from './nexusWeaverBoss.js';
-import { BossNPC } from './bossBase.js';
+import { NexusWeaverBoss } from './nexusWeaverBoss.js'; 
+import { BossNPC } from './bossBase.js'; 
 
 const AEGIS_RAM_COOLDOWN = 1000;
 
@@ -124,7 +124,10 @@ export class Player {
         this.hasAegisPathHelm = false;
         this.berserkerPermanentRayDamageMultiplier = 1.0;
         this.berserkerRagePercentage = 0;
-        this.berserkerRageHighDurationTimer = 0;
+        this.berserkerRageHighDurationTimer = 0; 
+        this.totalTimeInBossFight = 0;       
+        this.timeWithHighRageInBossFight = 0;  
+        this.maintainedHighRageThisBossFight = true; 
         this.aegisRamCooldownTimer = 0;
 
         this.activeAbilities = {
@@ -143,7 +146,7 @@ export class Player {
         this.momentumAnimTimer = Math.random() * 5000;
         this.ablativeAnimTimer = Math.random() * 5000;
         this.aegisAnimTimer = Math.random() * 5000;
-        this.timesHit = 0;
+        this.timesHit = 0; 
         this.totalDamageDealt = 0;
         this.targetsDestroyedThisRun = 0;
         this.originalPlayerSpeed = initialPlayerSpeed;
@@ -204,8 +207,15 @@ export class Player {
         this.isFreezeModeActive = false;
         this.hasUsedFreezeForCurrentOffers = false;
 
+        this.rerollsUsedThisRun = false; 
+        this.blocksUsedThisRun = false;  
+        this.freezesUsedThisRun = false; 
+
         this.usedAbilityInCurrentBossFight = false;
         this.hasTriggeredAegisPassiveBossDamageThisRun = false;
+        this.isAegisTeleportImpactPending = false; 
+        this.aegisTeleportImpactTimer = 0; 
+
         this.damageTakenThisBossFight = 0;
         this.teleportTimestamps = [];
         this.eventDataForNextSignal = {};
@@ -244,6 +254,15 @@ export class Player {
                     this.teleporting = false; this.teleportEffectTimer = 0;
                 }
             }
+
+            if (this.isAegisTeleportImpactPending && this.aegisTeleportImpactTimer > 0) {
+                this.aegisTeleportImpactTimer -= dt;
+                if (this.aegisTeleportImpactTimer <= 0) {
+                    this.isAegisTeleportImpactPending = false;
+                    this.aegisTeleportImpactTimer = 0;
+                }
+            }
+
 
             if (this.currentPath === 'aegis' && this.isChargingAegisCharge) {
                 const chargeProgress = Math.min(1, this.aegisChargeCurrentChargeTime / AEGIS_CHARGE_MAX_CHARGE_TIME);
@@ -360,7 +379,7 @@ export class Player {
                         if (Math.hypot(this.x - this.aegisChargeDashTargetX, this.y - this.aegisChargeDashTargetY) < dashSpeed * 0.5 || this.aegisChargeDashTimer <= 0) {
                             this.isAegisChargingDash = false; this.aegisChargeDashTimer = 0;
                             this.currentChargeRotation = 0;
-                            this.dealAegisChargeImpactDamage(activeBosses, targets, {updateScoreCallback});
+                            this.dealAegisChargeImpactDamage(activeBosses, targets, {updateScoreCallback, signalAchievementEvent}); 
                             let cd = gameConstants.AEGIS_CHARGE_COOLDOWN * (1.0 - this.globalCooldownReduction); this.aegisChargeCooldownTimer = Math.max(gameConstants.AEGIS_CHARGE_COOLDOWN * 0.1, cd);
                         }
                          mouseAbilityUIUpdateNeeded = true;
@@ -380,13 +399,13 @@ export class Player {
                      if (this.savageHowlAttackSpeedBuffTimer > 0) { this.savageHowlAttackSpeedBuffTimer -= dt; mouseAbilityUIUpdateNeeded = true; if (this.savageHowlAttackSpeedBuffTimer <= 0) this.isSavageHowlAttackSpeedBuffActive = false;}
                      if (this.savageHowlCooldownTimer > 0) {let ecm = Math.max(0.1, 1.0 - this.globalCooldownReduction); this.savageHowlCooldownTimer -= dt/ecm; mouseAbilityUIUpdateNeeded = true; if(this.savageHowlCooldownTimer < 0) this.savageHowlCooldownTimer=0;}
                 }
-                if (this.berserkerRagePercentage > 50) {
+                if (this.berserkerRagePercentage > 50) { 
                     this.berserkerRageHighDurationTimer += dt;
                     if (this.berserkerRageHighDurationTimer >= 120000 && signalAchievementEvent) { 
-                        signalAchievementEvent("sustained_fury_berserker", { 
+                        signalAchievementEvent("player_stat_duration_gte", { 
                             path: "berserker",
-                            stat: "berserkerRageHighDurationTimer",
-                            durationMs: this.berserkerRageHighDurationTimer
+                            stat: "berserkerRageHighDurationTimer", 
+                            durationMs: this.berserkerRageHighDurationTimer 
                         });
                     }
                 } else {
@@ -466,13 +485,11 @@ export class Player {
                 if (!(this.teleporting && this.teleportEffectTimer > 0)) {
                     for (const boss of activeBosses) {
                         if (checkCollision({ x: nX, y: this.y, radius: this.radius }, boss)) {
-                            if (this.hasAegisPathHelm && this.currentPath === 'aegis') this.handleAegisCollisionWithBoss(boss, gameContext);
                             nX = this.x; break;
                         }
                     }
                     for (const boss of activeBosses) {
                         if (checkCollision({ x: this.x, y: nY, radius: this.radius }, boss)) {
-                             if (this.hasAegisPathHelm && this.currentPath === 'aegis') this.handleAegisCollisionWithBoss(boss, gameContext);
                             nY = this.y; break;
                         }
                     }
@@ -570,14 +587,11 @@ export class Player {
                     this.gainHealth(regenAmount, updateHealthDisplayCallback);
                 }
             }
-        };
+        }; // End of update method
 
         this.handleAegisCollisionWithBoss = (boss, gameContext) => {
             if (!this.hasAegisPathHelm || !boss || boss.health <= 0 || this.currentPath !== 'aegis') return;
 
-            if (this.aegisRamCooldownTimer > 0) { 
-                return false; 
-            }
             this.aegisRamCooldownTimer = AEGIS_RAM_COOLDOWN;
 
             if (boss.lastHitByAegisTimer && (Date.now() - boss.lastHitByAegisTimer < 200) ) return false;
@@ -612,11 +626,9 @@ export class Player {
                 if (typeof boss.recoilVelX === 'number' && typeof boss.recoilVelY === 'number') {
                     boss.recoilVelX += Math.cos(angleToBoss) * knockbackForce;
                     boss.recoilVelY += Math.sin(angleToBoss) * knockbackForce;
-                    if (typeof boss.playerCollisionStunTimer === 'number' && typeof boss.PLAYER_COLLISION_STUN_DURATION === 'number') { 
-                        boss.playerCollisionStunTimer = Math.max(boss.playerCollisionStunTimer, (boss.PLAYER_COLLISION_STUN_DURATION || boss.AEGIS_PASSIVE_BOSS_STUN_DURATION || 200) * 0.3);
-                        if(typeof boss.speed === 'number') boss.speed = 0;
-                    } else if (typeof boss.playerCollisionStunTimer === 'number' && typeof boss.AEGIS_PASSIVE_BOSS_STUN_DURATION === 'number') { 
-                         boss.playerCollisionStunTimer = Math.max(boss.playerCollisionStunTimer, boss.AEGIS_PASSIVE_BOSS_STUN_DURATION);
+                    const stunDuration = boss.PLAYER_COLLISION_STUN_DURATION || boss.AEGIS_PASSIVE_BOSS_STUN_DURATION || 200;
+                    if (typeof boss.playerCollisionStunTimer === 'number') {
+                         boss.playerCollisionStunTimer = Math.max(boss.playerCollisionStunTimer, stunDuration * 0.5); 
                          if(typeof boss.speed === 'number') boss.speed = 0;
                     }
                 } else {
@@ -630,7 +642,7 @@ export class Player {
             this.velY += Math.sin(angleFromBoss) * AEGIS_PATH_BOSS_KNOCKBACK_FORCE * AEGIS_PATH_PLAYER_SELF_KNOCKBACK_FACTOR;
             return true; 
         };
-    }
+    } // End of constructor
 
     reset(canvasWidth, canvasHeight) {
         this.x = canvasWidth ? canvasWidth / 2 : PLAYER_BASE_RADIUS * 5;
@@ -686,6 +698,9 @@ export class Player {
         this.berserkerPermanentRayDamageMultiplier = 1.0;
         this.berserkerRagePercentage = 0;
         this.berserkerRageHighDurationTimer = 0;
+        this.totalTimeInBossFight = 0;       
+        this.timeWithHighRageInBossFight = 0; 
+        this.maintainedHighRageThisBossFight = true;
         this.aegisRamCooldownTimer = 0;
 
         this.activeAbilities = { '1': null, '2': null, '3': null };
@@ -696,7 +711,7 @@ export class Player {
         this.teleporting = false;
         this.teleportEffectTimer = 0;
         this.activeMiniWell = null;
-        this.timesHit = 0;
+        this.timesHit = 0; 
         this.totalDamageDealt = 0;
         this.targetsDestroyedThisRun = 0;
         this.usedAbilityInCurrentBossFight = false;
@@ -726,7 +741,15 @@ export class Player {
         this.frozenEvolutionChoice = null;
         this.isFreezeModeActive = false;
         this.hasUsedFreezeForCurrentOffers = false;
+
+        this.rerollsUsedThisRun = false; 
+        this.blocksUsedThisRun = false;  
+        this.freezesUsedThisRun = false; 
+
         this.hasTriggeredAegisPassiveBossDamageThisRun = false;
+        this.isAegisTeleportImpactPending = false; 
+        this.aegisTeleportImpactTimer = 0;
+
         this.damageTakenThisBossFight = 0;
         this.teleportTimestamps = [];
         this.eventDataForNextSignal = {};
@@ -876,13 +899,13 @@ export class Player {
 
             if (this.isChargingAegisCharge) { 
                 const chargeProgress = Math.min(1, this.aegisChargeCurrentChargeTime / AEGIS_CHARGE_MAX_CHARGE_TIME);
-                const endAngleProgress = -Math.PI / 2 + (chargeProgress * Math.PI * 2); // Renamed to avoid conflict
+                const endAngleProgress = -Math.PI / 2 + (chargeProgress * Math.PI * 2); 
                 
                 if (this.immuneColorsList.length > 0) {
                     const numColors = this.immuneColorsList.length;
                     const segmentAngleTotal = endAngleProgress - (-Math.PI / 2); 
                     const segmentAnglePerColor = segmentAngleTotal / numColors;
-                    let currentSegmentStartAngle = -Math.PI / 2;
+                    let currentSegmentStartAngle = -Math.PI / 2; 
 
                     for (let i = 0; i < numColors; i++) {
                         const color = this.immuneColorsList[i];
@@ -894,11 +917,11 @@ export class Player {
                             ctx.strokeStyle = chargeProgress >= 1 ? AEGIS_CHARGE_INDICATOR_COLOR_FULL : color;
                             ctx.stroke();
                         }
-                        currentSegmentStartAngle = segmentEnd;
+                        currentSegmentStartAngle = segmentEnd; 
                          if (currentSegmentStartAngle >= endAngleProgress - 0.001) break; 
                     }
-                    // If charge isn't full and there's remaining arc because colors didn't perfectly fill up to endAngleProgress
-                    if (chargeProgress < 1 && currentSegmentStartAngle < endAngleProgress) { 
+                    
+                    if (chargeProgress < 1 && currentSegmentStartAngle < endAngleProgress - 0.001) { 
                         ctx.beginPath();
                         ctx.arc(0, 0, indicatorVisualRadius, currentSegmentStartAngle, endAngleProgress); 
                         ctx.strokeStyle = AEGIS_CHARGE_INDICATOR_COLOR_CHARGING;
@@ -907,7 +930,7 @@ export class Player {
 
                 } else { 
                     ctx.beginPath();
-                    ctx.arc(0, 0, indicatorVisualRadius, -Math.PI / 2, endAngleProgress);
+                    ctx.arc(0, 0, indicatorVisualRadius, -Math.PI / 2, endAngleProgress); 
                     ctx.strokeStyle = chargeProgress >= 1 ? AEGIS_CHARGE_INDICATOR_COLOR_FULL : AEGIS_CHARGE_INDICATOR_COLOR_CHARGING;
                     ctx.stroke();
                 }
@@ -1244,14 +1267,14 @@ export class Player {
             effectiveDamageTakenMultiplier *= (1 - AEGIS_CHARGE_DR_DURING_DASH);
         }
 
-        // Aegis path is immune to direct boss BODY collision damage if this function is called for it.
-        // Projectiles/AoE will still pass through.
         if (this.hasAegisPathHelm && this.currentPath === 'aegis' &&
-            typeof hittingRayOrAmount === 'object' && hittingRayOrAmount !== null &&
-            !(hittingRayOrAmount instanceof Ray) && // Check if it's NOT a Ray (i.e., it's a boss body)
-            typeof hittingRayOrAmount.tier === 'number' // Further indication it's a boss
-           ) {
-            return 0; // Aegis takes no damage from direct boss body collision
+            typeof hittingRayOrAmount === 'object' &&
+            hittingRayOrAmount !== null &&
+            !(hittingRayOrAmount instanceof Ray) && 
+            typeof hittingRayOrAmount.tier === 'number' && 
+            typeof hittingRayOrAmount.dx === 'undefined')
+        {
+            return 0; 
         }
 
         if (this.isShieldOvercharging && this.currentPath === 'mage') {
@@ -1283,9 +1306,12 @@ export class Player {
         if (typeof hittingRayOrAmount === 'object' && hittingRayOrAmount !== null && hittingRayOrAmount instanceof Ray) {
             hittingRayObject = hittingRayOrAmount;
             damageToTake = hittingRayObject.damageValue !== undefined ? hittingRayObject.damageValue : RAY_DAMAGE_TO_PLAYER;
-        } else if (typeof hittingRayOrAmount === 'number') { // Direct damage amount (e.g. from Pulse Nova)
+        } else if (typeof hittingRayOrAmount === 'number') { 
             damageToTake = hittingRayOrAmount;
-        } else { // Fallback, should ideally not happen if called with a boss object that's not a Ray
+        } else if (typeof hittingRayOrAmount === 'object' && hittingRayOrAmount !== null && typeof hittingRayOrAmount.damage === 'number'){ // For direct damage objects like Pulse Nova
+             damageToTake = hittingRayOrAmount.damage;
+        }
+        else { 
             damageToTake = RAY_DAMAGE_TO_PLAYER; 
         }
 
@@ -1371,12 +1397,13 @@ export class Player {
             });
 
             if (typesPresent.size >= 3) {
-                // Access _mainCallbacks through a passed context or a globally accessible way if absolutely necessary
-                // For now, assuming signalAchievementEvent is part of a gameContext passed to player.update
-                if (gameContextForEventListeners && gameContextForEventListeners.callbacks && gameContextForEventListeners.callbacks.signalAchievementEvent) { // This might not be accessible here
-                     gameContextForEventListeners.callbacks.signalAchievementEvent("event_kinetic_cascade_mage");
-                } else if (_mainCallbacks && _mainCallbacks.signalAchievementEvent) { // Check if main.js _mainCallbacks is accessible (not ideal)
+                 // The global _mainCallbacks is not ideal to access here directly.
+                 // This signaling should ideally happen via the gameContext passed to player.update.
+                 // For now, we assume signalAchievementEvent is available via a higher scope or context.
+                if (typeof _mainCallbacks !== 'undefined' && _mainCallbacks && _mainCallbacks.signalAchievementEvent) { 
                      _mainCallbacks.signalAchievementEvent("event_kinetic_cascade_mage");
+                } else if (GameState && typeof GameState.getSignalAchievementEvent === 'function') { // Fallback if GameState holds it
+                    GameState.getSignalAchievementEvent()("event_kinetic_cascade_mage");
                 }
                 this.recentKineticBoosts = []; 
             }
@@ -1455,7 +1482,20 @@ export class Player {
         } else if (ability.cooldownTimer <= 0) {
             switch (ability.id) {
                 case 'teleport':
-                    this.doTeleport(abilityContext.bossDefeatEffectsArray, abilityContext.mouseX, abilityContext.mouseY, abilityContext.canvasWidth, abilityContext.canvasHeight, targets, signalAchievementEvent);
+                    if (this.currentPath === 'aegis' && (this.isChargingAegisCharge || this.isAegisChargingDash)) {
+                        this.isAegisTeleportImpactPending = true;
+                        this.aegisTeleportImpactTimer = 300; 
+                    } else {
+                        this.isAegisTeleportImpactPending = false; 
+                    }
+
+                    this.doTeleport(
+                        abilityContext.bossDefeatEffectsArray, 
+                        abilityContext.mouseX, abilityContext.mouseY, 
+                        abilityContext.canvasWidth, abilityContext.canvasHeight, 
+                        activeBosses, 
+                        signalAchievementEvent
+                    );
                     ability.cooldownTimer = effectiveCooldownToSet; abilityUsedSuccessfully = true;
                      if (abilityUsedSuccessfully && this.kineticCharge >= this.kineticChargeConsumption) this.consumeKineticChargeForDamageBoost(`numeric_${ability.id}`);
                     break;
@@ -1481,13 +1521,13 @@ export class Player {
     }
 
 
-    doTeleport(bossDefeatEffectsArray, mouseX, mouseY, canvasWidth, canvasHeight, targetsArray, signalAchievementEventCallback) {
-        if (this.teleporting && this.teleportEffectTimer > 0) return;
+    doTeleport(bossDefeatEffectsArray, mouseX, mouseY, canvasWidth, canvasHeight, activeBossesArray, signalAchievementEventCallback) {
+        if (this.teleporting && this.teleportEffectTimer > 0) return; 
         const oldX = this.x; const oldY = this.y;
 
         if (signalAchievementEventCallback) {
             this.teleportTimestamps.push(Date.now());
-            if (this.teleportTimestamps.length > 10) {
+            if (this.teleportTimestamps.length > 10) { 
                 this.teleportTimestamps.splice(0, this.teleportTimestamps.length - 10);
             }
         }
@@ -1502,31 +1542,18 @@ export class Player {
             bossDefeatEffectsArray.push({ x: this.x, y: this.y, radius: this.radius * 0.2, maxRadius: this.radius * 1.8, opacity: 0.8, timer: 350, duration: 350, color: 'rgba(200, 200, 255, opacity)', initialRadius: this.radius * 0.2 });
         }
         playSound(teleportSound);
-
-        if (targetsArray && targetsArray.length > 0 && signalAchievementEventCallback) {
-            let teleFragged = false;
-            for (let i = targetsArray.length - 1; i >= 0; i--) {
-                if (checkCollision(this, targetsArray[i])) {
-                    teleFragged = true;
-                    break;
-                }
-            }
-            if (teleFragged) {
-                signalAchievementEventCallback("teleport_kill_target");
-            }
-        }
-
+        
+        // The "Tele-Frag" for small red targets is removed.
+        // "Warp Slam" (Aegis Teleport Impact) is handled in dealAegisChargeImpactDamage.
+        
         if (signalAchievementEventCallback && this.teleportTimestamps.length >= 5) {
             const requiredCount = 5;
-            const timeWindow = 60000;
-            for (let i = this.teleportTimestamps.length - requiredCount; i >= 0; i--) {
-                const recentTimestamps = this.teleportTimestamps.slice(i, i + requiredCount);
-                if (recentTimestamps.length === requiredCount) {
-                    if ((recentTimestamps[requiredCount - 1] - recentTimestamps[0]) <= timeWindow) {
-                        signalAchievementEventCallback("rapid_relocation_success");
-                        this.teleportTimestamps = [];
-                        break;
-                    }
+            const timeWindow = 60000; 
+            if (this.teleportTimestamps.length >= requiredCount) {
+                 const recentTimestamps = this.teleportTimestamps.slice(-requiredCount);
+                 if ((recentTimestamps[requiredCount - 1] - recentTimestamps[0]) <= timeWindow) {
+                    signalAchievementEventCallback("rapid_relocation_success");
+                    this.teleportTimestamps = []; 
                 }
             }
         }
@@ -1597,12 +1624,12 @@ export class Player {
     activateAegisCharge_LMB_Aegis(abilityContext, isRelease = false) {
         if (!this.hasAegisCharge) return;
 
-        if (!isRelease) {
+        if (!isRelease) { 
             if (this.aegisChargeCooldownTimer <= 0 && !this.isChargingAegisCharge && !this.isAegisChargingDash) {
                 this.isChargingAegisCharge = true;
                 this.aegisChargeCurrentChargeTime = 0;
             }
-        } else {
+        } else { 
             if (this.isChargingAegisCharge) {
                 this.isChargingAegisCharge = false;
                 this.isAegisChargingDash = true;
@@ -1610,7 +1637,10 @@ export class Player {
                 this.aegisChargeDashTargetY = abilityContext.mouseY;
                 const dist = Math.hypot(this.aegisChargeDashTargetX - this.x, this.aegisChargeDashTargetY - this.y);
                 const dashSpeed = this.originalPlayerSpeed * AEGIS_CHARGE_DASH_SPEED_FACTOR;
-                this.aegisChargeDashTimer = (dist / dashSpeed) * (1000/60) * 2;
+                let dashDurationMs = (dist / dashSpeed) * (1000/60) * 1.5; 
+                dashDurationMs = Math.max(200, Math.min(dashDurationMs, 1000)); 
+                this.aegisChargeDashTimer = dashDurationMs;
+
                 this.procTemporalEcho('aegisCharge_LMB_Aegis', abilityContext);
             }
         }
@@ -1779,20 +1809,32 @@ export class Player {
         baseDamage = Math.round(baseDamage * (this.abilityDamageMultiplier || 1.0));
         if (this.abilityCritChance > 0 && Math.random() < this.abilityCritChance) baseDamage *= this.abilityCritDamageMultiplier;
 
+        const { signalAchievementEvent } = impactContext || {};
+
         if (activeBossesArray) {
             activeBossesArray.forEach(boss => {
                 if (Math.hypot(this.x - boss.x, this.y - boss.y) < AEGIS_CHARGE_AOE_RADIUS + boss.radius) {
                     if (boss.takeDamage) {
+                        const bossHpBeforeImpact = boss.health;
                         const dmgDone = boss.takeDamage(baseDamage, null, this, {isAbility: true, abilityType: 'aegisCharge'});
                         if (dmgDone > 0) {
                              this.totalDamageDealt += dmgDone;
                              this.aegisChargeBossDamageDealtThisRun += dmgDone;
+
+                            // Check for Warp Slam achievement
+                            if (this.isAegisTeleportImpactPending && 
+                                this.aegisTeleportImpactTimer > 0 && // Ensure impact is within the teleport window
+                                bossHpBeforeImpact > 0 && 
+                                boss.health <= 0 && 
+                                signalAchievementEvent) {
+                                signalAchievementEvent("event_aegis_teleport_impact_kill"); // No extra data needed as achievement checks path
+                            }
                         }
                     }
                 }
             });
         }
-        if (targetsArray) {
+        if (targetsArray) { 
             for (let i = targetsArray.length - 1; i >= 0; i--) {
                 const target = targetsArray[i];
                 if (Math.hypot(this.x - target.x, this.y - target.y) < AEGIS_CHARGE_AOE_RADIUS + target.radius) {
@@ -1803,6 +1845,8 @@ export class Player {
             }
         }
         this.aegisChargeCurrentChargeTime = 0;
+        this.isAegisTeleportImpactPending = false; 
+        this.aegisTeleportImpactTimer = 0;
     }
 
 }

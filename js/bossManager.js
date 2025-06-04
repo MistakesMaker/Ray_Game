@@ -67,8 +67,8 @@ this.standardAvailableBossTypes = [ChaserBoss, MirrorShieldBoss, GravityWellBoss
     this.nextBossToSpawnInfo = null;
 
     this.nexusWeaverDefeatedThisRun = false;
-    this.flawlessUniqueStandardBossTypesDefeatedThisRun = new Set();
-    this.flawlessUniqueBossTypesDefeatedThisRun = new Set(); // For "Flawless Victory x3" (any boss)
+    this.flawlessUniqueStandardBossTypesDefeatedThisRun = new Set(); 
+    this.flawlessUniqueBossTypesDefeatedThisRun = new Set(); 
 
 
     this.playSound = (audioContextConfig && audioContextConfig.playSound) ? audioContextConfig.playSound : playSound;
@@ -149,6 +149,11 @@ trySpawnBoss(currentScore, playerInstance) {
                 if (this.bossSpawnQueue[0].typeKey === 'nexusWeaver' && this.bossSpawnQueue[0].tier === 3) {
                      playerInstance.nexusMinionsKilledThisNexusT3Fight = 0;
                 }
+                if (this.bossSpawnQueue[0].typeKey === 'nexusWeaver' && 
+                    this.bossSpawnQueue[0].tier === 5 && 
+                    playerInstance.currentPath === 'berserker') {
+                    playerInstance.maintainedHighRageThisBossFight = true; 
+                }
             }
 
             const firstBossInWaveInfo = this.bossSpawnQueue[0];
@@ -175,6 +180,9 @@ processBossSpawnQueue(gameContext) {
             playerToUse.damageTakenThisBossFight = 0;
             if (bossInfo.typeKey === 'nexusWeaver' && bossInfo.tier === 3) {
                 playerToUse.nexusMinionsKilledThisNexusT3Fight = 0;
+            }
+            if (bossInfo.typeKey === 'nexusWeaver' && bossInfo.tier === 5 && playerToUse.currentPath === 'berserker') {
+                playerToUse.maintainedHighRageThisBossFight = true; 
             }
         }
 
@@ -250,6 +258,13 @@ update(playerInstance, gameContext) {
             this.activeBosses.splice(i, 1);
             continue;
         }
+        
+        if (playerInstance && playerInstance.currentPath === 'berserker' && 
+            boss instanceof NexusWeaverBoss && boss.tier === 5 &&
+            playerInstance.berserkerRagePercentage < 80) { // Check if rage dropped below threshold
+            playerInstance.maintainedHighRageThisBossFight = false;
+        }
+
         boss.update(playerInstance, bossUpdateContext);
 
         if (bossUpdateContext.playerCollidedWithBoss && bossUpdateContext.callbacks && bossUpdateContext.callbacks.onPlayerBossCollision) {
@@ -293,6 +308,13 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
         this.nexusWeaverDefeatedThisRun = true;
     }
 
+    // Signal for generic Nexus Weaver defeat, used by "Nexus Obliterator GM"
+    if (defeatedBoss instanceof NexusWeaverBoss && gameContext.callbacks.signalAchievementEvent) {
+        gameContext.callbacks.signalAchievementEvent("event_nexus_weaver_defeated", {
+            bossTier: defeatedBoss.tier
+        });
+    }
+    // Signal for specific timed Nexus Weaver defeats
     if (defeatedBoss instanceof NexusWeaverBoss && gameContext.callbacks.signalAchievementEvent) {
         gameContext.callbacks.signalAchievementEvent("nexus_tX_defeated_within_time", {
             bossTier: defeatedBoss.tier,
@@ -304,6 +326,37 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
             });
         }
 
+        // "The Untouchable God" (Nexus T1, flawless RUN)
+        if (defeatedBoss.tier === 1 && playerInstance.timesHit === 0) {
+            gameContext.callbacks.signalAchievementEvent("event_nexus_tX_defeated_flawless_run", {
+                bossTier: defeatedBoss.tier
+            });
+        }
+
+        // "No Re-rolls, No Regrets" (Nexus T5, no evo interactions used AT ALL this run)
+        if (defeatedBoss.tier === 5 && 
+            !playerInstance.rerollsUsedThisRun && 
+            !playerInstance.blocksUsedThisRun && 
+            !playerInstance.freezesUsedThisRun) {
+            gameContext.callbacks.signalAchievementEvent("event_nexus_tX_defeated_no_evo_interaction_use", {
+                bossTier: defeatedBoss.tier
+            });
+        }
+        
+        // "Rage Eternal" (Nexus T5, Berserker, high rage uptime for ENTIRE fight)
+        if (defeatedBoss.tier === 5 && playerInstance.currentPath === 'berserker') {
+            if (playerInstance.maintainedHighRageThisBossFight) { 
+                 gameContext.callbacks.signalAchievementEvent("event_berserker_boss_high_rage_kill", {
+                    bossKey: "nexusWeaver", 
+                    bossTier: 5, 
+                    path: "berserker",
+                    maintainedHighRageEntireFight: true
+                });
+            }
+        }
+
+
+        // Path-specific ability kills (Hard Tier)
         if (defeatedBoss.tier === 2 && playerInstance.currentPath && defeatedBoss.damageSourcesThisFight) {
             const sources = defeatedBoss.damageSourcesThisFight;
             let onlyAllowedPathAbilitiesUsed = false;
@@ -329,7 +382,6 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
                 if(sources.seismicSlam > 0) pathAbilitiesUsedList.push("seismicSlam");
                 if(sources.aegisPassive > 0) pathAbilitiesUsedList.push("aegisPassive");
 
-
             } else if (playerInstance.currentPath === 'berserker') {
                 if (playerInstance.isBloodpactActive && playerInstance.isSavageHowlAttackSpeedBuffActive) {
                      gameContext.callbacks.signalAchievementEvent("path_boss_buffed_kill", {
@@ -349,6 +401,28 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
                 });
             }
         }
+        // Archmage Ascendant (GM - Nexus T5, only Omega Laser)
+        if (defeatedBoss.tier === 5 && playerInstance.currentPath === 'mage' && defeatedBoss.damageSourcesThisFight) {
+             const sources = defeatedBoss.damageSourcesThisFight;
+             const onlyOmegaLaser = sources.primary === 0 &&
+                                    sources.aegisCharge === 0 &&
+                                    sources.seismicSlam === 0 &&
+                                    sources.aegisPassive === 0 &&
+                                    sources.otherAbility === 0 &&
+                                    sources.miniGravityWell === 0 && 
+                                    sources.omegaLaser > 0;
+            if (onlyOmegaLaser) {
+                gameContext.callbacks.signalAchievementEvent("path_boss_ability_only_kill", {
+                    bossKey: "nexusWeaver",
+                    bossTier: 5,
+                    path: "mage",
+                    onlyAllowedAbilitiesUsed: true,
+                    abilitiesUsed: ["omegaLaser"] 
+                });
+            }
+        }
+
+        // Pacifist Lord & Unpicker (Nexus T3)
         if (defeatedBoss.tier === 3 && gameContext.callbacks.signalAchievementEvent) {
             if (playerInstance.heartsCollectedThisRun === 0 && playerInstance.bonusPointsCollectedThisRun === 0) {
                 gameContext.callbacks.signalAchievementEvent("nexus_t3_defeated_no_pickups");
@@ -359,22 +433,29 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
         }
     }
 
-    if (this.standardAvailableBossTypes.some(type => defeatedBoss instanceof type) &&
-        defeatedBoss.tier === 6 &&
-        gameContext.callbacks.signalAchievementEvent) {
-        gameContext.callbacks.signalAchievementEvent("event_standard_boss_tX_defeated_no_class_evo", {
+    // Standard boss defeated logic
+    if (this.standardAvailableBossTypes.some(type => defeatedBoss instanceof type) && gameContext.callbacks.signalAchievementEvent) {
+        // For "Boss Slayer Supreme GM"
+        gameContext.callbacks.signalAchievementEvent("event_any_standard_boss_tier_X_defeated", {
+            bossKey: getBossKeyFromName(defeatedBoss),
             bossTier: defeatedBoss.tier
         });
+        // For "Glass Cannon Connoisseur (Hard)"
+        if (defeatedBoss.tier === 6) { 
+            gameContext.callbacks.signalAchievementEvent("event_standard_boss_tX_defeated_no_class_evo", {
+                bossTier: defeatedBoss.tier 
+            });
+        }
     }
-
-
+    
+    // Max Efficiency & Apex Predator (Tier 5 checks, Apex is specifically Nexus Weaver)
     if (defeatedBoss.tier === 5 && gameContext.callbacks.signalAchievementEvent) {
-        gameContext.callbacks.signalAchievementEvent("tX_boss_defeated_high_hp", {
+        gameContext.callbacks.signalAchievementEvent("tX_boss_defeated_high_hp", { // Max Efficiency (any T5 boss)
             bossTier: defeatedBoss.tier,
             playerHpPercent: playerInstance.hp / playerInstance.maxHp
         });
-        if (defeatedBoss instanceof NexusWeaverBoss && playerInstance.currentPath === 'berserker') {
-             if (playerInstance.isBloodpactActive && playerInstance.isSavageHowlAttackSpeedBuffActive) {
+        if (defeatedBoss instanceof NexusWeaverBoss && playerInstance.currentPath === 'berserker') { // Apex Predator
+             if (playerInstance.isBloodpactActive && playerInstance.isSavageHowlAttackSpeedBuffActive) { 
                  gameContext.callbacks.signalAchievementEvent("path_boss_buffed_kill", {
                     bossKey: "nexusWeaver", bossTier: 5, path: "berserker",
                     bloodpactActive: true, savageHowlActive: true
@@ -383,12 +464,12 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
         }
     }
 
+    // Flawless tracking
     if (playerInstance.damageTakenThisBossFight === 0 && gameContext.callbacks.signalAchievementEvent) {
         const bossKey = getBossKeyFromName(defeatedBoss);
         gameContext.callbacks.signalAchievementEvent("boss_defeated_flawless", { bossKey: bossKey, bossTier: defeatedBoss.tier });
 
-        // For "Flawless Victory x3" (any boss type)
-        if (!this.flawlessUniqueBossTypesDefeatedThisRun.has(bossKey)) {
+        if (!this.flawlessUniqueBossTypesDefeatedThisRun.has(bossKey)) { // For "Flawless Victory x3"
             this.flawlessUniqueBossTypesDefeatedThisRun.add(bossKey);
             if (this.flawlessUniqueBossTypesDefeatedThisRun.size >= 3) {
                  gameContext.callbacks.signalAchievementEvent("event_multi_unique_boss_flawless_any_type", {
@@ -396,9 +477,8 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
                  });
             }
         }
-
-        // For "Flawless Gauntlet" (standard bosses only)
-        if (this.standardBossTypeKeys.includes(bossKey) && !this.flawlessUniqueStandardBossTypesDefeatedThisRun.has(bossKey)) {
+        
+        if (this.standardBossTypeKeys.includes(bossKey) && !this.flawlessUniqueStandardBossTypesDefeatedThisRun.has(bossKey)) { // For "Flawless Gauntlet"
             this.flawlessUniqueStandardBossTypesDefeatedThisRun.add(bossKey);
             if (this.flawlessUniqueStandardBossTypesDefeatedThisRun.size >= 3) {
                  gameContext.callbacks.signalAchievementEvent("event_multi_unique_standard_boss_flawless", {
@@ -408,6 +488,7 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
         }
     }
 
+    // Resourceful Fighter
     if (!(defeatedBoss instanceof NexusWeaverBoss) &&
         defeatedBoss.tier === 2 &&
         this.standardAvailableBossTypes.some(type => defeatedBoss instanceof type) &&
@@ -647,7 +728,7 @@ reset() {
     this.bossesDefeatedInCurrentWave = 0;
     this.nexusWeaverDefeatedThisRun = false;
     this.flawlessUniqueStandardBossTypesDefeatedThisRun = new Set();
-    this.flawlessUniqueBossTypesDefeatedThisRun = new Set(); // Reset this too
+    this.flawlessUniqueBossTypesDefeatedThisRun = new Set(); 
 }
 
 isBossSequenceActive() { return this.activeBosses.length > 0 || this.bossWarningActive || this.bossSpawnQueue.length > 0; }
@@ -682,6 +763,9 @@ debugSpawnBoss(tierToSpawn, bossTypeKey = 'nexusWeaver', playerInstance) {
         playerInstance.damageTakenThisBossFight = 0;
         if (bossTypeKey === 'nexusWeaver' && tier === 3) {
             playerInstance.nexusMinionsKilledThisNexusT3Fight = 0;
+        }
+        if (bossTypeKey === 'nexusWeaver' && tier === 5 && playerInstance.currentPath === 'berserker') { 
+            playerInstance.maintainedHighRageThisBossFight = true;
         }
     }
 
