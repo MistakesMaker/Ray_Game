@@ -2,6 +2,7 @@
 import * as CONSTANTS from './constants.js';
 import * as GameState from './gameState.js';
 import { getReadableColorName as getReadableColorNameFromUtils } from './utils.js';
+import { getUnlockedAchievementCount } from './achievementManager.js';
 
 let evolutionChoicesMasterList = [];
 let _currentlyDisplayedEvolutionOffers = [];
@@ -21,11 +22,27 @@ let _dependencies = {
 
 
 // --- Helper Functions ---
-function rollTier() {
+function rollTier(unlockedAchievementCount = 0) {
+    const ACHIEVEMENT_BRACKET_SIZE = 15;
+    
+    // Determine how many reward brackets the player has unlocked
+    const bracketsUnlocked = Math.floor(unlockedAchievementCount / ACHIEVEMENT_BRACKET_SIZE);
+
+    // Define the bonus percentage per bracket to reach the final targets
+    const legendaryBonusPerBracket = 2.5; // (15% - 5%) / 4 brackets
+    const epicBonusPerBracket = 5;      // (30% - 10%) / 4 brackets
+    const rareBonusPerBracket = 5;      // (55% - 35%) / 4 brackets
+
+    // Calculate the current chances based on unlocked brackets
+    let legendaryChance = 5 + (bracketsUnlocked * legendaryBonusPerBracket);
+    let epicChance = 10 + (bracketsUnlocked * epicBonusPerBracket);
+    let rareChance = 35 + (bracketsUnlocked * rareBonusPerBracket);
+    
     const rand = Math.random() * 100;
-    if (rand < 5) return 'legendary';
-    if (rand < 15) return 'epic';
-    if (rand < 50) return 'rare';
+
+    if (rand < legendaryChance) return 'legendary';
+    if (rand < legendaryChance + epicChance) return 'epic';
+    if (rand < legendaryChance + epicChance + rareChance) return 'rare';
     return 'common';
 }
 
@@ -45,13 +62,28 @@ function generateSingleNewOffer(playerInstance, existingOfferBaseIds, additional
 
     if (availableChoices.length > 0) {
         const baseEvo = availableChoices[Math.floor(Math.random() * availableChoices.length)];
-        let rolledTierIfApplicable = baseEvo.isTiered ? rollTier() : 'common';
+        const unlockedCount = getUnlockedAchievementCount();
+        
+        let rolledTierIfApplicable;
+        // <<< CORE ABILITY LOGIC >>>
+        // If the evolution is not tiered (i.e., it's a Core ability), assign it the 'rare' tier.
+        // This ensures it always appears, even when common drops are 0%.
+        if (!baseEvo.isTiered) {
+            rolledTierIfApplicable = 'rare'; 
+        } else {
+            rolledTierIfApplicable = rollTier(unlockedCount);
+        }
+        
         const tierSpecificData = baseEvo.isTiered ? baseEvo.tiers[rolledTierIfApplicable] : baseEvo;
 
         return {
             baseId: baseEvo.id,
             classType: baseEvo.classType,
+            // If it's a Core ability, we set its rolledTier to null internally so it doesn't try to find tier data.
+            // The 'rare' roll was just to determine its visual display tier.
             rolledTier: baseEvo.isTiered ? rolledTierIfApplicable : null,
+            // We pass the "visual tier" separately for styling purposes.
+            visualTier: rolledTierIfApplicable,
             text: baseEvo.text,
             detailedDescription: baseEvo.isTiered && tierSpecificData
                 ? (typeof baseEvo.detailedDescription === 'function' ? baseEvo.detailedDescription(playerInstance, rolledTierIfApplicable, rolledTierIfApplicable) : (typeof tierSpecificData.description === 'function' ? tierSpecificData.description(playerInstance, rolledTierIfApplicable) : tierSpecificData.description) )
@@ -64,7 +96,7 @@ function generateSingleNewOffer(playerInstance, existingOfferBaseIds, additional
         };
     }
     return {
-        baseId: `empty_slot_replacement`, classType: 'ability', text:"No More Options", rolledTier: null,
+        baseId: `empty_slot_replacement`, classType: 'ability', text:"No More Options", rolledTier: null, visualTier: 'disabled',
         detailedDescription: "No further upgrades available for this slot.", applyEffect: ()=>{},
         cardEffectString: "Unavailable", originalEvolution: { id: `empty_slot_replacement`, isMaxed: ()=>true, isTiered: false, getEffectString: (p) => "N/A" }
     };
@@ -391,6 +423,7 @@ export function generateEvolutionOffers(playerInstance) {
                 if (heldTier && originalMasterEvo.tiers[heldTier]) {
                     const tierSpecificData = originalMasterEvo.tiers[heldTier];
                     reconstructedHeldOffer.rolledTier = heldTier;
+                    reconstructedHeldOffer.visualTier = heldTier;
                     reconstructedHeldOffer.detailedDescription = (typeof originalMasterEvo.detailedDescription === 'function')
                         ? originalMasterEvo.detailedDescription(playerInstance, heldTier, heldTier)
                         : (typeof tierSpecificData.description === 'function' ? tierSpecificData.description(playerInstance, heldTier) : tierSpecificData.description);
@@ -404,6 +437,7 @@ export function generateEvolutionOffers(playerInstance) {
                 }
             } else { 
                 reconstructedHeldOffer.rolledTier = null;
+                reconstructedHeldOffer.visualTier = 'rare'; // Core abilities are visually rare
                 reconstructedHeldOffer.detailedDescription = typeof originalMasterEvo.detailedDescription === 'function'
                     ? originalMasterEvo.detailedDescription(playerInstance, originalMasterEvo.id, null)
                     : originalMasterEvo.detailedDescription;
@@ -440,18 +474,28 @@ export function generateEvolutionOffers(playerInstance) {
     });
 
     let shuffledAvailableForNewRolls = [...availableChoicesForNewRolls].sort(() => 0.5 - Math.random());
+    
+    const unlockedCount = getUnlockedAchievementCount();
 
     for (let i = 0; i < 3; i++) {
         if (!filledIndices[i]) {
             if (shuffledAvailableForNewRolls.length > 0) {
                 const baseEvo = shuffledAvailableForNewRolls.shift();
-                let rolledTierIfApplicable = baseEvo.isTiered ? rollTier() : 'common';
+                
+                let rolledTierIfApplicable;
+                if (!baseEvo.isTiered) {
+                    rolledTierIfApplicable = 'rare';
+                } else {
+                    rolledTierIfApplicable = rollTier(unlockedCount);
+                }
+                
                 const tierSpecificData = baseEvo.isTiered ? baseEvo.tiers[rolledTierIfApplicable] : baseEvo;
 
                 const offer = {
                     baseId: baseEvo.id,
                     classType: baseEvo.classType,
                     rolledTier: baseEvo.isTiered ? rolledTierIfApplicable : null,
+                    visualTier: rolledTierIfApplicable,
                     text: baseEvo.text,
                     detailedDescription: baseEvo.isTiered && tierSpecificData
                         ? (typeof baseEvo.detailedDescription === 'function' ? baseEvo.detailedDescription(playerInstance, rolledTierIfApplicable, rolledTierIfApplicable) : (typeof tierSpecificData.description === 'function' ? tierSpecificData.description(playerInstance, rolledTierIfApplicable) : tierSpecificData.description) )
@@ -469,7 +513,7 @@ export function generateEvolutionOffers(playerInstance) {
                 }
             } else {
                 offers[i] = {
-                    baseId: `empty_slot_${i}`, classType: 'ability', text:"No More Options", rolledTier: null,
+                    baseId: `empty_slot_${i}`, classType: 'ability', text:"No More Options", rolledTier: null, visualTier: 'disabled',
                     detailedDescription: "No further upgrades available or other slots took priority.", applyEffect: ()=>{},
                     cardEffectString: "Unavailable", originalEvolution: { id: `empty_slot_${i}`, isMaxed: ()=>true, isTiered: false, getEffectString: (p) => "N/A" }
                 };
@@ -481,17 +525,17 @@ export function generateEvolutionOffers(playerInstance) {
     if (offers.every(o => o === null || o.baseId.startsWith('empty_slot_') || o.baseId === 'noMoreEvolutions')) {
          offers[0] = {
             baseId: 'noMoreEvolutions', classType: 'ability',
-            text:"All evolutions maxed or no valid options!", rolledTier: null,
+            text:"All evolutions maxed or no valid options!", rolledTier: null, visualTier: 'disabled',
             detailedDescription: "No further upgrades available at this time.",
             applyEffect:()=>"No more evolutions!", cardEffectString: "Unavailable",
             originalEvolution: {id:'noMoreEvolutions', isMaxed:()=>true, isTiered: false, getEffectString: (p) => "All Maxed!"}
         };
-        if(!offers[1]) offers[1] = { baseId: `empty_slot_1`, classType: 'ability', text:"No More Options", rolledTier: null, detailedDescription: "N/A", applyEffect: ()=>{}, cardEffectString: "Unavailable", originalEvolution: { id: `empty_slot_1`, isMaxed: ()=>true, isTiered: false, getEffectString: (p) => "N/A" }};
-        if(!offers[2]) offers[2] = { baseId: `empty_slot_2`, classType: 'ability', text:"No More Options", rolledTier: null, detailedDescription: "N/A", applyEffect: ()=>{}, cardEffectString: "Unavailable", originalEvolution: { id: `empty_slot_2`, isMaxed: ()=>true, isTiered: false, getEffectString: (p) => "N/A" }};
+        if(!offers[1]) offers[1] = { baseId: `empty_slot_1`, classType: 'ability', text:"No More Options", rolledTier: null, visualTier: 'disabled', detailedDescription: "N/A", applyEffect: ()=>{}, cardEffectString: "Unavailable", originalEvolution: { id: `empty_slot_1`, isMaxed: ()=>true, isTiered: false, getEffectString: (p) => "N/A" }};
+        if(!offers[2]) offers[2] = { baseId: `empty_slot_2`, classType: 'ability', text:"No More Options", rolledTier: null, visualTier: 'disabled', detailedDescription: "N/A", applyEffect: ()=>{}, cardEffectString: "Unavailable", originalEvolution: { id: `empty_slot_2`, isMaxed: ()=>true, isTiered: false, getEffectString: (p) => "N/A" }};
     }
     for(let i=0; i < 3; i++) {
         if (offers[i] === null) {
-            offers[i] = { baseId: `empty_slot_${i}_fallback`, classType: 'ability', text:"No More Options", rolledTier: null, detailedDescription: "N/A", applyEffect: ()=>{}, cardEffectString: "Unavailable", originalEvolution: { id: `empty_slot_${i}_fallback`, isMaxed: ()=>true, isTiered: false, getEffectString: (p) => "N/A" }};
+            offers[i] = { baseId: `empty_slot_${i}_fallback`, classType: 'ability', text:"No More Options", rolledTier: null, visualTier: 'disabled', detailedDescription: "N/A", applyEffect: ()=>{}, cardEffectString: "Unavailable", originalEvolution: { id: `empty_slot_${i}_fallback`, isMaxed: ()=>true, isTiered: false, getEffectString: (p) => "N/A" }};
         }
     }
 

@@ -64,6 +64,14 @@ export function getAllAchievementsWithStatus() {
     return processedAchievements.map(ach => ({ ...ach }));
 }
 
+// <<< NEW FUNCTION TO GET THE COUNT OF UNLOCKED ACHIEVEMENTS >>>
+export function getUnlockedAchievementCount() {
+    if (!processedAchievements || processedAchievements.length === 0) {
+        return 0;
+    }
+    return processedAchievements.filter(ach => ach.isUnlocked).length;
+}
+
 function unlockAchievement(achievementId, gameContext) {
     const achievement = processedAchievements.find(ach => ach.id === achievementId);
     if (achievement && !achievement.isUnlocked) {
@@ -172,7 +180,6 @@ function evaluateCondition(achievement, gameContext) {
 
         case "event_aegis_teleport_impact_kill": // For "Warp Slam"
             if (gameContext.eventFlags && gameContext.eventFlags.event_aegis_teleport_impact_kill) {
-                // The achievement definition also has `path: "aegis"` which will be implicitly checked if path is part of the condition object
                 return player.currentPath === conditions.path; 
             }
             return false;
@@ -300,19 +307,44 @@ function evaluateCondition(achievement, gameContext) {
             return !!(gameContext.eventFlags && gameContext.eventFlags.nexus_t3_defeated_no_minions_killed);
 
         case "path_boss_ability_only_kill":
-            if (player.currentPath === conditions.path && gameContext.eventFlags && gameContext.eventFlags.path_boss_ability_only_kill) {
+            if (gameContext.eventFlags && gameContext.eventFlags.path_boss_ability_only_kill) {
                 const eventData = gameContext.eventFlags.path_boss_ability_only_kill_data || {};
-                if (eventData.path !== conditions.path || eventData.bossKey !== conditions.bossKey || eventData.bossTier !== conditions.bossTier) {
+                const sources = eventData.damageSources || {};
+
+                // Basic validation
+                if (eventData.bossKey !== conditions.bossKey || eventData.bossTier !== conditions.bossTier) {
                     return false;
                 }
-                if (achievement.id === "archmage_ascendant_gm") { 
-                    return eventData.onlyAllowedAbilitiesUsed === true &&
-                           Array.isArray(eventData.abilitiesUsed) &&
-                           eventData.abilitiesUsed.length === 1 &&
-                           eventData.abilitiesUsed[0] === "omegaLaser";
+                if (conditions.path !== 'any' && player.currentPath !== conditions.path) {
+                    return false;
                 }
-                return eventData.onlyAllowedAbilitiesUsed === true &&
-                       (Array.isArray(eventData.abilitiesUsed) && eventData.abilitiesUsed.length > 0);
+
+                // Handle "Primary Discipline" Omega achievement
+                if (achievement.id === 'primary_discipline_omega') {
+                    return sources.primary > 0 &&
+                           (sources.omegaLaser || 0) === 0 &&
+                           (sources.miniGravityWell || 0) === 0 &&
+                           (sources.aegisCharge || 0) === 0 &&
+                           (sources.seismicSlam || 0) === 0 &&
+                           (sources.aegisPassive || 0) === 0 &&
+                           (sources.otherAbility || 0) === 0;
+                }
+
+                // Handle other ability-only achievements
+                const allowedAbilities = conditions.allowedAbilities || [];
+                let totalDamageFromAllowedSources = 0;
+                let totalDamageFromOtherSources = 0;
+
+                const damageSourceKeys = ['primary', 'omegaLaser', 'miniGravityWell', 'aegisCharge', 'seismicSlam', 'aegisPassive', 'otherAbility'];
+                damageSourceKeys.forEach(key => {
+                    if (allowedAbilities.includes(key)) {
+                        totalDamageFromAllowedSources += (sources[key] || 0);
+                    } else {
+                        totalDamageFromOtherSources += (sources[key] || 0);
+                    }
+                });
+                
+                return totalDamageFromAllowedSources > 0 && totalDamageFromOtherSources === 0;
             }
             return false;
 
@@ -427,14 +459,6 @@ export function checkAllAchievements(gameContext) {
             "event_nexus_tX_defeated_no_evo_interaction_use", 
             "event_any_standard_boss_tier_X_defeated" 
         ];
-        // Remove the old "teleport_kill_target" if it's no longer used for anything else.
-        // For now, I'll keep it in case some other logic (not related to Warp Slam) might use it.
-        // If you are sure it's fully replaced, you can remove it from flagsToReset.
-        if (flagsToReset.includes("teleport_kill_target")) { // Only remove if it was there
-            const oldTeleportIndex = flagsToReset.indexOf("teleport_kill_target");
-            if (oldTeleportIndex > -1) flagsToReset.splice(oldTeleportIndex, 1);
-        }
-
 
         flagsToReset.forEach(flagName => {
             if (gameContext.eventFlags.hasOwnProperty(flagName)) {

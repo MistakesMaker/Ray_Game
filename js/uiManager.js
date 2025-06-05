@@ -602,16 +602,13 @@ export function populateEvolutionOptionsUI(
         const choiceWrapper = document.createElement('div'); choiceWrapper.classList.add('evolution-choice-wrapper');
         const optionDiv = document.createElement('div'); optionDiv.classList.add('evolutionOption'); optionDiv.dataset.class = uiChoiceData.classType; optionDiv.dataset.baseId = uiChoiceData.baseId;
 
-        if (!uiChoiceData.originalEvolution.isTiered) {
-            optionDiv.dataset.tier = "core";
-        } else if (uiChoiceData.originalEvolution.isTiered && uiChoiceData.rolledTier && uiChoiceData.rolledTier !== "none") {
-            optionDiv.dataset.tier = uiChoiceData.rolledTier;
-        } else {
-            optionDiv.dataset.tier = 'disabled';
-        }
+        // Use visualTier for styling, but data-tier for the actual internal tier (null for core)
+        const displayTier = uiChoiceData.originalEvolution.isTiered ? uiChoiceData.rolledTier : 'core';
+        optionDiv.dataset.tier = displayTier;
+        optionDiv.dataset.visualTier = uiChoiceData.visualTier || displayTier;
 
         const tierLabel = document.createElement('span'); tierLabel.classList.add('evolution-tier-label');
-        const tierStyle = getTierStyling(optionDiv.dataset.tier);
+        const tierStyle = getTierStyling(optionDiv.dataset.visualTier);
         tierLabel.textContent = tierStyle.text;
         tierLabel.style.color = tierStyle.color;
         tierLabel.classList.add('has-tier');
@@ -652,7 +649,7 @@ export function populateEvolutionOptionsUI(
                 if (playerInstance.isFreezeModeActive && uiChoiceData.baseId !== 'noMoreEvolutions' && !uiChoiceData.baseId.startsWith('empty_slot_') && !isMaxed && !isAlreadyBlockedByPlayer && (playerInstance.evolutionFreezesRemaining > 0 || (playerInstance.frozenEvolutionChoice && playerInstance.frozenEvolutionChoice.choiceData.baseId === uiChoiceData.baseId))) optionDiv.classList.add('primed-for-freeze');
 
                 let tooltipText = "";
-                const ttTierStyle = getTierStyling(optionDiv.dataset.tier);
+                const ttTierStyle = getTierStyling(optionDiv.dataset.visualTier);
                 tooltipText = `<span style="text-transform: capitalize; font-weight: bold; color: ${ttTierStyle.color};">${ttTierStyle.text} TIER</span><br>`;
 
                 if (currentInputState.shiftPressed) {
@@ -883,6 +880,129 @@ export function displayAchievementsScreenUI(allAchievementsWithStatus, onBackCal
 
     importedAchievementTierSelectorContainer.innerHTML = '';
     importedAchievementsListContainer.innerHTML = '';
+    
+    let progressTooltip = document.body.querySelector('#achievement-progress-tooltip');
+    if (!progressTooltip) {
+        progressTooltip = document.createElement('div');
+        progressTooltip.id = 'achievement-progress-tooltip';
+        document.body.appendChild(progressTooltip);
+    }
+    
+    let progressContainer = importedAchievementsScreen.querySelector('#achievement-progress-container');
+    if (!progressContainer) {
+        progressContainer = document.createElement('div');
+        progressContainer.id = 'achievement-progress-container';
+        progressContainer.style.width = '90%';
+        progressContainer.style.maxWidth = '600px';
+        progressContainer.style.margin = '0 auto 15px auto';
+        progressContainer.style.padding = '10px';
+        progressContainer.style.border = '1px solid #404060';
+        progressContainer.style.borderRadius = '8px';
+        progressContainer.style.backgroundColor = 'rgba(0,0,0,0.3)';
+        
+        const h2 = importedAchievementsScreen.querySelector('h2');
+        if (h2 && h2.nextSibling) {
+            h2.parentNode.insertBefore(progressContainer, h2.nextSibling);
+        } else {
+            importedAchievementsScreen.insertBefore(progressContainer, importedAchievementTierSelectorContainer);
+        }
+    }
+    progressContainer.innerHTML = '';
+
+    const unlockedCount = allAchievementsWithStatus.filter(a => a.isUnlocked).length;
+    const totalCount = allAchievementsWithStatus.length;
+    const progressPercent = totalCount > 0 ? (unlockedCount / totalCount) * 100 : 0;
+    const ACHIEVEMENT_BRACKET_SIZE = 15;
+
+    progressContainer.innerHTML = `
+        <div style="text-align: center; color: #ffdd88; font-size: 16px; margin-bottom: 8px;">
+            Evolution Drop Rate Progress
+        </div>
+        <div class="progress-bar-wrapper" style="position: relative; height: 20px; background-color: #202030; border-radius: 5px; overflow: hidden; border: 1px solid #505070;">
+            <div class="progress-bar-fill" style="width: ${progressPercent}%; height: 100%; background: linear-gradient(90deg, #308030, #88ff88); transition: width 0.5s ease-out; pointer-events: none;"></div>
+            <div class="progress-bar-markers" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></div>
+            <div class="progress-bar-text" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; text-shadow: 1px 1px 2px black; pointer-events: none;">
+                ${unlockedCount} / ${totalCount}
+            </div>
+        </div>
+        <div style="font-size: 11px; color: #aaa; text-align: center; margin-top: 5px;">
+            Hover over a colored section to see the drop rates for that tier.
+        </div>
+    `;
+
+    const markersContainer = progressContainer.querySelector('.progress-bar-markers');
+    if(markersContainer) {
+        const totalBrackets = Math.ceil(totalCount / ACHIEVEMENT_BRACKET_SIZE);
+
+        for (let i = 0; i < totalBrackets; i++) {
+            const segment = document.createElement('div');
+            const startPercent = ((i * ACHIEVEMENT_BRACKET_SIZE) / totalCount) * 100;
+            let endPercent = (((i + 1) * ACHIEVEMENT_BRACKET_SIZE) / totalCount) * 100;
+            if (i === totalBrackets - 1) { endPercent = 100; }
+            const widthPercent = endPercent - startPercent;
+
+            segment.style.position = 'absolute';
+            segment.style.left = `${startPercent}%`;
+            segment.style.width = `${widthPercent}%`;
+            segment.style.top = '0';
+            segment.style.height = '100%';
+            segment.style.cursor = 'pointer';
+
+            // Draw a visible marker line for all but the last segment
+            if (i < totalBrackets - 1) {
+                const markerLine = document.createElement('div');
+                markerLine.style.position = 'absolute';
+                markerLine.style.right = '0px';
+                markerLine.style.top = '0';
+                markerLine.style.width = '2px';
+                markerLine.style.height = '100%';
+                markerLine.style.backgroundColor = 'rgba(255, 255, 255, 0.5)';
+                markerLine.style.pointerEvents = 'none'; // Make sure line doesn't interfere
+                segment.appendChild(markerLine);
+            }
+            
+            const calculateRatesForBracket = (bracketIndex) => {
+                const legendaryBonusPerBracket = 2.5;
+                const epicBonusPerBracket = 5;
+                const rareBonusPerBracket = 5;
+
+                let legendaryChance = 5 + (bracketIndex * legendaryBonusPerBracket);
+                let epicChance = 10 + (bracketIndex * epicBonusPerBracket);
+                let rareChance = 35 + (bracketIndex * rareBonusPerBracket);
+                let commonChance = 100 - legendaryChance - epicChance - rareChance;
+
+                return { legendaryChance, epicChance, rareChance, commonChance };
+            };
+            
+            segment.addEventListener('mouseover', (event) => {
+                const rates = calculateRatesForBracket(i);
+                const endRange = (i + 1) * ACHIEVEMENT_BRACKET_SIZE - 1;
+                const titleText = i === totalBrackets - 1 ? 
+                    `Drop Rates at ${i * ACHIEVEMENT_BRACKET_SIZE}+ Unlocks` :
+                    `Drop Rates at ${i * ACHIEVEMENT_BRACKET_SIZE} - ${endRange} Unlocks`;
+
+                progressTooltip.innerHTML = `
+                    <div style="font-weight:bold; color: #ffdd88; margin-bottom: 5px;">${titleText}</div>
+                    <div style="color: #FFB000;">Legendary: ${rates.legendaryChance.toFixed(1)}%</div>
+                    <div style="color: #C077FF;">Epic: ${rates.epicChance.toFixed(1)}%</div>
+                    <div style="color: #55FF55;">Rare: ${rates.rareChance.toFixed(1)}%</div>
+                    <div style="color: #9DB8B7;">Common: ${Math.max(0, rates.commonChance).toFixed(1)}%</div>
+                `;
+                progressTooltip.style.display = 'block';
+                progressTooltip.style.left = `${event.pageX + 10}px`;
+                progressTooltip.style.top = `${event.pageY + 10}px`;
+            });
+            segment.addEventListener('mousemove', (event) => {
+                progressTooltip.style.left = `${event.pageX + 10}px`;
+                progressTooltip.style.top = `${event.pageY + 10}px`;
+            });
+            segment.addEventListener('mouseout', () => {
+                progressTooltip.style.display = 'none';
+            });
+
+            markersContainer.appendChild(segment);
+        }
+    }
 
     const tiers = Object.values(achievementTiers); 
 

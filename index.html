@@ -231,26 +231,33 @@
         #evolutionScreen .evolutionOption[data-class="attack"]:hover { background-color: rgba(250, 100, 100, 0.38); }
         #evolutionScreen .evolutionOption[data-class="tank"]:hover   { background-color: rgba(70, 240, 70, 0.45); }
         #evolutionScreen .evolutionOption[data-class="ability"]:hover{ background-color: rgba(150, 70, 220, 0.45); }
-        #evolutionScreen .evolutionOption[data-tier="epic"][data-class="tank"],
-        #evolutionScreen .evolutionOption[data-tier="legendary"][data-class="tank"] {
-            background-color: rgba(50, 220, 50, 0.25) !important;
-        }
-        #evolutionScreen .evolutionOption[data-tier="epic"][data-class="tank"]:hover,
-        #evolutionScreen .evolutionOption[data-tier="legendary"][data-class="tank"]:hover {
-            background-color: rgba(70, 240, 70, 0.35) !important;
-        }
-        #evolutionScreen .evolutionOption[data-tier="core"] {
+        
+        /* Ensure Core (even if visually Rare) maintains blue theme */
+        #evolutionScreen .evolutionOption[data-tier="core"],
+        #evolutionScreen .evolutionOption[data-visual-tier="rare"][data-tier="core"] {
             border-color: #40A0D0;
             box-shadow: 0 0 20px 7px rgba(60,180,255,0.6), 0 0 7px rgba(100,200,255,0.4) inset;
             animation: corePulse 1.8s infinite ease-in-out;
-            background-color: rgba(30, 70, 130, 0.50) !important;
+            background-color: rgba(30, 70, 130, 0.50) !important; /* Override other class-based backgrounds */
         }
-        #evolutionScreen .evolutionOption[data-tier="core"]:hover {
+        #evolutionScreen .evolutionOption[data-tier="core"]:hover,
+        #evolutionScreen .evolutionOption[data-visual-tier="rare"][data-tier="core"]:hover {
             border-color: #60C0F0;
             transform: translateY(-3px) scale(1.02);
             box-shadow: 0 0 30px 9px rgba(80,200,255,0.8), 0 0 12px rgba(120,220,255,0.6) inset;
-            background-color: rgba(40, 90, 160, 0.65) !important;
+            background-color: rgba(40, 90, 160, 0.65) !important; /* Override other class-based backgrounds */
         }
+        /* Adjust tank background for higher tiers if needed, but core should take precedence */
+        #evolutionScreen .evolutionOption[data-tier="epic"][data-class="tank"]:not([data-tier="core"]),
+        #evolutionScreen .evolutionOption[data-tier="legendary"][data-class="tank"]:not([data-tier="core"]) {
+            background-color: rgba(50, 220, 50, 0.25) !important;
+        }
+        #evolutionScreen .evolutionOption[data-tier="epic"][data-class="tank"]:not([data-tier="core"]):hover,
+        #evolutionScreen .evolutionOption[data-tier="legendary"][data-class="tank"]:not([data-tier="core"]):hover {
+            background-color: rgba(70, 240, 70, 0.35) !important;
+        }
+
+
         #evolutionScreen .evolutionOption[data-tier="common"] {
             border-color: #78788f;
             box-shadow: 0 0 10px 2px rgba(120,150,150,0.3), 0 0 3px rgba(150,180,180,0.2) inset;
@@ -261,12 +268,13 @@
             transform: translateY(-2px) scale(1.01);
             box-shadow: 0 0 12px 3px rgba(120,150,150,0.35), 0 0 4px rgba(150,180,180,0.25) inset;
         }
-        #evolutionScreen .evolutionOption[data-tier="rare"] {
+        /* Style for cards visually presented as Rare, but EXCLUDING Core evolutions */
+        #evolutionScreen .evolutionOption[data-visual-tier="rare"]:not([data-tier="core"]) {
             border-color: #30aa30;
             box-shadow: 0 0 20px 7px rgba(60,255,60,0.6), 0 0  7px rgba(80,255,80,0.4) inset;
             animation: rarePulse 2s infinite ease-in-out;
         }
-        #evolutionScreen .evolutionOption[data-tier="rare"]:hover {
+        #evolutionScreen .evolutionOption[data-visual-tier="rare"]:not([data-tier="core"]):hover {
             border-color: #55FF55;
             transform: translateY(-3px) scale(1.02);
             box-shadow: 0 0 30px 9px rgba(50,255,50,0.8), 0 0 12px rgba(100,255,100,0.6) inset;
@@ -462,6 +470,9 @@
         #abilityCooldownUI > .ability-slot:nth-child(3) { margin-left: 25px; } /* Gap after mouse abilities */
 
         #evolutionTooltip { display: none; position: absolute; background-color: rgba(20, 20, 50, 0.9); color: #ddeeff; border: 1px solid #55aaff; border-radius: 5px; padding: 8px 12px; font-size: 13px; max-width: 250px; text-align: left; pointer-events: none; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+        
+        /* Tooltip for achievement progress bar */
+        #achievement-progress-tooltip { z-index: 1001 !important; }
 
         #pausePlayerStatsPanel {
             position: absolute;
@@ -761,7 +772,7 @@
         .achievement-tier-badge.hard { color: #f88; }
         .achievement-tier-badge.master { color: #f8f; }
         .achievement-tier-badge.grandmaster { color: #ffc800; }
-        .achievement-tier-badge.omega { color: #00ffff; text-shadow: 0 0 3px #00ffff; } /* NEW TIER STYLE */
+        .achievement-tier-badge.omega { color: #00ffff; text-shadow: 0 0 3px #00ffff, 0 0 5px #00dddd; }
 
         #achievementsScreen button#backToMainMenuFromAchievementsButton {
             margin-top: 15px;
@@ -911,6 +922,10 @@
     </div>
     <div id="abilityCooldownUI"></div>
     <div id="evolutionTooltip"></div>
+
+    <!-- Tooltip for Achievement Progress Bar -->
+    <div id="achievement-progress-tooltip" style="display: none; position: absolute; background-color: rgba(20, 20, 50, 0.9); color: #ddeeff; border: 1px solid #55aaff; border-radius: 5px; padding: 8px 12px; font-size: 13px; max-width: 250px; text-align: left; pointer-events: none; z-index: 1001; box-shadow: 0 2px 10px rgba(0,0,0,0.5);"></div>
+
     <audio id="bgMusic" src="space_ambient.mp3" loop></audio>
 
 <script type="module" src="js/main.js"></script>

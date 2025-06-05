@@ -299,208 +299,96 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
         return;
     }
     const gameplayTimeAtKill = gameContext.callbacks.getGameplayTimeElapsed ? gameContext.callbacks.getGameplayTimeElapsed() : 0;
+    const signalAchievement = gameContext.callbacks.signalAchievementEvent;
+    if (!signalAchievement) return; // Can't proceed without this
 
+    const bossKey = getBossKeyFromName(defeatedBoss);
 
     if (defeatedBoss instanceof NexusWeaverBoss && !this.nexusWeaverDefeatedThisRun) {
-        if (gameContext.callbacks.signalAchievementEvent) {
-            gameContext.callbacks.signalAchievementEvent("nexus_weaver_defeated_first_time_run");
-        }
+        signalAchievement("nexus_weaver_defeated_first_time_run");
         this.nexusWeaverDefeatedThisRun = true;
     }
 
-    // Signal for generic Nexus Weaver defeat, used by "Nexus Obliterator GM"
-    if (defeatedBoss instanceof NexusWeaverBoss && gameContext.callbacks.signalAchievementEvent) {
-        gameContext.callbacks.signalAchievementEvent("event_nexus_weaver_defeated", {
-            bossTier: defeatedBoss.tier
-        });
-    }
-    // Signal for specific timed Nexus Weaver defeats
-    if (defeatedBoss instanceof NexusWeaverBoss && gameContext.callbacks.signalAchievementEvent) {
-        gameContext.callbacks.signalAchievementEvent("nexus_tX_defeated_within_time", {
+    signalAchievement("event_nexus_weaver_defeated", { bossTier: defeatedBoss.tier });
+
+    if (defeatedBoss instanceof NexusWeaverBoss) {
+        signalAchievement("nexus_tX_defeated_within_time", {
             bossTier: defeatedBoss.tier,
-            timeTakenMs: gameplayTimeAtKill 
+            timeTakenMs: gameplayTimeAtKill
         });
         if (!playerInstance.usedAbilityInCurrentBossFight) {
-            gameContext.callbacks.signalAchievementEvent("nexus_weaver_defeated_no_abilities_strict", {
-                bossTier: defeatedBoss.tier
-            });
+            signalAchievement("nexus_weaver_defeated_no_abilities_strict", { bossTier: defeatedBoss.tier });
         }
-
-        // "The Untouchable God" (Nexus T1, flawless RUN)
         if (defeatedBoss.tier === 1 && playerInstance.timesHit === 0) {
-            gameContext.callbacks.signalAchievementEvent("event_nexus_tX_defeated_flawless_run", {
-                bossTier: defeatedBoss.tier
+            signalAchievement("event_nexus_tX_defeated_flawless_run", { bossTier: 1 });
+        }
+        if (defeatedBoss.tier === 5 && !playerInstance.rerollsUsedThisRun && !playerInstance.blocksUsedThisRun && !playerInstance.freezesUsedThisRun) {
+            signalAchievement("event_nexus_tX_defeated_no_evo_interaction_use", { bossTier: 5 });
+        }
+        if (defeatedBoss.tier === 5 && playerInstance.currentPath === 'berserker' && playerInstance.maintainedHighRageThisBossFight) {
+             signalAchievement("event_berserker_boss_high_rage_kill", {
+                bossKey: "nexusWeaver", bossTier: 5, path: "berserker", maintainedHighRageEntireFight: true
             });
         }
-
-        // "No Re-rolls, No Regrets" (Nexus T5, no evo interactions used AT ALL this run)
-        if (defeatedBoss.tier === 5 && 
-            !playerInstance.rerollsUsedThisRun && 
-            !playerInstance.blocksUsedThisRun && 
-            !playerInstance.freezesUsedThisRun) {
-            gameContext.callbacks.signalAchievementEvent("event_nexus_tX_defeated_no_evo_interaction_use", {
-                bossTier: defeatedBoss.tier
-            });
-        }
-        
-        // "Rage Eternal" (Nexus T5, Berserker, high rage uptime for ENTIRE fight)
-        if (defeatedBoss.tier === 5 && playerInstance.currentPath === 'berserker') {
-            if (playerInstance.maintainedHighRageThisBossFight) { 
-                 gameContext.callbacks.signalAchievementEvent("event_berserker_boss_high_rage_kill", {
-                    bossKey: "nexusWeaver", 
-                    bossTier: 5, 
-                    path: "berserker",
-                    maintainedHighRageEntireFight: true
-                });
-            }
-        }
-
-
-        // Path-specific ability kills (Hard Tier)
-        if (defeatedBoss.tier === 2 && playerInstance.currentPath && defeatedBoss.damageSourcesThisFight) {
-            const sources = defeatedBoss.damageSourcesThisFight;
-            let onlyAllowedPathAbilitiesUsed = false;
-            let pathAbilitiesUsedList = [];
-
-            if (playerInstance.currentPath === 'mage') {
-                onlyAllowedPathAbilitiesUsed = sources.primary === 0 &&
-                                               sources.aegisCharge === 0 &&
-                                               sources.seismicSlam === 0 &&
-                                               sources.aegisPassive === 0 &&
-                                               sources.otherAbility === 0 &&
-                                               (sources.omegaLaser > 0 || sources.miniGravityWell > 0);
-                if(sources.omegaLaser > 0) pathAbilitiesUsedList.push("omegaLaser");
-                if(sources.miniGravityWell > 0) pathAbilitiesUsedList.push("miniGravityWell");
-
-            } else if (playerInstance.currentPath === 'aegis') {
-                onlyAllowedPathAbilitiesUsed = sources.primary === 0 &&
-                                               sources.omegaLaser === 0 &&
-                                               sources.miniGravityWell === 0 &&
-                                               sources.otherAbility === 0 &&
-                                               (sources.aegisCharge > 0 || sources.seismicSlam > 0 || sources.aegisPassive > 0);
-                if(sources.aegisCharge > 0) pathAbilitiesUsedList.push("aegisCharge");
-                if(sources.seismicSlam > 0) pathAbilitiesUsedList.push("seismicSlam");
-                if(sources.aegisPassive > 0) pathAbilitiesUsedList.push("aegisPassive");
-
-            } else if (playerInstance.currentPath === 'berserker') {
-                if (playerInstance.isBloodpactActive && playerInstance.isSavageHowlAttackSpeedBuffActive) {
-                     gameContext.callbacks.signalAchievementEvent("path_boss_buffed_kill", {
-                        bossKey: "nexusWeaver", bossTier: 2, path: "berserker",
-                        bloodpactActive: true, savageHowlActive: true
-                    });
-                }
-            }
-
-            if ((playerInstance.currentPath === 'mage' || playerInstance.currentPath === 'aegis') && onlyAllowedPathAbilitiesUsed) {
-                 gameContext.callbacks.signalAchievementEvent("path_boss_ability_only_kill", {
-                    bossKey: "nexusWeaver",
-                    bossTier: 2,
-                    path: playerInstance.currentPath,
-                    onlyAllowedAbilitiesUsed: true,
-                    abilitiesUsed: pathAbilitiesUsedList
-                });
-            }
-        }
-        // Archmage Ascendant (GM - Nexus T5, only Omega Laser)
-        if (defeatedBoss.tier === 5 && playerInstance.currentPath === 'mage' && defeatedBoss.damageSourcesThisFight) {
-             const sources = defeatedBoss.damageSourcesThisFight;
-             const onlyOmegaLaser = sources.primary === 0 &&
-                                    sources.aegisCharge === 0 &&
-                                    sources.seismicSlam === 0 &&
-                                    sources.aegisPassive === 0 &&
-                                    sources.otherAbility === 0 &&
-                                    sources.miniGravityWell === 0 && 
-                                    sources.omegaLaser > 0;
-            if (onlyOmegaLaser) {
-                gameContext.callbacks.signalAchievementEvent("path_boss_ability_only_kill", {
-                    bossKey: "nexusWeaver",
-                    bossTier: 5,
-                    path: "mage",
-                    onlyAllowedAbilitiesUsed: true,
-                    abilitiesUsed: ["omegaLaser"] 
-                });
-            }
-        }
-
-        // Pacifist Lord & Unpicker (Nexus T3)
-        if (defeatedBoss.tier === 3 && gameContext.callbacks.signalAchievementEvent) {
+        if (defeatedBoss.tier === 3) {
             if (playerInstance.heartsCollectedThisRun === 0 && playerInstance.bonusPointsCollectedThisRun === 0) {
-                gameContext.callbacks.signalAchievementEvent("nexus_t3_defeated_no_pickups");
+                signalAchievement("nexus_t3_defeated_no_pickups");
             }
             if (playerInstance.nexusMinionsKilledThisNexusT3Fight === 0) {
-                gameContext.callbacks.signalAchievementEvent("nexus_t3_defeated_no_minions_killed");
+                signalAchievement("nexus_t3_defeated_no_minions_killed");
             }
         }
     }
 
-    // Standard boss defeated logic
-    if (this.standardAvailableBossTypes.some(type => defeatedBoss instanceof type) && gameContext.callbacks.signalAchievementEvent) {
-        // For "Boss Slayer Supreme GM"
-        gameContext.callbacks.signalAchievementEvent("event_any_standard_boss_tier_X_defeated", {
-            bossKey: getBossKeyFromName(defeatedBoss),
-            bossTier: defeatedBoss.tier
-        });
-        // For "Glass Cannon Connoisseur (Hard)"
+    if (this.standardAvailableBossTypes.some(type => defeatedBoss instanceof type)) {
+        signalAchievement("event_any_standard_boss_tier_X_defeated", { bossKey, bossTier: defeatedBoss.tier });
         if (defeatedBoss.tier === 6) { 
-            gameContext.callbacks.signalAchievementEvent("event_standard_boss_tX_defeated_no_class_evo", {
-                bossTier: defeatedBoss.tier 
-            });
+            signalAchievement("event_standard_boss_tX_defeated_no_class_evo", { bossTier: 6 });
         }
     }
     
-    // Max Efficiency & Apex Predator (Tier 5 checks, Apex is specifically Nexus Weaver)
-    if (defeatedBoss.tier === 5 && gameContext.callbacks.signalAchievementEvent) {
-        gameContext.callbacks.signalAchievementEvent("tX_boss_defeated_high_hp", { // Max Efficiency (any T5 boss)
-            bossTier: defeatedBoss.tier,
-            playerHpPercent: playerInstance.hp / playerInstance.maxHp
+    if (defeatedBoss.tier >= 5) { // Max Efficiency and Apex Predator
+        signalAchievement("tX_boss_defeated_high_hp", {
+            bossTier: defeatedBoss.tier, playerHpPercent: playerInstance.hp / playerInstance.maxHp
         });
-        if (defeatedBoss instanceof NexusWeaverBoss && playerInstance.currentPath === 'berserker') { // Apex Predator
+        if (defeatedBoss instanceof NexusWeaverBoss && defeatedBoss.tier === 5 && playerInstance.currentPath === 'berserker') {
              if (playerInstance.isBloodpactActive && playerInstance.isSavageHowlAttackSpeedBuffActive) { 
-                 gameContext.callbacks.signalAchievementEvent("path_boss_buffed_kill", {
-                    bossKey: "nexusWeaver", bossTier: 5, path: "berserker",
-                    bloodpactActive: true, savageHowlActive: true
-                });
+                 signalAchievement("path_boss_buffed_kill", { bossKey, bossTier: 5, path: "berserker", bloodpactActive: true, savageHowlActive: true });
             }
+        }
+    }
+    
+    // Path-specific ability/buff kills
+    if (defeatedBoss.damageSourcesThisFight && playerInstance.currentPath) {
+        signalAchievement("path_boss_ability_only_kill", {
+            bossKey, bossTier: defeatedBoss.tier, path: playerInstance.currentPath,
+            damageSources: { ...defeatedBoss.damageSourcesThisFight } 
+        });
+        if (playerInstance.currentPath === 'berserker') {
+            signalAchievement("path_boss_buffed_kill", {
+                bossKey, bossTier: defeatedBoss.tier, path: "berserker",
+                bloodpactActive: playerInstance.isBloodpactActive,
+                savageHowlActive: playerInstance.isSavageHowlAttackSpeedBuffActive
+            });
         }
     }
 
     // Flawless tracking
-    if (playerInstance.damageTakenThisBossFight === 0 && gameContext.callbacks.signalAchievementEvent) {
-        const bossKey = getBossKeyFromName(defeatedBoss);
-        gameContext.callbacks.signalAchievementEvent("boss_defeated_flawless", { bossKey: bossKey, bossTier: defeatedBoss.tier });
-
-        if (!this.flawlessUniqueBossTypesDefeatedThisRun.has(bossKey)) { // For "Flawless Victory x3"
+    if (playerInstance.damageTakenThisBossFight === 0) {
+        signalAchievement("boss_defeated_flawless", { bossKey, bossTier: defeatedBoss.tier });
+        if (!this.flawlessUniqueBossTypesDefeatedThisRun.has(bossKey)) {
             this.flawlessUniqueBossTypesDefeatedThisRun.add(bossKey);
-            if (this.flawlessUniqueBossTypesDefeatedThisRun.size >= 3) {
-                 gameContext.callbacks.signalAchievementEvent("event_multi_unique_boss_flawless_any_type", {
-                    uniqueFlawlessBossTypes: this.flawlessUniqueBossTypesDefeatedThisRun.size
-                 });
-            }
+            signalAchievement("event_multi_unique_boss_flawless_any_type", { uniqueFlawlessBossTypes: this.flawlessUniqueBossTypesDefeatedThisRun.size });
         }
-        
-        if (this.standardBossTypeKeys.includes(bossKey) && !this.flawlessUniqueStandardBossTypesDefeatedThisRun.has(bossKey)) { // For "Flawless Gauntlet"
+        if (this.standardBossTypeKeys.includes(bossKey) && !this.flawlessUniqueStandardBossTypesDefeatedThisRun.has(bossKey)) {
             this.flawlessUniqueStandardBossTypesDefeatedThisRun.add(bossKey);
-            if (this.flawlessUniqueStandardBossTypesDefeatedThisRun.size >= 3) {
-                 gameContext.callbacks.signalAchievementEvent("event_multi_unique_standard_boss_flawless", {
-                    uniqueFlawlessBossTypes: this.flawlessUniqueStandardBossTypesDefeatedThisRun.size
-                 });
-            }
+            signalAchievement("event_multi_unique_standard_boss_flawless", { uniqueFlawlessBossTypes: this.flawlessUniqueStandardBossTypesDefeatedThisRun.size });
         }
     }
 
     // Resourceful Fighter
-    if (!(defeatedBoss instanceof NexusWeaverBoss) &&
-        defeatedBoss.tier === 2 &&
-        this.standardAvailableBossTypes.some(type => defeatedBoss instanceof type) &&
-        !playerInstance.usedAbilityInCurrentBossFight &&
-        gameContext.callbacks && gameContext.callbacks.signalAchievementEvent) {
-
-        const bossKey = getBossKeyFromName(defeatedBoss);
-        gameContext.callbacks.signalAchievementEvent("boss_defeat_no_abilities", {
-            bossTier: defeatedBoss.tier,
-            bossKey: bossKey,
-            noAbilitiesUsedFromBossManager: true
-        });
+    if (!(defeatedBoss instanceof NexusWeaverBoss) && defeatedBoss.tier === 2 && !playerInstance.usedAbilityInCurrentBossFight) {
+        signalAchievement("boss_defeat_no_abilities", { bossKey, bossTier: 2, noAbilitiesUsedFromBossManager: true });
     }
     playerInstance.usedAbilityInCurrentBossFight = false;
 

@@ -240,13 +240,13 @@ export const allAchievements = [
     {
         id: "battering_ram_medium",
         name: "Battering Ram",
-        description: "As an Aegis, deal 500 total damage to bosses using Aegis Charge impact.",
+        description: "As an Aegis, deal 200 total damage to bosses using Aegis Charge impact.",
         tier: achievementTiers.MEDIUM,
         iconPath: "assets/icons/ach_battering_ram.png", 
         unlockConditions: {
             type: "player_stat_gte",
             stat: "aegisChargeBossDamageDealtThisRun",
-            value: 500,
+            value: 200,
             path: "aegis"
         }
     },
