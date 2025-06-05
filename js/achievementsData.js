@@ -5,7 +5,8 @@ export const achievementTiers = {
     MEDIUM: "Medium",
     HARD: "Hard",
     MASTER: "Master",
-    GRANDMASTER: "Grandmaster"
+    GRANDMASTER: "Grandmaster",
+    OMEGA: "Omega" // <<< NEW TIER
 };
 
 export const allAchievements = [
@@ -575,7 +576,7 @@ export const allAchievements = [
         }
     },
     
-    // --- GRANDMASTER Tier (Selected by you) ---
+    // --- GRANDMASTER Tier ---
     {
         id: "nexus_blitz_t1_gm",
         name: "Nexus Blitz: T1 Grandmaster",
@@ -668,7 +669,6 @@ export const allAchievements = [
             type: "event_berserker_boss_high_rage_kill", 
             bossKey: "nexusWeaver",
             bossTier: 5,
-            // minRagePercentSustained: 0.80 // This detail is handled by the event signal now
         }
     },
     {
@@ -738,6 +738,101 @@ export const allAchievements = [
         unlockConditions: {
             type: "event_nexus_weaver_defeated", 
             bossTier: 10 
+        }
+    },
+
+    // --- OMEGA Tier ---
+    {
+        id: "omega_survivor_apex",
+        name: "Omega Survivor: Apex",
+        description: "Reach a Survival score of 50,000.",
+        tier: achievementTiers.OMEGA,
+        iconPath: "assets/icons/ach_omega_score_apex.png",
+        unlockConditions: {
+            type: "gamestate_score_gte",
+            value: 50000
+        }
+    },
+    {
+        id: "nexus_blitz_t1_omega",
+        name: "Nexus Blitz: T1 Omega",
+        description: "Defeat Nexus Weaver Tier 1 within 1 minute.",
+        tier: achievementTiers.OMEGA,
+        iconPath: "assets/icons/ach_omega_blitz_t1.png",
+        unlockConditions: {
+            type: "event_nexus_tX_defeated_within_time",
+            bossTier: 1,
+            timeLimitMs: 60000 
+        }
+    },
+    {
+        id: "nexus_blitz_t2_omega",
+        name: "Nexus Blitz: T2 Omega",
+        description: "Defeat Nexus Weaver Tier 2 within 2 minutes.",
+        tier: achievementTiers.OMEGA,
+        iconPath: "assets/icons/ach_omega_blitz_t2.png",
+        unlockConditions: {
+            type: "event_nexus_tX_defeated_within_time",
+            bossTier: 2,
+            timeLimitMs: 120000 
+        }
+    },
+    {
+        id: "nexus_blitz_t3_omega",
+        name: "Nexus Blitz: T3 Omega",
+        description: "Defeat Nexus Weaver Tier 3 within 3 minutes.",
+        tier: achievementTiers.OMEGA,
+        iconPath: "assets/icons/ach_omega_blitz_t3.png",
+        unlockConditions: {
+            type: "event_nexus_tX_defeated_within_time",
+            bossTier: 3,
+            timeLimitMs: 180000 
+        }
+    },
+    {
+        id: "nexus_blitz_t4_omega",
+        name: "Nexus Blitz: T4 Omega",
+        description: "Defeat Nexus Weaver Tier 4 within 3 minutes 30 seconds.",
+        tier: achievementTiers.OMEGA,
+        iconPath: "assets/icons/ach_omega_blitz_t4.png",
+        unlockConditions: {
+            type: "event_nexus_tX_defeated_within_time",
+            bossTier: 4,
+            timeLimitMs: 210000 
+        }
+    },
+    {
+        id: "nexus_blitz_t5_omega",
+        name: "Nexus Blitz: T5 Omega",
+        description: "Defeat Nexus Weaver Tier 5 within 4 minutes.",
+        tier: achievementTiers.OMEGA,
+        iconPath: "assets/icons/ach_omega_blitz_t5.png",
+        unlockConditions: {
+            type: "event_nexus_tX_defeated_within_time",
+            bossTier: 5,
+            timeLimitMs: 240000 
+        }
+    },
+    { 
+        id: "boss_slayer_supreme_omega",
+        name: "Boss Slayer Supreme: Omega",
+        description: "Defeat any standard boss (Chaser, Reflector, or Singularity) at Tier 30 or higher in a single run.",
+        tier: achievementTiers.OMEGA,
+        iconPath: "assets/icons/ach_omega_boss_slayer.png", 
+        unlockConditions: {
+            type: "event_any_standard_boss_tier_X_defeated", 
+            minTier: 30 
+        }
+    },
+    {
+        id: "nexus_obliterator_omega",
+        name: "Nexus Obliterator: Omega",
+        description: "Defeat Nexus Weaver Tier 15.",
+        tier: achievementTiers.OMEGA,
+        iconPath: "assets/icons/ach_omega_nexus_obliterator.png", 
+        unlockConditions: {
+            type: "event_nexus_weaver_defeated", 
+            bossTier: 15 
         }
     },
 ];
