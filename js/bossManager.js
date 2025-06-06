@@ -334,8 +334,26 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
 
     if (this.standardAvailableBossTypes.some(type => defeatedBoss instanceof type)) {
         signalAchievement("event_any_standard_boss_tier_X_defeated", { bossKey, bossTier: defeatedBoss.tier });
-        if (defeatedBoss.tier === 6) { 
-            signalAchievement("event_standard_boss_tX_defeated_no_class_evo", { bossTier: 6 });
+        
+        // <<< BUG FIX & DEBUG LOGGING >>>
+        if (defeatedBoss.tier >= 3) { // Changed to 3 for your debugging, can be changed back to 6
+            const tieredTankEvos = playerInstance.acquiredEvolutions.filter(evo => evo.classType === 'tank' && evo.isTiered === true);
+            const hasNoTieredTankEvos = tieredTankEvos.length === 0;
+
+            // Log the check
+            console.log(`[GlassCannonCheck] Defeated T${defeatedBoss.tier} ${bossKey}. Has no tiered tank evos: ${hasNoTieredTankEvos}`);
+            if (tieredTankEvos.length > 0) {
+                console.log('[GlassCannonCheck] Found tiered tank evos:', tieredTankEvos.map(e => e.id));
+            } else {
+                console.log('[GlassCannonCheck] No tiered tank evos found.');
+            }
+            
+            if (hasNoTieredTankEvos) {
+                 signalAchievement("event_standard_boss_tX_defeated_no_class_evo", { 
+                    bossTier: defeatedBoss.tier,
+                    hasNoTieredTankEvolutions: true 
+                });
+            }
         }
     }
     
@@ -371,17 +389,17 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
 
         if (!this.flawlessUniqueBossTypesDefeatedThisRun.has(bossKey)) {
             this.flawlessUniqueBossTypesDefeatedThisRun.add(bossKey);
-            signalAchievement("event_multi_unique_boss_flawless_any_type"); // Data no longer needed, it's checked directly
+            signalAchievement("event_multi_unique_boss_flawless_any_type");
         }
 
-        // <<< BUG FIX: Add a separate check for the stricter Flawless Gauntlet >>>
         if (playerInstance.flawlessStreakActive && this.standardBossTypeKeys.includes(bossKey)) {
             if (!this.flawlessUniqueStandardBossTypesDefeatedThisRun.has(bossKey)) {
                  this.flawlessUniqueStandardBossTypesDefeatedThisRun.add(bossKey);
-                 // This event is for the Master achievement, it now implies a stricter check
                  signalAchievement("event_multi_unique_standard_boss_flawless");
             }
         }
+    } else {
+        playerInstance.flawlessStreakActive = false;
     }
 
     // Resourceful Fighter
@@ -418,6 +436,7 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
 
 
     if (defeatedBoss instanceof NexusWeaverBoss &&
+        defeatedBoss.tier <= 5 && 
         gameContext.callbacks.hasNexusWeaverTierTimeBeenRecordedThisRun &&
         !gameContext.callbacks.hasNexusWeaverTierTimeBeenRecordedThisRun(defeatedBoss.tier) &&
         gameContext.callbacks.getGameplayTimeElapsed) {

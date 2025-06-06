@@ -24,7 +24,7 @@ export class MirrorShieldBoss extends BossNPC {
         this.PLAYER_COLLISION_STUN_DURATION_MIRROR = 200; 
         this.recoilVelX = 0;
         this.recoilVelY = 0;
-        this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE = 1.5; // Mirror shield is a bit more hefty
+        this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE = 1.5;
         this.AEGIS_PASSIVE_BOSS_STUN_DURATION = 80;
     }
 
@@ -118,7 +118,6 @@ export class MirrorShieldBoss extends BossNPC {
             this.y = Math.max(this.radius, Math.min(canvasHeight - this.radius, this.y));
         }
 
-
         if (checkCollision(this, playerInstance)) {
             const playerIsTeleporting = (playerInstance.teleporting && playerInstance.teleportEffectTimer > 0);
             const playerIsCurrentlyShieldOvercharging = isPlayerShieldOvercharging; 
@@ -127,22 +126,14 @@ export class MirrorShieldBoss extends BossNPC {
             
             if (canPlayerPhysicallyInteract) {
                 if (playerInstance.hasAegisPathHelm) {
-                    // Player is Aegis Path
-                    const pushAngleBoss = Math.atan2(this.y - playerInstance.y, this.x - playerInstance.x);
-                     const overlap = (this.radius + playerInstance.radius) - Math.hypot(this.x - playerInstance.x, this.y - playerInstance.y);
-                    if (overlap > 0) {
-                        this.x += Math.cos(pushAngleBoss) * overlap * 0.5;
-                        this.y += Math.sin(pushAngleBoss) * overlap * 0.5;
-                    }
-
                     if (playerInstance.aegisRamCooldownTimer <= 0) {
-                        // Aegis offensive ram is ready
+                        // <<< BUG FIX: Direct check for ram readiness >>>
                         if (gameContext && gameContext.playerCollidedWithBoss !== undefined) {
                             gameContext.playerCollidedWithBoss = { boss: this, type: "aegisOffensiveRam" };
                         }
                     } else {
-                        // Aegis offensive ram is on COOLDOWN. Player takes NO damage from this body collision.
-                        // Boss still gets a slight recoil.
+                        // This part handles the passive knockback when ram is on cooldown
+                        const pushAngleBoss = Math.atan2(this.y - playerInstance.y, this.x - playerInstance.x);
                         this.recoilVelX += Math.cos(pushAngleBoss) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE;
                         this.recoilVelY += Math.sin(pushAngleBoss) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE;
                         this.playerCollisionStunTimer = Math.max(this.playerCollisionStunTimer, this.AEGIS_PASSIVE_BOSS_STUN_DURATION);
@@ -152,12 +143,11 @@ export class MirrorShieldBoss extends BossNPC {
                         playerInstance.velY += Math.sin(playerPushAngle) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE * 0.5;
                     }
                 } else {
-                    // Player is NOT Aegis Path - Standard collision damage & knockback logic
+                    // Standard player collision
                     if (!playerIsDamageImmuneFromRecentHit && this.playerCollisionStunTimer <= 0 && !this.isFeared) { 
                         if(gameContext && gameContext.playerCollidedWithBoss !== undefined) {
                              gameContext.playerCollidedWithBoss = { boss: this, type: "standardPlayerDamage" };
                         }
-                        // Boss also gets recoiled
                         const pushAngleBoss = Math.atan2(this.y - playerInstance.y, this.x - playerInstance.x);
                         this.recoilVelX = Math.cos(pushAngleBoss) * PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.3;
                         this.recoilVelY = Math.sin(pushAngleBoss) * PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.3;

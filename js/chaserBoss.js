@@ -11,8 +11,8 @@ export class ChaserBoss extends BossNPC {
         this.PLAYER_COLLISION_STUN_DURATION = 400; 
         this.recoilVelX = 0;
         this.recoilVelY = 0;
-        this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE = 2; // How much boss recoils from Aegis player even if ram is on CD
-        this.AEGIS_PASSIVE_BOSS_STUN_DURATION = 100; // Short stun for boss
+        this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE = 2; 
+        this.AEGIS_PASSIVE_BOSS_STUN_DURATION = 100;
     }
 
     draw(ctx) {
@@ -63,14 +63,14 @@ export class ChaserBoss extends BossNPC {
             this.playerCollisionStunTimer -= dt;
             this.x += this.recoilVelX * normalizedDtFactor;
             this.y += this.recoilVelY * normalizedDtFactor;
-            this.recoilVelX *= 0.88; // Damping factor for recoil
+            this.recoilVelX *= 0.88; 
             this.recoilVelY *= 0.88;
             if (Math.abs(this.recoilVelX) < 0.01) this.recoilVelX = 0;
             if (Math.abs(this.recoilVelY) < 0.01) this.recoilVelY = 0;
             if (this.playerCollisionStunTimer <= 0) {
                 this.speed = this.baseSpeed;
             }
-        } else if (this.hitStunTimer <= 0) { // Normal movement if not hit-stunned
+        } else if (this.hitStunTimer <= 0) { 
             const angleToPlayer = Math.atan2(playerInstance.y - this.y, playerInstance.x - this.x);
             this.x += Math.cos(angleToPlayer) * this.speed * normalizedDtFactor;
             this.y += Math.sin(angleToPlayer) * this.speed * normalizedDtFactor;
@@ -84,47 +84,34 @@ export class ChaserBoss extends BossNPC {
         if (checkCollision(this, playerInstance)) {
             const playerIsTeleporting = (playerInstance.teleporting && playerInstance.teleportEffectTimer > 0);
             const playerIsShieldOverchargingCurrently = isPlayerShieldOvercharging; 
-            const playerDamageImmuneFromHit = (postDamageImmunityTimer !== undefined && postDamageImmunityTimer > 0); // Immunity from recent damage
+            const playerDamageImmuneFromHit = (postDamageImmunityTimer !== undefined && postDamageImmunityTimer > 0);
             
-            // Player can interact if not teleporting or shield overcharging (Mage ability)
             const canPlayerPhysicallyInteract = !playerIsTeleporting && !playerIsShieldOverchargingCurrently;
 
             if (canPlayerPhysicallyInteract) {
                 if (playerInstance.hasAegisPathHelm) {
-                    // Player is Aegis Path
-                    const pushAngleBoss = Math.atan2(this.y - playerInstance.y, this.x - playerInstance.x);
-                    const overlap = (this.radius + playerInstance.radius) - Math.hypot(this.x - playerInstance.x, this.y - playerInstance.y);
-                    if (overlap > 0) { // Ensure they are actually overlapping
-                        this.x += Math.cos(pushAngleBoss) * overlap * 0.5; // Basic separation
-                        this.y += Math.sin(pushAngleBoss) * overlap * 0.5;
-                    }
-
                     if (playerInstance.aegisRamCooldownTimer <= 0) {
-                        // Aegis offensive ram is ready. Signal for player.handleAegisCollisionWithBoss
+                        // <<< BUG FIX: Direct check for ram readiness >>>
                         if (gameContext && gameContext.playerCollidedWithBoss !== undefined) {
-                            // gameLogic (via main.js callback) will call player.handleAegisCollisionWithBoss
                             gameContext.playerCollidedWithBoss = { boss: this, type: "aegisOffensiveRam" };
                         }
                     } else {
-                        // Aegis offensive ram is on COOLDOWN. Player takes NO damage from this body collision.
-                        // Boss still gets a slight recoil from the player's mass.
+                        // This part handles the passive knockback when ram is on cooldown
+                        const pushAngleBoss = Math.atan2(this.y - playerInstance.y, this.x - playerInstance.x);
                         this.recoilVelX += Math.cos(pushAngleBoss) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE;
                         this.recoilVelY += Math.sin(pushAngleBoss) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE;
                         this.playerCollisionStunTimer = Math.max(this.playerCollisionStunTimer, this.AEGIS_PASSIVE_BOSS_STUN_DURATION);
-                        this.speed = 0; // Briefly stop the boss
-                         // Player also gets a slight pushback
+                        this.speed = 0; 
                         const playerPushAngle = Math.atan2(playerInstance.y - this.y, playerInstance.x - this.x);
                         playerInstance.velX += Math.cos(playerPushAngle) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE * 0.5;
                         playerInstance.velY += Math.sin(playerPushAngle) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE * 0.5;
                     }
                 } else {
-                    // Player is NOT Aegis Path - Standard collision damage & knockback logic for the player
+                    // Standard player collision
                     if (!playerDamageImmuneFromHit) { 
-                        // Signal to gameLogic that a standard (damaging) collision occurred.
                         if (gameContext && gameContext.playerCollidedWithBoss !== undefined) {
                              gameContext.playerCollidedWithBoss = { boss: this, type: "standardPlayerDamage" };
                         }
-                        // Boss also gets recoiled and stunned by standard collision
                         const pushAngleBoss = Math.atan2(this.y - playerInstance.y, this.x - playerInstance.x);
                         this.recoilVelX = Math.cos(pushAngleBoss) * PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.6;
                         this.recoilVelY = Math.sin(pushAngleBoss) * PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.6;

@@ -29,8 +29,8 @@ export class GravityWellBoss extends BossNPC {
         this.recoilVelY = 0;
         this.playerCollisionStunTimer = 0;
         this.PLAYER_COLLISION_STUN_DURATION = 300;
-        this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE = 1.0; // Gravity Well boss is less mobile
-        this.AEGIS_PASSIVE_BOSS_STUN_DURATION = 50; 
+        this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE = 1.0; 
+        this.AEGIS_PASSIVE_BOSS_STUN_DURATION = 50;
     }
 
     draw(ctx) {
@@ -228,7 +228,7 @@ export class GravityWellBoss extends BossNPC {
                     const pullFactor = this.gravityRay.gravityStrength * ((this.gravityRay.gravityRadius - distToWellCenter) / this.gravityRay.gravityRadius);
                     ray.dx += Math.cos(pullAngle) * pullFactor * (dt / (1000 / 60));
                     ray.dy += Math.sin(pullAngle) * pullFactor * (dt / (1000 / 60));
-                    const speedMag = Math.sqrt(ray.dx**2 + ray.dy**2);
+                    const speedMag = Math.sqrt(ray.dx ** 2 + ray.dy ** 2);
                     let maxPullInfluence = ray.initialSpeedMultiplier * BASE_RAY_SPEED * 1.8;
                     if(speedMag > maxPullInfluence) { ray.dx = (ray.dx / speedMag) * maxPullInfluence; ray.dy = (ray.dy / speedMag) * maxPullInfluence; }
 
@@ -259,7 +259,6 @@ export class GravityWellBoss extends BossNPC {
 
         if (this.activeDetonationEffect) { this.activeDetonationEffect.timer -= dt; if (this.activeDetonationEffect.timer <= 0) this.activeDetonationEffect = null; }
 
-        // Player collision with GravityWellBoss main body
         if (checkCollision(this, playerInstance)) {
             const playerIsTeleporting = (playerInstance.teleporting && playerInstance.teleportEffectTimer > 0);
             const playerIsCurrentlyShieldOvercharging = isPlayerShieldOvercharging;
@@ -268,28 +267,20 @@ export class GravityWellBoss extends BossNPC {
 
             if (canPlayerPhysicallyInteract) {
                 if (playerInstance.hasAegisPathHelm) {
-                    // Player is Aegis Path
-                    const pushAngleBoss = Math.atan2(this.y - playerInstance.y, this.x - playerInstance.x);
-                    const overlap = (this.radius + playerInstance.radius) - Math.hypot(this.x - playerInstance.x, this.y - playerInstance.y);
-                    if (overlap > 0) {
-                        this.x += Math.cos(pushAngleBoss) * overlap * 0.5;
-                        this.y += Math.sin(pushAngleBoss) * overlap * 0.5;
-                    }
-                    
+                    // <<< BUG FIX: Reverted to the simpler, correct logic >>>
                     if (playerInstance.aegisRamCooldownTimer <= 0) {
-                        // Aegis offensive ram is ready
                         if (gameContext && gameContext.playerCollidedWithBoss !== undefined) {
                             gameContext.playerCollidedWithBoss = { boss: this, type: "aegisOffensiveRam" };
                         }
                     } else {
-                        // Aegis offensive ram is on COOLDOWN. Player takes NO damage from this body collision.
-                        // Boss still gets a slight recoil.
+                        // This part handles the passive knockback when ram is on cooldown
+                        const pushAngleBoss = Math.atan2(this.y - playerInstance.y, this.x - playerInstance.x);
                         this.recoilVelX += Math.cos(pushAngleBoss) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE;
                         this.recoilVelY += Math.sin(pushAngleBoss) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE;
                         this.playerCollisionStunTimer = Math.max(this.playerCollisionStunTimer, this.AEGIS_PASSIVE_BOSS_STUN_DURATION);
                         this.speed = 0; 
                         const playerPushAngle = Math.atan2(playerInstance.y - this.y, playerInstance.x - this.x);
-                        playerInstance.velX += Math.cos(playerPushAngle) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE * 0.6; // Gravity well is somewhat movable
+                        playerInstance.velX += Math.cos(playerPushAngle) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE * 0.6;
                         playerInstance.velY += Math.sin(playerPushAngle) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE * 0.6;
                     }
                 } else {
@@ -298,11 +289,10 @@ export class GravityWellBoss extends BossNPC {
                         if (gameContext && gameContext.playerCollidedWithBoss !== undefined) {
                              gameContext.playerCollidedWithBoss = { boss: this, type: "standardPlayerDamage" };
                         }
-                        // Boss also gets recoiled
                         const pushAngleBoss = Math.atan2(this.y - playerInstance.y, this.x - playerInstance.x);
-                        this.recoilVelX = Math.cos(pushAngleBoss) * PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.2; // Less recoil than chaser
+                        this.recoilVelX = Math.cos(pushAngleBoss) * PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.2; 
                         this.recoilVelY = Math.sin(pushAngleBoss) * PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.2;
-                        this.playerCollisionStunTimer = this.PLAYER_COLLISION_STUN_DURATION; // Standard stun
+                        this.playerCollisionStunTimer = this.PLAYER_COLLISION_STUN_DURATION;
                         this.speed = 0;
                     }
                 }

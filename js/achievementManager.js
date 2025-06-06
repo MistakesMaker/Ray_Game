@@ -111,6 +111,20 @@ function evaluateCondition(achievement, gameContext) {
     const bossManager = gameContext.bossManager;
 
     switch (conditions.type) {
+        // <<< NEW, MORE RELIABLE LOGIC FOR GLASS CANNON >>>
+        case "event_standard_boss_tX_defeated_no_class_evo":
+            if (!bossManager || !player.acquiredEvolutions) {
+                return false;
+            }
+            const hasTieredTankEvo = player.acquiredEvolutions.some(evo => evo.classType === conditions.excludedClass && evo.isTiered === true);
+            if (hasTieredTankEvo) {
+                return false; // Fail fast if a tiered tank evo is found
+            }
+            // Check if any standard boss has reached the required tier
+            const standardBossKeys = ["chaser", "reflector", "singularity"];
+            const hasHighTierBoss = standardBossKeys.some(key => (bossManager.bossTiers[key] || 0) >= conditions.bossTier);
+            return hasHighTierBoss;
+
         case "player_stat_gte":
             if (conditions.path && player.currentPath !== conditions.path) return false;
             const statPartsGTE = conditions.stat.split('.');
@@ -272,23 +286,12 @@ function evaluateCondition(achievement, gameContext) {
         case "event_nexus_weaver_defeated_no_abilities_strict":
             return !!(gameContext.eventFlags && gameContext.eventFlags.nexus_weaver_defeated_no_abilities_strict);
 
-        case "event_standard_boss_tX_defeated_no_class_evo":
-            if (gameContext.eventFlags && gameContext.eventFlags.standard_boss_tX_defeated_no_class_evo) {
-                const eventData = gameContext.eventFlags.standard_boss_tX_defeated_no_class_evo_data || {};
-                if (eventData.bossTier === conditions.bossTier && player.acquiredEvolutions && Array.isArray(player.acquiredEvolutions)) {
-                    return !player.acquiredEvolutions.some(evo => evo.classType === conditions.excludedClass);
-                }
-            }
-            return false;
-
-        // <<< BUG FIX: This now checks the persistent bossManager set and the player's run-long flawless streak >>>
-        case "event_multi_unique_standard_boss_flawless":
+        case "event_multi_unique_standard_boss_flawless": 
              if (bossManager && bossManager.flawlessUniqueStandardBossTypesDefeatedThisRun && player.flawlessStreakActive) {
                 return bossManager.flawlessUniqueStandardBossTypesDefeatedThisRun.size >= conditions.count;
             }
             return false;
         
-        // <<< BUG FIX: This now checks the persistent bossManager set >>>
         case "event_multi_unique_boss_flawless_any_type":
             if (bossManager && bossManager.flawlessUniqueBossTypesDefeatedThisRun) {
                 return bossManager.flawlessUniqueBossTypesDefeatedThisRun.size >= conditions.count;
@@ -459,7 +462,7 @@ export function checkAllAchievements(gameContext) {
             "tX_boss_defeated_high_hp",
             "nexus_weaver_defeated_no_abilities_strict",
             "standard_boss_tX_defeated_no_class_evo",
-            // DO NOT RESET the multi-boss flags here, as they need to persist
+            // DO NOT RESET the multi-boss flags here, as they are now checked directly from the bossManager
             // "multi_unique_standard_boss_flawless", 
             // "multi_unique_boss_flawless_any_type",
             "nexus_t3_defeated_no_minions_killed", 

@@ -859,9 +859,10 @@ function confirmEvolutionChoice(uiSelectedChoice, indexOfCardInOffer, playerInst
             if (!playerInstance.acquiredEvolutions) {
                 playerInstance.acquiredEvolutions = [];
             }
+            // <<< BUG FIX: Store 'isTiered' property for better filtering later >>>
             playerInstance.acquiredEvolutions.push({
                 id: originalEvo.id,
-                isTiered: originalEvo.isTiered,
+                isTiered: originalEvo.isTiered, // <-- This is the important part
                 rolledTier: uiSelectedChoice.rolledTier, 
                 classType: originalEvo.classType 
             });

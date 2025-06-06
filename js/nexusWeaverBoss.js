@@ -341,11 +341,12 @@ export class NexusWeaverBoss extends BossNPC {
         this._lastDamageSourcePlayer = false;
         this._lastDamageTimestamp = 0;
         
-        this.playerCollisionStunTimer = 0; // Nexus has its own stun timer, not from BossNPC default
+        this.playerCollisionStunTimer = 0; 
         this.recoilVelX = 0;
         this.recoilVelY = 0;
-        this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE = 1; // Very slight recoil, it's a big boss
-        this.AEGIS_PASSIVE_BOSS_STUN_DURATION = 50; // Very short stun
+        this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE = 1; 
+        this.AEGIS_PASSIVE_BOSS_STUN_DURATION = 50;
+        this.isCollidingWithPlayer = false; // <<< NEW
     }
 
     lastDamageSourcePlayer() {
@@ -506,18 +507,18 @@ export class NexusWeaverBoss extends BossNPC {
             this.spawnTellTimer = 0;
             this.pulseNovaActive = false;
             this.pulseNovaTimer = 0;
-        } else if (this.playerCollisionStunTimer > 0) { // Handle boss's own stun from Aegis passive
+        } else if (this.playerCollisionStunTimer > 0) { 
             this.playerCollisionStunTimer -= dt;
             this.x += this.recoilVelX * normalizedDtFactor;
             this.y += this.recoilVelY * normalizedDtFactor;
-            this.recoilVelX *= 0.85; // Damping for Nexus
+            this.recoilVelX *= 0.85; 
             this.recoilVelY *= 0.85;
             if (Math.abs(this.recoilVelX) < 0.01) this.recoilVelX = 0;
             if (Math.abs(this.recoilVelY) < 0.01) this.recoilVelY = 0;
             if (this.playerCollisionStunTimer <= 0) {
                 this.speed = this.baseSpeed;
             }
-        } else { // Normal behavior when not feared and not stunned by player collision
+        } else { 
             if (this.hitStunTimer <= 0) {
                 const angleToPlayer = Math.atan2(playerInstance.y - this.y, playerInstance.x - this.x);
                 const distToPlayer = Math.hypot(playerInstance.x - this.x, playerInstance.y - this.y);
@@ -596,9 +597,11 @@ export class NexusWeaverBoss extends BossNPC {
                 this.activeMinions.splice(i, 1);
             }
         }
+        
+        const isCurrentlyColliding = checkCollision(this, playerInstance);
+        const justStartedColliding = isCurrentlyColliding && !this.isCollidingWithPlayer;
 
-        // Player collision with Nexus Weaver main body
-        if (checkCollision(this, playerInstance)) {
+        if (isCurrentlyColliding) {
             const playerIsTeleporting = (playerInstance.teleporting && playerInstance.teleportEffectTimer > 0);
             const playerIsCurrentlyShieldOvercharging = isPlayerShieldOvercharging;
             const playerIsDamageImmuneFromRecentHit = (postDamageImmunityTimer !== undefined && postDamageImmunityTimer > 0);
@@ -606,25 +609,20 @@ export class NexusWeaverBoss extends BossNPC {
             
             if (canPlayerPhysicallyInteract) {
                 if (playerInstance.hasAegisPathHelm) {
-                    // Player is Aegis Path
-                    const pushAngleBoss = Math.atan2(this.y - playerInstance.y, this.x - playerInstance.x);
-                    const overlap = (this.radius + playerInstance.radius) - Math.hypot(this.x - playerInstance.x, this.y - playerInstance.y);
-                    if (overlap > 0) {
-                        this.x += Math.cos(pushAngleBoss) * overlap * 0.5;
-                        this.y += Math.sin(pushAngleBoss) * overlap * 0.5;
-                    }
-
+                    // <<< BUG FIX: Reverted to the simpler, correct logic >>>
                     if (playerInstance.aegisRamCooldownTimer <= 0) {
                         if (gameContext && gameContext.playerCollidedWithBoss !== undefined) {
                             gameContext.playerCollidedWithBoss = { boss: this, type: "aegisOffensiveRam" };
                         }
                     } else {
+                        // This part handles the passive knockback when ram is on cooldown
+                        const pushAngleBoss = Math.atan2(this.y - playerInstance.y, this.x - playerInstance.x);
                         this.recoilVelX += Math.cos(pushAngleBoss) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE;
                         this.recoilVelY += Math.sin(pushAngleBoss) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE;
                         this.playerCollisionStunTimer = Math.max(this.playerCollisionStunTimer, this.AEGIS_PASSIVE_BOSS_STUN_DURATION);
                         this.speed = 0;
                         const playerPushAngle = Math.atan2(playerInstance.y - this.y, playerInstance.x - this.x);
-                        playerInstance.velX += Math.cos(playerPushAngle) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE * 0.3; // Nexus is big, less pushback on player
+                        playerInstance.velX += Math.cos(playerPushAngle) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE * 0.3;
                         playerInstance.velY += Math.sin(playerPushAngle) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE * 0.3;
                     }
                 } else {
@@ -633,16 +631,18 @@ export class NexusWeaverBoss extends BossNPC {
                         if(gameContext && gameContext.playerCollidedWithBoss !== undefined) {
                              gameContext.playerCollidedWithBoss = { boss: this, type: "standardPlayerDamage" };
                         }
-                        // Nexus doesn't get significantly recoiled by standard player collision
                         const pushAngleBoss = Math.atan2(this.y - playerInstance.y, this.x - playerInstance.x);
-                        this.recoilVelX = Math.cos(pushAngleBoss) * PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.1; // Minimal recoil
+                        this.recoilVelX = Math.cos(pushAngleBoss) * PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.1; 
                         this.recoilVelY = Math.sin(pushAngleBoss) * PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.1;
-                        this.playerCollisionStunTimer = 100; // Short stun
+                        this.playerCollisionStunTimer = 100; 
                         this.speed = 0;
                     }
                 }
             }
         }
+        
+        // No longer need to track previous state this way
+        // this.isCollidingWithPlayer = isCurrentlyColliding;
     }
 
     takeDamage(amount, ray, playerInstance, context = {}) { 

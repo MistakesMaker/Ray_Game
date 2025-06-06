@@ -384,14 +384,14 @@ export const allAchievements = [
     {
         id: "true_aegis_hard",
         name: "True Aegis",
-        description: "As Aegis, defeat Nexus Weaver Tier 2 using only Aegis Charge/Passive and Seismic Slam for damage.",
+        description: "As Aegis, defeat Nexus Weaver Tier 1 using only Aegis Charge/Passive and Seismic Slam for damage.",
         tier: achievementTiers.HARD,
         iconPath: "assets/icons/ach_true_aegis.png", 
         unlockConditions: {
             type: "path_boss_ability_only_kill",
             path: "aegis",
             bossKey: "nexusWeaver",
-            bossTier: 2,
+            bossTier: 1,
             allowedAbilities: ["aegisCharge", "seismicSlam", "aegisPassive"]
         }
     },
