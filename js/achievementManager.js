@@ -64,7 +64,6 @@ export function getAllAchievementsWithStatus() {
     return processedAchievements.map(ach => ({ ...ach }));
 }
 
-// <<< NEW FUNCTION TO GET THE COUNT OF UNLOCKED ACHIEVEMENTS >>>
 export function getUnlockedAchievementCount() {
     if (!processedAchievements || processedAchievements.length === 0) {
         return 0;
@@ -86,7 +85,7 @@ function unlockAchievement(achievementId, gameContext) {
         }
 
         if (gameContext && gameContext.activeBuffNotificationsArray && UIManager) {
-            const notificationText = `🏆 Achievement Unlocked: ${achievement.name}!`;
+            const notificationText = `🏆 Achievement Unlocked: ${achievement.name} (${achievement.tier})!`;
             gameContext.activeBuffNotificationsArray.push({
                 text: notificationText,
                 timer: CONSTANTS_MODULE.BUFF_NOTIFICATION_DURATION * 1.5
@@ -378,10 +377,22 @@ function evaluateCondition(achievement, gameContext) {
 
         case "player_stat_duration_gte":
             if (conditions.path && player.currentPath !== conditions.path) return false;
-            if (player.hasOwnProperty(conditions.stat) && typeof player[conditions.stat] === 'number') {
-                return player[conditions.stat] >= conditions.durationMs;
+            
+            // Check if timer value is sufficient
+            if (!player.hasOwnProperty(conditions.stat) || typeof player[conditions.stat] !== 'number' || player[conditions.stat] < conditions.durationMs) {
+                return false;
             }
-            return false;
+
+            // If a stat threshold is defined, check it as well
+            if (conditions.statThreshold !== undefined) {
+                if (conditions.stat === "berserkerRageHighDurationTimer") {
+                    if (player.berserkerRagePercentage <= conditions.statThreshold) return false;
+                } else if (conditions.stat === "berserkerUnstoppableFuryTimer") {
+                     if (player.berserkerRagePercentage < conditions.statThreshold) return false;
+                }
+            }
+            
+            return true;
 
         case "event_kinetic_cascade_mage":
             return !!(gameContext.eventFlags && gameContext.eventFlags.kinetic_cascade_mage);

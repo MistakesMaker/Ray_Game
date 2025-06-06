@@ -6,7 +6,7 @@ export const achievementTiers = {
     HARD: "Hard",
     MASTER: "Master",
     GRANDMASTER: "Grandmaster",
-    OMEGA: "Omega" // <<< NEW TIER
+    OMEGA: "Omega"
 };
 
 export const allAchievements = [
@@ -159,15 +159,15 @@ export const allAchievements = [
     {
         id: "unstoppable_fury_easy",
         name: "Unstoppable Fury",
-        description: "Reach 90% bonus damage from the Berserker's Echo low HP effect (Berserker Path).",
+        description: "Maintain 70% or higher bonus damage from the Berserker's Echo low HP effect for 5 consecutive seconds.",
         tier: achievementTiers.EASY,
-        iconPath: "assets/icons/ach_rage.png", // Placeholder
+        iconPath: "assets/icons/ach_rage.png",
         unlockConditions: {
-            type: "player_stat_gte",
+            type: "player_stat_duration_gte",
             path: "berserker",
-            stat: "berserkerRagePercentage",
-            value: 90,
-            scope: "run"
+            stat: "berserkerUnstoppableFuryTimer",
+            statThreshold: 70, // <<< NEW THRESHOLD PROPERTY
+            durationMs: 5000
         }
     },
 
@@ -240,13 +240,13 @@ export const allAchievements = [
     {
         id: "battering_ram_medium",
         name: "Battering Ram",
-        description: "As an Aegis, deal 200 total damage to bosses using Aegis Charge impact.",
+        description: "As an Aegis, deal 500 total damage to bosses using Aegis Charge impact.",
         tier: achievementTiers.MEDIUM,
         iconPath: "assets/icons/ach_battering_ram.png", 
         unlockConditions: {
             type: "player_stat_gte",
             stat: "aegisChargeBossDamageDealtThisRun",
-            value: 200,
+            value: 500,
             path: "aegis"
         }
     },
@@ -289,7 +289,7 @@ export const allAchievements = [
     // --- Hard Tier ---
     {
         id: "nexus_blitz_t1_hard", 
-        name: "Nexus Blitz: Tier 1 (Hard)",
+        name: "Nexus Blitz: Tier 1",
         description: "Defeat Nexus Weaver Tier 1 within 2 minutes.",
         tier: achievementTiers.HARD,
         iconPath: "assets/icons/ach_nexus_blitz_t1_hard.png", 
@@ -301,7 +301,7 @@ export const allAchievements = [
     },
     {
         id: "nexus_blitz_t2_hard", 
-        name: "Nexus Blitz: Tier 2 (Hard)",
+        name: "Nexus Blitz: Tier 2",
         description: "Defeat Nexus Weaver Tier 2 within 3 minutes 15 seconds.",
         tier: achievementTiers.HARD,
         iconPath: "assets/icons/ach_nexus_blitz_t2_hard.png", 
@@ -313,7 +313,7 @@ export const allAchievements = [
     },
     {
         id: "nexus_blitz_t3_hard", 
-        name: "Nexus Blitz: Tier 3 (Hard)",
+        name: "Nexus Blitz: Tier 3",
         description: "Defeat Nexus Weaver Tier 3 within 4 minutes 30 seconds.",
         tier: achievementTiers.HARD,
         iconPath: "assets/icons/ach_nexus_blitz_t3_hard.png", 
@@ -437,7 +437,7 @@ export const allAchievements = [
     },
     {
         id: "nexus_blitz_t1_master",
-        name: "Nexus Blitz: Tier 1 (Master)",
+        name: "Nexus Blitz: Tier 1",
         description: "Defeat Nexus Weaver Tier 1 within 1 minute 30 seconds.",
         tier: achievementTiers.MASTER,
         iconPath: "assets/icons/ach_nexus_blitz_t1_master.png", 
@@ -449,7 +449,7 @@ export const allAchievements = [
     },
     {
         id: "nexus_blitz_t2_master",
-        name: "Nexus Blitz: Tier 2 (Master)",
+        name: "Nexus Blitz: Tier 2",
         description: "Defeat Nexus Weaver Tier 2 within 2 minutes 45 seconds.",
         tier: achievementTiers.MASTER,
         iconPath: "assets/icons/ach_nexus_blitz_t2_master.png", 
@@ -461,7 +461,7 @@ export const allAchievements = [
     },
     {
         id: "nexus_blitz_t3_master",
-        name: "Nexus Blitz: Tier 3 (Master)",
+        name: "Nexus Blitz: Tier 3",
         description: "Defeat Nexus Weaver Tier 3 within 3 minutes 30 seconds.",
         tier: achievementTiers.MASTER,
         iconPath: "assets/icons/ach_nexus_blitz_t3_master.png", 
@@ -473,7 +473,7 @@ export const allAchievements = [
     },
     {
         id: "nexus_blitz_t4_master",
-        name: "Nexus Blitz: Tier 4 (Master)",
+        name: "Nexus Blitz: Tier 4",
         description: "Defeat Nexus Weaver Tier 4 within 4 minutes 30 seconds.",
         tier: achievementTiers.MASTER,
         iconPath: "assets/icons/ach_nexus_blitz_t4_master.png", 
@@ -485,7 +485,7 @@ export const allAchievements = [
     },
     {
         id: "nexus_blitz_t5_master",
-        name: "Nexus Blitz: Tier 5 (Master)",
+        name: "Nexus Blitz: Tier 5",
         description: "Defeat Nexus Weaver Tier 5 within 5 minutes 30 seconds.",
         tier: achievementTiers.MASTER,
         iconPath: "assets/icons/ach_nexus_blitz_t5_master.png", 
@@ -579,7 +579,7 @@ export const allAchievements = [
     // --- GRANDMASTER Tier ---
     {
         id: "nexus_blitz_t1_gm",
-        name: "Nexus Blitz: T1 Grandmaster",
+        name: "Nexus Blitz: Tier 1",
         description: "Defeat Nexus Weaver Tier 1 within 1 minute 15 seconds.",
         tier: achievementTiers.GRANDMASTER,
         iconPath: "assets/icons/ach_gm_nexus_blitz_t1.png", 
@@ -591,7 +591,7 @@ export const allAchievements = [
     },
     {
         id: "nexus_blitz_t2_gm",
-        name: "Nexus Blitz: T2 Grandmaster",
+        name: "Nexus Blitz: Tier 2",
         description: "Defeat Nexus Weaver Tier 2 within 2 minutes 15 seconds.",
         tier: achievementTiers.GRANDMASTER,
         iconPath: "assets/icons/ach_gm_nexus_blitz_t2.png", 
@@ -603,7 +603,7 @@ export const allAchievements = [
     },
     {
         id: "nexus_blitz_t3_gm",
-        name: "Nexus Blitz: T3 Grandmaster",
+        name: "Nexus Blitz: Tier 3",
         description: "Defeat Nexus Weaver Tier 3 within 3 minutes 15 seconds.",
         tier: achievementTiers.GRANDMASTER,
         iconPath: "assets/icons/ach_gm_nexus_blitz_t3.png", 
@@ -615,7 +615,7 @@ export const allAchievements = [
     },
     {
         id: "nexus_blitz_t4_gm",
-        name: "Nexus Blitz: T4 Grandmaster",
+        name: "Nexus Blitz: Tier 4",
         description: "Defeat Nexus Weaver Tier 4 within 3 minutes 45 seconds.",
         tier: achievementTiers.GRANDMASTER,
         iconPath: "assets/icons/ach_gm_nexus_blitz_t4.png", 
@@ -627,7 +627,7 @@ export const allAchievements = [
     },
     {
         id: "nexus_blitz_t5_gm",
-        name: "Nexus Blitz: T5 Grandmaster",
+        name: "Nexus Blitz: Tier 5",
         description: "Defeat Nexus Weaver Tier 5 within 4 minutes 15 seconds.",
         tier: achievementTiers.GRANDMASTER,
         iconPath: "assets/icons/ach_gm_nexus_blitz_t5.png", 
@@ -744,7 +744,7 @@ export const allAchievements = [
     // --- OMEGA Tier ---
     {
         id: "omega_survivor_apex",
-        name: "Omega Survivor: Apex",
+        name: "Omega Survivor",
         description: "Reach a Survival score of 50,000.",
         tier: achievementTiers.OMEGA,
         iconPath: "assets/icons/ach_omega_score_apex.png",
@@ -755,7 +755,7 @@ export const allAchievements = [
     },
     {
         id: "nexus_blitz_t1_omega",
-        name: "Nexus Blitz: T1 Omega",
+        name: "Nexus Blitz: Tier 1",
         description: "Defeat Nexus Weaver Tier 1 within 1 minute.",
         tier: achievementTiers.OMEGA,
         iconPath: "assets/icons/ach_omega_blitz_t1.png",
@@ -767,7 +767,7 @@ export const allAchievements = [
     },
     {
         id: "nexus_blitz_t2_omega",
-        name: "Nexus Blitz: T2 Omega",
+        name: "Nexus Blitz: Tier 2",
         description: "Defeat Nexus Weaver Tier 2 within 2 minutes.",
         tier: achievementTiers.OMEGA,
         iconPath: "assets/icons/ach_omega_blitz_t2.png",
@@ -779,7 +779,7 @@ export const allAchievements = [
     },
     {
         id: "nexus_blitz_t3_omega",
-        name: "Nexus Blitz: T3 Omega",
+        name: "Nexus Blitz: Tier 3",
         description: "Defeat Nexus Weaver Tier 3 within 3 minutes.",
         tier: achievementTiers.OMEGA,
         iconPath: "assets/icons/ach_omega_blitz_t3.png",
@@ -791,7 +791,7 @@ export const allAchievements = [
     },
     {
         id: "nexus_blitz_t4_omega",
-        name: "Nexus Blitz: T4 Omega",
+        name: "Nexus Blitz: Tier 4",
         description: "Defeat Nexus Weaver Tier 4 within 3 minutes 30 seconds.",
         tier: achievementTiers.OMEGA,
         iconPath: "assets/icons/ach_omega_blitz_t4.png",
@@ -803,7 +803,7 @@ export const allAchievements = [
     },
     {
         id: "nexus_blitz_t5_omega",
-        name: "Nexus Blitz: T5 Omega",
+        name: "Nexus Blitz: Tier 5",
         description: "Defeat Nexus Weaver Tier 5 within 4 minutes.",
         tier: achievementTiers.OMEGA,
         iconPath: "assets/icons/ach_omega_blitz_t5.png",
@@ -815,7 +815,7 @@ export const allAchievements = [
     },
     { 
         id: "boss_slayer_supreme_omega",
-        name: "Boss Slayer Supreme: Omega",
+        name: "Boss Slayer Supreme",
         description: "Defeat any standard boss (Chaser, Reflector, or Singularity) at Tier 30 or higher in a single run.",
         tier: achievementTiers.OMEGA,
         iconPath: "assets/icons/ach_omega_boss_slayer.png", 
@@ -826,7 +826,7 @@ export const allAchievements = [
     },
     {
         id: "nexus_obliterator_omega",
-        name: "Nexus Obliterator: Omega",
+        name: "Nexus Obliterator",
         description: "Defeat Nexus Weaver Tier 15.",
         tier: achievementTiers.OMEGA,
         iconPath: "assets/icons/ach_omega_nexus_obliterator.png", 
