@@ -240,25 +240,25 @@ export const allAchievements = [
     {
         id: "battering_ram_medium",
         name: "Battering Ram",
-        description: "As an Aegis, deal 500 total damage to bosses using Aegis Charge impact.",
+        description: "As an Aegis, deal 200 total damage to bosses using Aegis Charge impact.",
         tier: achievementTiers.MEDIUM,
         iconPath: "assets/icons/ach_battering_ram.png", 
         unlockConditions: {
             type: "player_stat_gte",
             stat: "aegisChargeBossDamageDealtThisRun",
-            value: 500,
+            value: 200,
             path: "aegis"
         }
     },
     {
         id: "vampiric_thirst_medium",
         name: "Vampiric Thirst",
-        description: "As a Berserker, heal for 50+ HP from a single Bloodpact activation.",
+        description: "As a Berserker, heal for 30+ HP from a single Bloodpact activation.",
         tier: achievementTiers.MEDIUM,
         iconPath: "assets/icons/ach_vampiric_thirst.png", 
         unlockConditions: {
             type: "event_bloodpact_heal_amount",
-            minHeal: 50,
+            minHeal: 30,
             path: "berserker"
         }
     },
