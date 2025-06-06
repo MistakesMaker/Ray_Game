@@ -471,8 +471,7 @@
 
         #evolutionTooltip { display: none; position: absolute; background-color: rgba(20, 20, 50, 0.9); color: #ddeeff; border: 1px solid #55aaff; border-radius: 5px; padding: 8px 12px; font-size: 13px; max-width: 250px; text-align: left; pointer-events: none; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
         
-        /* Tooltip for achievement progress bar */
-        #achievement-progress-tooltip { z-index: 1001 !important; }
+        #achievement-progress-tooltip { display: none; position: absolute; background-color: rgba(20, 20, 50, 0.9); color: #ddeeff; border: 1px solid #55aaff; border-radius: 5px; padding: 8px 12px; font-size: 13px; max-width: 250px; text-align: left; pointer-events: none; z-index: 1001; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
 
         #pausePlayerStatsPanel {
             position: absolute;
@@ -714,6 +713,7 @@
             background-color: #2a2a5a;
             border-radius: 6px;
             border-left: 5px solid #505070; /* Default border for locked */
+            position: relative; /* Needed for the ::after pseudo-element */
         }
         .achievement-entry.unlocked {
             background-color: #353565; /* Slightly lighter for unlocked */
@@ -729,13 +729,33 @@
             font-size: 24px; /* For text placeholder if no image */
             color: #777;
             flex-shrink: 0;
-            /* Later: background-image: url(...); background-size: cover; */
+            background-size: cover;
+            background-position: center;
+            position: relative; /* Needed for the ::after pseudo-element */
         }
         .achievement-entry.unlocked .achievement-icon {
             border-color: #ffcc66;
-            background-color: #4a4a7a; /* Darker gold-ish for icon bg */
-            color: #ffdd88; /* Lighter gold for text placeholder */
+            background-color: #4a4a7a;
+            color: transparent; /* Hide the placeholder ? if an image is loaded */
         }
+        /* <<< THIS IS THE FIX >>> */
+        .achievement-entry.unlocked .achievement-icon::after {
+            content: '✔️';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            color: white;
+            text-shadow: 0 0 5px black, 0 0 8px black;
+            background-color: rgba(20, 150, 20, 0.4); /* Green overlay to signify completion */
+            border-radius: 4px;
+        }
+
         .achievement-details {
             flex-grow: 1;
             text-align: left;
@@ -924,7 +944,7 @@
     <div id="evolutionTooltip"></div>
 
     <!-- Tooltip for Achievement Progress Bar -->
-    <div id="achievement-progress-tooltip" style="display: none; position: absolute; background-color: rgba(20, 20, 50, 0.9); color: #ddeeff; border: 1px solid #55aaff; border-radius: 5px; padding: 8px 12px; font-size: 13px; max-width: 250px; text-align: left; pointer-events: none; z-index: 1001; box-shadow: 0 2px 10px rgba(0,0,0,0.5);"></div>
+    <div id="achievement-progress-tooltip" style="display: none; position: absolute;"></div>
 
     <audio id="bgMusic" src="space_ambient.mp3" loop></audio>
 

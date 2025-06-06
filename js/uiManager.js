@@ -947,8 +947,7 @@ export function displayAchievementsScreenUI(allAchievementsWithStatus, onBackCal
             segment.style.top = '0';
             segment.style.height = '100%';
             segment.style.cursor = 'pointer';
-
-            // Draw a visible marker line for all but the last segment
+            
             if (i < totalBrackets - 1) {
                 const markerLine = document.createElement('div');
                 markerLine.style.position = 'absolute';
@@ -957,7 +956,6 @@ export function displayAchievementsScreenUI(allAchievementsWithStatus, onBackCal
                 markerLine.style.width = '2px';
                 markerLine.style.height = '100%';
                 markerLine.style.backgroundColor = 'rgba(255, 255, 255, 0.5)';
-                markerLine.style.pointerEvents = 'none'; // Make sure line doesn't interfere
                 segment.appendChild(markerLine);
             }
             
@@ -976,10 +974,10 @@ export function displayAchievementsScreenUI(allAchievementsWithStatus, onBackCal
             
             segment.addEventListener('mouseover', (event) => {
                 const rates = calculateRatesForBracket(i);
-                const endRange = (i + 1) * ACHIEVEMENT_BRACKET_SIZE - 1;
-                const titleText = i === totalBrackets - 1 ? 
-                    `Drop Rates at ${i * ACHIEVEMENT_BRACKET_SIZE}+ Unlocks` :
-                    `Drop Rates at ${i * ACHIEVEMENT_BRACKET_SIZE} - ${endRange} Unlocks`;
+                const endRange = Math.min(totalCount, (i + 1) * ACHIEVEMENT_BRACKET_SIZE - 1);
+                const titleText = (i * ACHIEVEMENT_BRACKET_SIZE > 0) ? 
+                    `Drop Rates for ${i * ACHIEVEMENT_BRACKET_SIZE}-${endRange} Unlocks` :
+                    `Base Drop Rates (0-${endRange} Unlocks)`;
 
                 progressTooltip.innerHTML = `
                     <div style="font-weight:bold; color: #ffdd88; margin-bottom: 5px;">${titleText}</div>
@@ -1033,13 +1031,12 @@ export function displayAchievementsScreenUI(allAchievementsWithStatus, onBackCal
 
             const iconDiv = document.createElement('div');
             iconDiv.classList.add('achievement-icon');
-            if (ach.isUnlocked) {
-                iconDiv.textContent = '✔️'; 
-                iconDiv.style.color = '#ffcc66';
+            if (ach.iconPath) { // Check if an icon path is defined
+                iconDiv.style.backgroundImage = `url(${ach.iconPath})`;
+                iconDiv.textContent = ''; // Clear placeholder text if image exists
             } else {
-                iconDiv.textContent = '❓'; 
+                iconDiv.textContent = ach.isUnlocked ? '' : '❓'; // Show question mark only if locked AND no icon
             }
-            
 
             const detailsDiv = document.createElement('div');
             detailsDiv.classList.add('achievement-details');
