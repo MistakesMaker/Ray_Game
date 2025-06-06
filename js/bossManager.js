@@ -145,15 +145,6 @@ trySpawnBoss(currentScore, playerInstance) {
 
             if (playerInstance) {
                 playerInstance.usedAbilityInCurrentBossFight = false;
-                playerInstance.damageTakenThisBossFight = 0;
-                if (this.bossSpawnQueue[0].typeKey === 'nexusWeaver' && this.bossSpawnQueue[0].tier === 3) {
-                     playerInstance.nexusMinionsKilledThisNexusT3Fight = 0;
-                }
-                if (this.bossSpawnQueue[0].typeKey === 'nexusWeaver' && 
-                    this.bossSpawnQueue[0].tier === 5 && 
-                    playerInstance.currentPath === 'berserker') {
-                    playerInstance.maintainedHighRageThisBossFight = true; 
-                }
             }
 
             const firstBossInWaveInfo = this.bossSpawnQueue[0];
@@ -176,8 +167,8 @@ processBossSpawnQueue(gameContext) {
         const playerToUse = gameContext.player || (gameContext.callbacks && gameContext.callbacks.getPlayerInstance ? gameContext.callbacks.getPlayerInstance() : null);
 
         if (playerToUse) {
-            playerToUse.usedAbilityInCurrentBossFight = false;
             playerToUse.damageTakenThisBossFight = 0;
+            playerToUse.usedAbilityInCurrentBossFight = false;
             if (bossInfo.typeKey === 'nexusWeaver' && bossInfo.tier === 3) {
                 playerToUse.nexusMinionsKilledThisNexusT3Fight = 0;
             }
@@ -303,15 +294,16 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
     if (!signalAchievement) return; // Can't proceed without this
 
     const bossKey = getBossKeyFromName(defeatedBoss);
-
-    if (defeatedBoss instanceof NexusWeaverBoss && !this.nexusWeaverDefeatedThisRun) {
-        signalAchievement("nexus_weaver_defeated_first_time_run");
-        this.nexusWeaverDefeatedThisRun = true;
-    }
-
-    signalAchievement("event_nexus_weaver_defeated", { bossTier: defeatedBoss.tier });
+    console.log(`[BossManager] Handling defeat of: ${bossKey} (Tier: ${defeatedBoss.tier}) | Flawless (this fight): ${playerInstance.damageTakenThisBossFight === 0} | Total Hits (this run): ${playerInstance.timesHit}`);
 
     if (defeatedBoss instanceof NexusWeaverBoss) {
+        if (!this.nexusWeaverDefeatedThisRun) {
+            signalAchievement("nexus_weaver_defeated_first_time_run");
+            this.nexusWeaverDefeatedThisRun = true;
+        }
+        
+        signalAchievement("event_nexus_weaver_defeated", { bossTier: defeatedBoss.tier });
+
         signalAchievement("nexus_tX_defeated_within_time", {
             bossTier: defeatedBoss.tier,
             timeTakenMs: gameplayTimeAtKill
@@ -376,13 +368,19 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
     // Flawless tracking
     if (playerInstance.damageTakenThisBossFight === 0) {
         signalAchievement("boss_defeated_flawless", { bossKey, bossTier: defeatedBoss.tier });
+
         if (!this.flawlessUniqueBossTypesDefeatedThisRun.has(bossKey)) {
             this.flawlessUniqueBossTypesDefeatedThisRun.add(bossKey);
-            signalAchievement("event_multi_unique_boss_flawless_any_type", { uniqueFlawlessBossTypes: this.flawlessUniqueBossTypesDefeatedThisRun.size });
+            signalAchievement("event_multi_unique_boss_flawless_any_type"); // Data no longer needed, it's checked directly
         }
-        if (this.standardBossTypeKeys.includes(bossKey) && !this.flawlessUniqueStandardBossTypesDefeatedThisRun.has(bossKey)) {
-            this.flawlessUniqueStandardBossTypesDefeatedThisRun.add(bossKey);
-            signalAchievement("event_multi_unique_standard_boss_flawless", { uniqueFlawlessBossTypes: this.flawlessUniqueStandardBossTypesDefeatedThisRun.size });
+
+        // <<< BUG FIX: Add a separate check for the stricter Flawless Gauntlet >>>
+        if (playerInstance.flawlessStreakActive && this.standardBossTypeKeys.includes(bossKey)) {
+            if (!this.flawlessUniqueStandardBossTypesDefeatedThisRun.has(bossKey)) {
+                 this.flawlessUniqueStandardBossTypesDefeatedThisRun.add(bossKey);
+                 // This event is for the Master achievement, it now implies a stricter check
+                 signalAchievement("event_multi_unique_standard_boss_flawless");
+            }
         }
     }
 
@@ -648,7 +646,8 @@ debugSpawnBoss(tierToSpawn, bossTypeKey = 'nexusWeaver', playerInstance) {
 
     if (playerInstance) {
         playerInstance.usedAbilityInCurrentBossFight = false;
-        playerInstance.damageTakenThisBossFight = 0;
+        // The reset is now correctly in processBossSpawnQueue
+        // playerInstance.damageTakenThisBossFight = 0;
         if (bossTypeKey === 'nexusWeaver' && tier === 3) {
             playerInstance.nexusMinionsKilledThisNexusT3Fight = 0;
         }

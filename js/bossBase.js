@@ -35,19 +35,16 @@ export class BossNPC {
         this.fearSourceY = 0;
         this.FEAR_SPEED_MULTIPLIER = 1.2;
 
-        // <<< NEW: For tracking damage sources for achievements >>>
+        // For tracking damage sources for achievements
         this.damageSourcesThisFight = {
-            primary: 0,          // Player's normal ray attacks
-            omegaLaser: 0,       // Mage path
-            miniGravityWell: 0,  // Mage path (launched rays) / or general ability if applicable
-            aegisCharge: 0,      // Aegis path (LMB impact)
-            seismicSlam: 0,      // Aegis path (RMB)
-            // Bloodpact and Savage Howl are buffs/debuffs, not direct damage dealers in the same way.
-            // Other direct damage numeric abilities could be added if needed for other achievements.
-            otherAbility: 0,     // Damage from other player abilities (e.g. EMP, future abilities)
-            aegisPassive: 0,     // Aegis path (passive ram)
+            primary: 0,
+            omegaLaser: 0,
+            miniGravityWell: 0,
+            aegisCharge: 0,
+            seismicSlam: 0,
+            otherAbility: 0,
+            aegisPassive: 0,
         };
-        // <<< END NEW >>>
     }
 
     applyBleed(dpt, duration) {
@@ -79,7 +76,7 @@ export class BossNPC {
         if (this.health < 0) this.health = 0;
 
 
-        // <<< NEW: Track damage source >>>
+        // <<< BUG FIX: Correctly track damage source for Aegis Charge >>>
         if (playerInstance) { // Only track if damage is from the player
             if (context.isAegisCollision) {
                 this.damageSourcesThisFight.aegisPassive += actualDamageTaken;
@@ -100,9 +97,8 @@ export class BossNPC {
                     this.damageSourcesThisFight.primary += actualDamageTaken;
                 }
             }
-            // console.log("Boss Damage Sources Updated:", this.damageSourcesThisFight); // For debugging
         }
-        // <<< END NEW >>>
+        // <<< END BUG FIX >>>
 
 
         if (this.isFeared) {

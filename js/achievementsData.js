@@ -240,25 +240,25 @@ export const allAchievements = [
     {
         id: "battering_ram_medium",
         name: "Battering Ram",
-        description: "As an Aegis, deal 200 total damage to bosses using Aegis Charge impact.",
+        description: "As an Aegis, deal 150 total damage to bosses using Aegis Charge impact.",
         tier: achievementTiers.MEDIUM,
         iconPath: "assets/icons/ach_battering_ram.png", 
         unlockConditions: {
             type: "player_stat_gte",
             stat: "aegisChargeBossDamageDealtThisRun",
-            value: 200,
+            value: 150,
             path: "aegis"
         }
     },
     {
         id: "vampiric_thirst_medium",
         name: "Vampiric Thirst",
-        description: "As a Berserker, heal for 30+ HP from a single Bloodpact activation.",
+        description: "As a Berserker, heal for 15+ HP from a single Bloodpact activation.",
         tier: achievementTiers.MEDIUM,
         iconPath: "assets/icons/ach_vampiric_thirst.png", 
         unlockConditions: {
             type: "event_bloodpact_heal_amount",
-            minHeal: 30,
+            minHeal: 15,
             path: "berserker"
         }
     },
@@ -277,12 +277,12 @@ export const allAchievements = [
     {
         id: "momentum_master_medium",
         name: "Momentum Master",
-        description: "Deal over 30 damage with a single ray hit due to Momentum Injectors.",
+        description: "Deal over 3 damage with a single ray hit due to Momentum Injectors.",
         tier: achievementTiers.MEDIUM,
         iconPath: "assets/icons/ach_momentum_master.png", 
         unlockConditions: {
             type: "event_momentum_ray_hit_high_damage",
-            minDamage: 30
+            minDamage: 3
         }
     },
 
@@ -352,7 +352,7 @@ export const allAchievements = [
         tier: achievementTiers.HARD,
         iconPath: "assets/icons/ach_flawless_x3.png", 
         unlockConditions: {
-            type: "event_multi_unique_boss_flawless_any_type", 
+            type: "event_multi_unique_boss_flawless_any_type", // <<< BUG FIX: Correct event type
             count: 3
         }
     },
@@ -651,12 +651,12 @@ export const allAchievements = [
     {
         id: "one_shot_wonder_gm",
         name: "One Shot Wonder",
-        description: "Deal over 50 damage with a single ray hit.",
+        description: "Deal over 80 damage with a single ray hit.",
         tier: achievementTiers.GRANDMASTER,
         iconPath: "assets/icons/ach_gm_one_shot.png", 
         unlockConditions: {
             type: "event_momentum_ray_hit_high_damage",
-            minDamage: 50 
+            minDamage: 80 
         }
     },
     {

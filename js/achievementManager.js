@@ -108,6 +108,7 @@ function evaluateCondition(achievement, gameContext) {
     const conditions = achievement.unlockConditions;
     const initialCharges = gameContext.initialEvoScreenCharges || { rerolls: -1, blocks: -1, freezes: -1 };
     const constants = gameContext.CONSTANTS || CONSTANTS_MODULE; 
+    const bossManager = gameContext.bossManager;
 
     switch (conditions.type) {
         case "player_stat_gte":
@@ -280,17 +281,17 @@ function evaluateCondition(achievement, gameContext) {
             }
             return false;
 
-        case "event_multi_unique_standard_boss_flawless": 
-             if (gameContext.eventFlags && gameContext.eventFlags.multi_unique_standard_boss_flawless) { 
-                const eventData = gameContext.eventFlags.multi_unique_standard_boss_flawless_data || {};
-                return eventData.uniqueFlawlessBossTypes >= conditions.count;
+        // <<< BUG FIX: This now checks the persistent bossManager set and the player's run-long flawless streak >>>
+        case "event_multi_unique_standard_boss_flawless":
+             if (bossManager && bossManager.flawlessUniqueStandardBossTypesDefeatedThisRun && player.flawlessStreakActive) {
+                return bossManager.flawlessUniqueStandardBossTypesDefeatedThisRun.size >= conditions.count;
             }
             return false;
         
+        // <<< BUG FIX: This now checks the persistent bossManager set >>>
         case "event_multi_unique_boss_flawless_any_type":
-            if (gameContext.eventFlags && gameContext.eventFlags.multi_unique_boss_flawless_any_type) {
-                const eventData = gameContext.eventFlags.multi_unique_boss_flawless_any_type_data || {};
-                return eventData.uniqueFlawlessBossTypes >= conditions.count;
+            if (bossManager && bossManager.flawlessUniqueBossTypesDefeatedThisRun) {
+                return bossManager.flawlessUniqueBossTypesDefeatedThisRun.size >= conditions.count;
             }
             return false;
 
@@ -458,8 +459,9 @@ export function checkAllAchievements(gameContext) {
             "tX_boss_defeated_high_hp",
             "nexus_weaver_defeated_no_abilities_strict",
             "standard_boss_tX_defeated_no_class_evo",
-            "multi_unique_standard_boss_flawless", 
-            "multi_unique_boss_flawless_any_type",
+            // DO NOT RESET the multi-boss flags here, as they need to persist
+            // "multi_unique_standard_boss_flawless", 
+            // "multi_unique_boss_flawless_any_type",
             "nexus_t3_defeated_no_minions_killed", 
             "path_boss_ability_only_kill",
             "path_boss_buffed_kill",

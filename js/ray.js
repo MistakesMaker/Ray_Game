@@ -309,7 +309,11 @@ export class Ray {
                     }
                 }
             }
-            if (didBounce && player && player.visualModifiers && player.visualModifiers.momentumInjectors && !this.isBossProjectile && !this.isGravityWellRay) {const maxBonus = 0.25; this.momentumDamageBonusValue = Math.min(maxBonus, (this.momentumDamageBonusValue || 0) + (player.momentumDamageBonus || 0));}
+            // <<< BUG FIX: Check for momentum upgrade on bounce >>>
+            if (didBounce && player && player.momentumDamageBonus > 0 && !this.isBossProjectile && !this.isGravityWellRay) {
+                const maxBonus = 0.25; 
+                this.momentumDamageBonusValue = Math.min(maxBonus, (this.momentumDamageBonusValue || 0) + player.momentumDamageBonus);
+            }
             if (!this.isActive) return;
 
 
@@ -496,13 +500,11 @@ export class PlayerGravityWell {
     }
 
     detonate(detonateContext) {
-        if (!this.isActive) return;
+        if (!this.isActive) return 0;
         this.isActive = false; this.isPendingDetonation = false;
         const { targetX, targetY, player } = detonateContext;
 
         const launchedRayCount = this.absorbedRays.length;
-        // "Well Master" achievement check is now handled in player.js activateAbility
-        // No need to call _mainCallbacks.signalAchievementEvent here directly.
 
         playSound(this.playerWellDetonateSound);
         this.absorbedRays.forEach(ray => {
@@ -544,5 +546,7 @@ export class PlayerGravityWell {
         });
         this.absorbedRays = [];
         if(player && player.activeMiniWell === this) player.activeMiniWell = null;
+        
+        return launchedRayCount;
     }
 }

@@ -125,6 +125,7 @@ export class Player {
         this.berserkerPermanentRayDamageMultiplier = 1.0;
         this.berserkerRagePercentage = 0;
         this.berserkerRageHighDurationTimer = 0; 
+        this.berserkerUnstoppableFuryTimer = 0;
         this.totalTimeInBossFight = 0;       
         this.timeWithHighRageInBossFight = 0;  
         this.maintainedHighRageThisBossFight = true; 
@@ -147,6 +148,7 @@ export class Player {
         this.ablativeAnimTimer = Math.random() * 5000;
         this.aegisAnimTimer = Math.random() * 5000;
         this.timesHit = 0; 
+        this.flawlessStreakActive = true; 
         this.totalDamageDealt = 0;
         this.targetsDestroyedThisRun = 0;
         this.originalPlayerSpeed = initialPlayerSpeed;
@@ -399,18 +401,6 @@ export class Player {
                      if (this.savageHowlAttackSpeedBuffTimer > 0) { this.savageHowlAttackSpeedBuffTimer -= dt; mouseAbilityUIUpdateNeeded = true; if (this.savageHowlAttackSpeedBuffTimer <= 0) this.isSavageHowlAttackSpeedBuffActive = false;}
                      if (this.savageHowlCooldownTimer > 0) {let ecm = Math.max(0.1, 1.0 - this.globalCooldownReduction); this.savageHowlCooldownTimer -= dt/ecm; mouseAbilityUIUpdateNeeded = true; if(this.savageHowlCooldownTimer < 0) this.savageHowlCooldownTimer=0;}
                 }
-                if (this.berserkerRagePercentage > 50) { 
-                    this.berserkerRageHighDurationTimer += dt;
-                    if (this.berserkerRageHighDurationTimer >= 120000 && signalAchievementEvent) { 
-                        signalAchievementEvent("player_stat_duration_gte", { 
-                            path: "berserker",
-                            stat: "berserkerRageHighDurationTimer", 
-                            durationMs: this.berserkerRageHighDurationTimer 
-                        });
-                    }
-                } else {
-                    this.berserkerRageHighDurationTimer = 0;
-                }
             }
 
 
@@ -468,11 +458,26 @@ export class Player {
                 }
             }
 
-
             if (this.currentPath === 'berserker') {
                 const missingHpPercentage = Math.max(0, (this.maxHp - this.hp) / this.maxHp);
                 const tenPercentIncrements = Math.floor(missingHpPercentage * 10);
                 this.berserkerRagePercentage = tenPercentIncrements * BERSERKERS_ECHO_DAMAGE_PER_10_HP * 100;
+                // Logic for "Unstoppable Fury" (Easy achievement, >=70% rage)
+                if (this.berserkerRagePercentage >= 70) {
+                    this.berserkerUnstoppableFuryTimer = (this.berserkerUnstoppableFuryTimer || 0) + dt;
+                } else {
+                    this.berserkerUnstoppableFuryTimer = 0;
+                }
+                // Logic for "Sustained Fury" (Master achievement, >50% rage)
+                if (this.berserkerRagePercentage > 50) {
+                    this.berserkerRageHighDurationTimer = (this.berserkerRageHighDurationTimer || 0) + dt;
+                } else {
+                    this.berserkerRageHighDurationTimer = 0;
+                }
+            } else { // if not berserker, reset timers
+                 this.berserkerRagePercentage = 0;
+                 this.berserkerUnstoppableFuryTimer = 0;
+                 this.berserkerRageHighDurationTimer = 0;
             }
 
 
@@ -698,6 +703,7 @@ export class Player {
         this.berserkerPermanentRayDamageMultiplier = 1.0;
         this.berserkerRagePercentage = 0;
         this.berserkerRageHighDurationTimer = 0;
+        this.berserkerUnstoppableFuryTimer = 0;
         this.totalTimeInBossFight = 0;       
         this.timeWithHighRageInBossFight = 0; 
         this.maintainedHighRageThisBossFight = true;
@@ -712,6 +718,7 @@ export class Player {
         this.teleportEffectTimer = 0;
         this.activeMiniWell = null;
         this.timesHit = 0; 
+        this.flawlessStreakActive = true; // <<< NEW: Reset the streak
         this.totalDamageDealt = 0;
         this.targetsDestroyedThisRun = 0;
         this.usedAbilityInCurrentBossFight = false;
@@ -1300,7 +1307,9 @@ export class Player {
             return 0;
         }
 
-        this.timeSinceLastHit = 0; this.timesHit++;
+        this.timeSinceLastHit = 0; 
+        this.timesHit++;
+        this.flawlessStreakActive = false; // <<< The streak is broken on the first hit
         let damageToTake; let hittingRayObject = null;
 
         if (typeof hittingRayOrAmount === 'object' && hittingRayOrAmount !== null && hittingRayOrAmount instanceof Ray) {
@@ -1326,7 +1335,8 @@ export class Player {
         this.hp -= damageToTake;
         if (this.hp < 0) this.hp = 0;
 
-        if (bossManager && bossManager.isBossSequenceActive()) {
+        // <<< BUG FIX: Changed condition to be more specific >>>
+        if (bossManager && bossManager.activeBosses.length > 0) {
             this.damageTakenThisBossFight += damageToTake;
         }
 
@@ -1466,12 +1476,11 @@ export class Player {
         if (ability.id === 'miniGravityWell') {
             if (this.activeMiniWell && this.activeMiniWell.isActive) {
                 this.currentGravityWellKineticBoost = this.consumeKineticChargeForDamageBoost(`numeric_${ability.id}_detonate`);
-                this.activeMiniWell.detonate({ targetX: abilityContext.mouseX, targetY: abilityContext.mouseY, player: this });
+                const launchedRayCount = this.activeMiniWell.detonate({ targetX: abilityContext.mouseX, targetY: abilityContext.mouseY, player: this });
                 ability.cooldownTimer = effectiveCooldownToSet; ability.justBecameReady = false; abilityUsedSuccessfully = true;
 
-                if (this.eventDataForNextSignal && this.eventDataForNextSignal.player_well_detonated && signalAchievementEvent) {
-                    signalAchievementEvent("player_well_detonated", this.eventDataForNextSignal.player_well_detonated);
-                    delete this.eventDataForNextSignal.player_well_detonated;
+                if (signalAchievementEvent && launchedRayCount > 0) {
+                    signalAchievementEvent("player_well_detonated", { launchedRays: launchedRayCount });
                 }
 
             } else if (ability.cooldownTimer <= 0) {
@@ -1816,6 +1825,7 @@ export class Player {
                 if (Math.hypot(this.x - boss.x, this.y - boss.y) < AEGIS_CHARGE_AOE_RADIUS + boss.radius) {
                     if (boss.takeDamage) {
                         const bossHpBeforeImpact = boss.health;
+                        // <<< BUG FIX: Pass correct context for Battering Ram >>>
                         const dmgDone = boss.takeDamage(baseDamage, null, this, {isAbility: true, abilityType: 'aegisCharge'});
                         if (dmgDone > 0) {
                              this.totalDamageDealt += dmgDone;

@@ -517,6 +517,7 @@ function initGame() {
             if (eventData && Object.keys(eventData).length > 0) {
                 eventFlagsForAchievements[eventName + "_data"] = eventData;
             }
+            // Per-frame check now handles this, so this call can be removed if desired, but is harmless.
             AchievementManager.checkAllAchievements(getGameContextForAchievements());
         }
     };
@@ -987,6 +988,7 @@ const gameContextForEventListeners = {
             if (eventData && Object.keys(eventData).length > 0) {
                 eventFlagsForAchievements[eventName + "_data"] = eventData;
             }
+            // Per-frame check now handles this, so this call is less critical but harmless.
             AchievementManager.checkAllAchievements(getGameContextForAchievements());
         }
     }
@@ -1028,7 +1030,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     AchievementManager.initializeAchievements();
 
     setupEventListeners(gameCanvasElement, gameContextForEventListeners);
-    initGameLoop(GameState.isGameOver, GameState.isGameRunning, GameState.isAnyPauseActive);
+    // <<< MODIFIED: Pass the achievement checker to the game loop initializer >>>
+    initGameLoop(
+        GameState.isGameOver, 
+        GameState.isGameRunning, 
+        GameState.isAnyPauseActive,
+        () => AchievementManager.checkAllAchievements(getGameContextForAchievements()) // The new callback
+    );
     setCanvasDimensions();
 
     const viewHighScoresBtn = document.getElementById('viewHighScoresButton');

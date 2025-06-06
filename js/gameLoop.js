@@ -9,18 +9,20 @@ let _drawCallback = null;
 let _isGameOverCallback = null;
 let _isGameRunningCallback = null; 
 let _isAnyPauseActiveCallback = null; 
-
+let _checkAchievementsCallback = null; // <<< NEW
 
 /**
  * Initializes the game loop module with necessary callbacks.
  * @param {function} isGameOverFn - Function that returns true if the game is over.
  * @param {function} isGameRunningFn - Function that returns true if the game is currently in a "running" logical state.
  * @param {function} isAnyPauseActiveFn - Function that returns true if any game pause (popups, Esc, countdown) is active.
+ * @param {function} checkAchievementsFn - Function to call every frame to check for achievements. // <<< NEW
  */
-export function initGameLoop(isGameOverFn, isGameRunningFn, isAnyPauseActiveFn) {
+export function initGameLoop(isGameOverFn, isGameRunningFn, isAnyPauseActiveFn, checkAchievementsFn) { // <<< MODIFIED
     _isGameOverCallback = isGameOverFn;
     _isGameRunningCallback = isGameRunningFn;
     _isAnyPauseActiveCallback = isAnyPauseActiveFn; 
+    _checkAchievementsCallback = checkAchievementsFn; // <<< NEW
 }
 
 /**
@@ -54,6 +56,12 @@ function loop(timestamp) {
     // GameState.isAnyPauseActive() checks for popups, Esc, countdown.
     if (_isGameRunningCallback() && !_isAnyPauseActiveCallback()) {
         _updateCallback(deltaTime || (1000 / 60)); // Fallback deltaTime if first frame or issue
+
+        // <<< NEW: Check achievements every frame when game is running and not paused >>>
+        if (_checkAchievementsCallback) {
+            _checkAchievementsCallback();
+        }
+
     } else {
         // If paused, we might still want to update certain non-gameplay elements or animations
         // in the future. For now, we just skip the main game logic update.
