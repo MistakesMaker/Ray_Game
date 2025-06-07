@@ -53,7 +53,7 @@ export function initializeLootPools(playerInstance, updateBuffIndicatorCallback)
             id: 'aegisPath', 
             type: 'path_buff',
             name: 'Aegis Path',
-            description: `Evolve into a spiked juggernaut, a living battering ram. HP Regeneration is 50% more effective. Colliding with bosses damages and knocks them back. Grants a fortified, spiky appearance. LMB: Hold to charge, release to dash. RMB: AoE Seismic Slam.`, // MODIFIED DESCRIPTION
+            description: `Evolve into a spiked juggernaut, a living battering ram. HP Regeneration is 50% more effective. Colliding with bosses damages and knocks them back. Grants a fortified, spiky appearance. LMB: Hold to charge, release to dash. RMB: AoE Seismic Slam.`,
             grants_LMB: 'aegisCharge',
             grants_RMB: 'seismicSlam'
         },
@@ -61,7 +61,7 @@ export function initializeLootPools(playerInstance, updateBuffIndicatorCallback)
             id: 'berserkersEcho', 
             type: 'path_buff',
             name: 'Path of Fury',
-            description: `Grants a permanent 1.5x damage multiplier to your normal rays. Per 10% missing Max HP: +${CONSTANTS.BERSERKERS_ECHO_DAMAGE_PER_10_HP*100}% normal ray damage & +${CONSTANTS.BERSERKERS_ECHO_SPEED_PER_10_HP*100}% speed. Grants Berserker's Helm. LMB: Activate Bloodpact for ray lifesteal. RMB: Savage Howl to fear enemies and boost attack speed.`,
+            description: `Grants a permanent +3 Ray Damage. Per 10% missing Max HP: +${CONSTANTS.BERSERKERS_ECHO_DAMAGE_PER_10_HP*100}% normal ray damage & +${CONSTANTS.BERSERKERS_ECHO_SPEED_PER_10_HP*100}% speed. Grants Berserker's Helm. LMB: Activate Bloodpact for ray lifesteal. RMB: Savage Howl to fear enemies and boost attack speed.`,
             grants_LMB: 'bloodpact',
             grants_RMB: 'savageHowl'
         },
@@ -195,7 +195,7 @@ function confirmPathSelection(chosenPathBuff, playerInstance) {
     playerInstance.hasSavageHowl = false;
     
     playerInstance.berserkerPermanentRayDamageMultiplier = 1.0; 
-    playerInstance.hpRegenPathMultiplier = 1.0; // Reset for all paths first
+    playerInstance.hpRegenPathMultiplier = 1.0; 
 
     // Reset Kinetic Conversion before setting for Mage
     playerInstance.kineticConversionLevel = 0;
@@ -208,13 +208,13 @@ function confirmPathSelection(chosenPathBuff, playerInstance) {
     if (chosenPathBuff.id === 'aegisPath') {
         playerInstance.currentPath = 'aegis';
         playerInstance.hasAegisPathHelm = true;
-        playerInstance.hpRegenPathMultiplier = 1.5; // <<< SET HP REGEN BOOST FOR AEGIS
+        playerInstance.hpRegenPathMultiplier = 1.5;
         if (chosenPathBuff.grants_LMB === 'aegisCharge') playerInstance.hasAegisCharge = true;
         if (chosenPathBuff.grants_RMB === 'seismicSlam') playerInstance.hasSeismicSlam = true;
     } else if (chosenPathBuff.id === 'berserkersEcho') {
         playerInstance.currentPath = 'berserker';
         playerInstance.hasBerserkersEchoHelm = true;
-        playerInstance.berserkerPermanentRayDamageMultiplier = 1.5; 
+        playerInstance.rayDamageBonus += 3; // <<< THIS IS THE CHANGE
         if (chosenPathBuff.grants_LMB === 'bloodpact') playerInstance.hasBloodpact = true;
         if (chosenPathBuff.grants_RMB === 'savageHowl') playerInstance.hasSavageHowl = true;
     } else if (chosenPathBuff.id === 'ultimateConfiguration') {
