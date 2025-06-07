@@ -705,7 +705,7 @@ export class Player {
         this.berserkerRageHighDurationTimer = 0;
         this.berserkerUnstoppableFuryTimer = 0;
         this.totalTimeInBossFight = 0;       
-        this.timeWithHighRageInBossFight = 0; 
+        this.timeWithHighRageInBossFight = 0;  
         this.highValueMaintainedForAchievement = null;
         this.aegisRamCooldownTimer = 0;
 
@@ -903,7 +903,6 @@ export class Player {
         if (this.currentPath === 'aegis' && this.hasAegisCharge) {
             const indicatorVisualRadius = this.radius + AEGIS_CHARGE_INDICATOR_RADIUS_OFFSET;
             ctx.lineWidth = AEGIS_CHARGE_INDICATOR_LINE_WIDTH;
-            // const now = Date.now(); // Already defined
 
             if (this.isChargingAegisCharge) { 
                 const chargeProgress = Math.min(1, this.aegisChargeCurrentChargeTime / AEGIS_CHARGE_MAX_CHARGE_TIME);
@@ -1026,11 +1025,7 @@ export class Player {
         ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
         ctx.fillStyle = PLAYER_BASE_COLOR;
         ctx.fill();
-
-        if (this.visualModifiers.ablativeSublayer) {
-            ctx.save(); ctx.clip(); const pS = 10; const pA = 0.08+Math.abs(Math.sin(this.ablativeAnimTimer/800))*0.04; ctx.lineWidth=1; ctx.strokeStyle=`rgba(160,160,255,${pA})`; for(let i=-this.radius*2;i<this.radius*2;i+=pS){ctx.beginPath();ctx.moveTo(i,-this.radius*2);ctx.lineTo(i+this.radius*2,this.radius*2);ctx.stroke();ctx.beginPath();ctx.moveTo(-this.radius*2,i);ctx.lineTo(this.radius*2,i+this.radius*2);ctx.stroke();} ctx.restore();
-        }
-
+        
         if (this.immuneColorsList.length > 0) {
             const sliceAngle = (Math.PI * 2) / this.immuneColorsList.length;
             for (let i = 0; i < this.immuneColorsList.length; i++) {
@@ -1045,12 +1040,28 @@ export class Player {
                 } else { ctx.fill(); }
             }
         }
-
+        
         ctx.beginPath(); ctx.arc(0,0,this.radius,0,Math.PI*2);
         const isAbl = this.visualModifiers.ablativeSublayer;
         ctx.lineWidth = isAbl ? 3 : 2; ctx.strokeStyle = isAbl ? '#B0C0FF' : '#FFFFFF'; ctx.stroke();
         if(isAbl){ctx.beginPath();ctx.arc(0,0,this.radius-2,0,Math.PI*2);ctx.strokeStyle='rgba(160,180,255,0.3)';ctx.lineWidth=1;ctx.stroke();}
         ctx.closePath();
+
+        // <<< FIX: Moved ablativeSublayer draw to AFTER the main body and colors are drawn >>>
+        if (this.visualModifiers.ablativeSublayer) {
+            ctx.save();
+            ctx.clip(); // Clip to the player's circle
+            const pS = 10; 
+            const pA = 0.08 + Math.abs(Math.sin(this.ablativeAnimTimer/800)) * 0.04; 
+            ctx.lineWidth=1; 
+            ctx.strokeStyle=`rgba(160,160,255,${pA})`; 
+            for(let i=-this.radius*2; i<this.radius*2; i+=pS){
+                ctx.beginPath(); ctx.moveTo(i, -this.radius*2); ctx.lineTo(i+this.radius*2, this.radius*2); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(-this.radius*2, i); ctx.lineTo(this.radius*2, i+this.radius*2); ctx.stroke();
+            } 
+            ctx.restore();
+        }
+
 
         if (this.visualModifiers.momentumInjectors) {
             const nV=2; const vAO=Math.PI/2.5; const vL=this.radius*0.4; const vW=this.radius*0.15; ctx.fillStyle='#AAAAAA'; for(let i=0;i<nV;i++){const a=-Math.PI+(i===0?-vAO:vAO); ctx.save();ctx.rotate(a);ctx.fillRect(-this.radius*0.9,-vW/2,vL,vW);ctx.restore();}}
@@ -1220,13 +1231,6 @@ export class Player {
         ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2);
         ctx.fillStyle = PLAYER_BASE_COLOR; ctx.fill();
 
-        if (visualModifiers.ablativeSublayer) {
-            ctx.save(); ctx.clip(); const pS = 10 * displayScale; const pA = 0.08 + Math.abs(Math.sin(ablativeAnimTimer / 800)) * 0.04;
-            ctx.lineWidth=1 * displayScale; ctx.strokeStyle=`rgba(160,160,255,${pA})`;
-            for(let i=-radius*2; i<radius*2; i+=pS){ctx.beginPath();ctx.moveTo(i,-radius*2);ctx.lineTo(i+radius*2,radius*2);ctx.stroke();ctx.beginPath();ctx.moveTo(-this.radius*2,i);ctx.lineTo(this.radius*2,i+this.radius*2);ctx.stroke();}
-            ctx.restore();
-        }
-
         if (immuneColorsList.length > 0) {
             const sliceAngle = (Math.PI * 2) / immuneColorsList.length;
             for (let i = 0; i < immuneColorsList.length; i++) {
@@ -1236,6 +1240,24 @@ export class Player {
                 ctx.fillStyle = immuneColorsList[i]; ctx.fill();
             }
         }
+
+        // <<< FIX: Moved this block to draw on top of colors >>>
+        if (visualModifiers.ablativeSublayer) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(0, 0, radius, 0, Math.PI * 2);
+            ctx.clip(); // Clip to the player's circle
+            const pS = 10 * displayScale; 
+            const pA = 0.08 + Math.abs(Math.sin(ablativeAnimTimer / 800)) * 0.04;
+            ctx.lineWidth = 1 * displayScale; 
+            ctx.strokeStyle = `rgba(160,160,255,${pA})`;
+            for(let i = -radius * 2; i < radius * 2; i += pS){
+                ctx.beginPath(); ctx.moveTo(i, -radius * 2); ctx.lineTo(i + radius * 2, radius * 2); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(-radius * 2, i); ctx.lineTo(radius * 2, i + radius * 2); ctx.stroke();
+            }
+            ctx.restore();
+        }
+
 
         ctx.beginPath(); ctx.arc(0,0,radius,0,Math.PI*2);
         const isAbl = visualModifiers.ablativeSublayer;
