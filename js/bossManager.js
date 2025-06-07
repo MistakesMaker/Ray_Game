@@ -13,6 +13,7 @@ singularitySpawnSound as audioSingularitySpawnSoundLocal,
 nexusWeaverSpawnSound as audioNexusWeaverSpawnSoundLocal
 } from './audio.js';
 import { PENDING_RECORD_NAME } from './highScoreManager.js';
+import * as AchievementManager from './achievementManager.js'; // NEW IMPORT
 
 
 function formatMillisecondsToTimeInternal(ms) {
@@ -172,8 +173,20 @@ processBossSpawnQueue(gameContext) {
             if (bossInfo.typeKey === 'nexusWeaver' && bossInfo.tier === 3) {
                 playerToUse.nexusMinionsKilledThisNexusT3Fight = 0;
             }
-            if (bossInfo.typeKey === 'nexusWeaver' && bossInfo.tier === 5 && playerToUse.currentPath === 'berserker') {
-                playerToUse.maintainedHighRageThisBossFight = true; 
+            // NEW: Generic achievement tracking setup
+            playerToUse.highValueMaintainedForAchievement = null;
+            const achievements = AchievementManager.getAllAchievementsWithStatus();
+            for (const ach of achievements) {
+                if (!ach.isUnlocked && ach.unlockConditions.type === "event_berserker_boss_high_rage_kill") {
+                    if (bossInfo.typeKey === ach.unlockConditions.bossKey && bossInfo.tier === ach.unlockConditions.bossTier) {
+                         playerToUse.highValueMaintainedForAchievement = {
+                            achievementId: ach.id,
+                            maintained: true,
+                            minRage: ach.unlockConditions.minRagePercentage || 80
+                        };
+                        break; 
+                    }
+                }
             }
         }
 
@@ -250,10 +263,12 @@ update(playerInstance, gameContext) {
             continue;
         }
         
-        if (playerInstance && playerInstance.currentPath === 'berserker' && 
-            boss instanceof NexusWeaverBoss && boss.tier === 5 &&
-            playerInstance.berserkerRagePercentage < 80) { // Check if rage dropped below threshold
-            playerInstance.maintainedHighRageThisBossFight = false;
+        // NEW: Generic per-frame check
+        if (playerInstance && playerInstance.highValueMaintainedForAchievement) {
+            const achData = playerInstance.highValueMaintainedForAchievement;
+            if (achData.maintained && playerInstance.berserkerRagePercentage < achData.minRage) {
+                achData.maintained = false;
+            }
         }
 
         boss.update(playerInstance, bossUpdateContext);
@@ -296,6 +311,21 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
     const bossKey = getBossKeyFromName(defeatedBoss);
     console.log(`[BossManager] Handling defeat of: ${bossKey} (Tier: ${defeatedBoss.tier}) | Flawless (this fight): ${playerInstance.damageTakenThisBossFight === 0} | Total Hits (this run): ${playerInstance.timesHit}`);
 
+    // NEW: Generic final check
+    if (playerInstance.highValueMaintainedForAchievement) {
+        const achData = playerInstance.highValueMaintainedForAchievement;
+        const achDef = AchievementManager.getAllAchievementsWithStatus().find(a => a.id === achData.achievementId);
+        if (achDef && achData.maintained && defeatedBoss instanceof NexusWeaverBoss && defeatedBoss.tier === achDef.unlockConditions.bossTier) {
+            signalAchievement("event_berserker_boss_high_rage_kill", {
+                bossKey: "nexusWeaver",
+                bossTier: achDef.unlockConditions.bossTier,
+                path: "berserker",
+                maintainedHighRageEntireFight: true
+            });
+        }
+    }
+
+
     if (defeatedBoss instanceof NexusWeaverBoss) {
         if (!this.nexusWeaverDefeatedThisRun) {
             signalAchievement("nexus_weaver_defeated_first_time_run");
@@ -317,11 +347,6 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
         if (defeatedBoss.tier === 5 && !playerInstance.rerollsUsedThisRun && !playerInstance.blocksUsedThisRun && !playerInstance.freezesUsedThisRun) {
             signalAchievement("event_nexus_tX_defeated_no_evo_interaction_use", { bossTier: 5 });
         }
-        if (defeatedBoss.tier === 5 && playerInstance.currentPath === 'berserker' && playerInstance.maintainedHighRageThisBossFight) {
-             signalAchievement("event_berserker_boss_high_rage_kill", {
-                bossKey: "nexusWeaver", bossTier: 5, path: "berserker", maintainedHighRageEntireFight: true
-            });
-        }
         if (defeatedBoss.tier === 3) {
             if (playerInstance.heartsCollectedThisRun === 0 && playerInstance.bonusPointsCollectedThisRun === 0) {
                 signalAchievement("nexus_t3_defeated_no_pickups");
@@ -335,18 +360,9 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
     if (this.standardAvailableBossTypes.some(type => defeatedBoss instanceof type)) {
         signalAchievement("event_any_standard_boss_tier_X_defeated", { bossKey, bossTier: defeatedBoss.tier });
         
-        // <<< BUG FIX & DEBUG LOGGING >>>
-        if (defeatedBoss.tier >= 3) { // Changed to 3 for your debugging, can be changed back to 6
+        if (defeatedBoss.tier >= 3) {
             const tieredTankEvos = playerInstance.acquiredEvolutions.filter(evo => evo.classType === 'tank' && evo.isTiered === true);
             const hasNoTieredTankEvos = tieredTankEvos.length === 0;
-
-            // Log the check
-            console.log(`[GlassCannonCheck] Defeated T${defeatedBoss.tier} ${bossKey}. Has no tiered tank evos: ${hasNoTieredTankEvos}`);
-            if (tieredTankEvos.length > 0) {
-                console.log('[GlassCannonCheck] Found tiered tank evos:', tieredTankEvos.map(e => e.id));
-            } else {
-                console.log('[GlassCannonCheck] No tiered tank evos found.');
-            }
             
             if (hasNoTieredTankEvos) {
                  signalAchievement("event_standard_boss_tX_defeated_no_class_evo", { 
@@ -357,7 +373,7 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
         }
     }
     
-    if (defeatedBoss.tier >= 5) { // Max Efficiency and Apex Predator
+    if (defeatedBoss.tier >= 5) {
         signalAchievement("tX_boss_defeated_high_hp", {
             bossTier: defeatedBoss.tier, playerHpPercent: playerInstance.hp / playerInstance.maxHp
         });
@@ -368,7 +384,6 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
         }
     }
     
-    // Path-specific ability/buff kills
     if (defeatedBoss.damageSourcesThisFight && playerInstance.currentPath) {
         signalAchievement("path_boss_ability_only_kill", {
             bossKey, bossTier: defeatedBoss.tier, path: playerInstance.currentPath,
@@ -383,7 +398,6 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
         }
     }
 
-    // Flawless tracking
     if (playerInstance.damageTakenThisBossFight === 0) {
         signalAchievement("boss_defeated_flawless", { bossKey, bossTier: defeatedBoss.tier });
 
@@ -402,7 +416,6 @@ handleBossDefeat(defeatedBoss, index, playerInstance, gameContext) {
         playerInstance.flawlessStreakActive = false;
     }
 
-    // Resourceful Fighter
     if (!(defeatedBoss instanceof NexusWeaverBoss) && defeatedBoss.tier === 2 && !playerInstance.usedAbilityInCurrentBossFight) {
         signalAchievement("boss_defeat_no_abilities", { bossKey, bossTier: 2, noAbilitiesUsedFromBossManager: true });
     }
@@ -666,12 +679,23 @@ debugSpawnBoss(tierToSpawn, bossTypeKey = 'nexusWeaver', playerInstance) {
     if (playerInstance) {
         playerInstance.usedAbilityInCurrentBossFight = false;
         // The reset is now correctly in processBossSpawnQueue
-        // playerInstance.damageTakenThisBossFight = 0;
         if (bossTypeKey === 'nexusWeaver' && tier === 3) {
             playerInstance.nexusMinionsKilledThisNexusT3Fight = 0;
         }
-        if (bossTypeKey === 'nexusWeaver' && tier === 5 && playerInstance.currentPath === 'berserker') { 
-            playerInstance.maintainedHighRageThisBossFight = true;
+        // NEW: Generic achievement tracking setup
+        playerInstance.highValueMaintainedForAchievement = null;
+        const achievements = AchievementManager.getAllAchievementsWithStatus();
+        for (const ach of achievements) {
+            if (!ach.isUnlocked && ach.unlockConditions.type === "event_berserker_boss_high_rage_kill") {
+                if (bossTypeKey === ach.unlockConditions.bossKey && tier === ach.unlockConditions.bossTier) {
+                    playerInstance.highValueMaintainedForAchievement = {
+                        achievementId: ach.id,
+                        maintained: true,
+                        minRage: ach.unlockConditions.minRagePercentage || 80
+                    };
+                    break;
+                }
+            }
         }
     }
 

@@ -348,7 +348,7 @@ export const allAchievements = [
     {
         id: "flawless_victory_x3_hard",
         name: "Flawless Victory x3",
-        description: "Defeat 3 different bosses flawlessly in a single run.",
+        description: "Defeat 3 different boss ifghts flawlessly in a single run.",
         tier: achievementTiers.HARD,
         iconPath: "assets/icons/ach_flawless_x3.png", 
         unlockConditions: {
@@ -660,15 +660,16 @@ export const allAchievements = [
         }
     },
     {
-        id: "rage_eternal_gm",
+         id: "rage_eternal_gm",
         name: "Rage Eternal",
         description: "As Berserker, defeat Nexus Weaver Tier 5 while maintaining over 80% Berserker Rage for the entire fight.",
         tier: achievementTiers.GRANDMASTER,
-        iconPath: "assets/icons/ach_gm_rage_eternal.png", 
+        iconPath: "assets/icons/ach_gm_rage_eternal.png",
         unlockConditions: {
-            type: "event_berserker_boss_high_rage_kill", 
+            type: "event_berserker_boss_high_rage_kill",
             bossKey: "nexusWeaver",
             bossTier: 5,
+            minRagePercentage: 80 // <<< NEW: Condition is now part of the data
         }
     },
     {
@@ -816,12 +817,12 @@ export const allAchievements = [
     { 
         id: "boss_slayer_supreme_omega",
         name: "Boss Slayer Supreme",
-        description: "Defeat any standard boss (Chaser, Reflector, or Singularity) at Tier 30 or higher in a single run.",
+        description: "Defeat any standard boss (Chaser, Reflector, or Singularity) at Tier 40 or higher in a single run.",
         tier: achievementTiers.OMEGA,
         iconPath: "assets/icons/ach_omega_boss_slayer.png", 
         unlockConditions: {
             type: "event_any_standard_boss_tier_X_defeated", 
-            minTier: 30 
+            minTier: 40 
         }
     },
     {

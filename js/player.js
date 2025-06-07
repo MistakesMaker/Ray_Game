@@ -128,7 +128,7 @@ export class Player {
         this.berserkerUnstoppableFuryTimer = 0;
         this.totalTimeInBossFight = 0;       
         this.timeWithHighRageInBossFight = 0;  
-        this.maintainedHighRageThisBossFight = true; 
+        this.highValueMaintainedForAchievement = null; 
         this.aegisRamCooldownTimer = 0;
 
         this.activeAbilities = {
@@ -706,7 +706,7 @@ export class Player {
         this.berserkerUnstoppableFuryTimer = 0;
         this.totalTimeInBossFight = 0;       
         this.timeWithHighRageInBossFight = 0; 
-        this.maintainedHighRageThisBossFight = true;
+        this.highValueMaintainedForAchievement = null;
         this.aegisRamCooldownTimer = 0;
 
         this.activeAbilities = { '1': null, '2': null, '3': null };
@@ -739,7 +739,8 @@ export class Player {
         this.healingThisBloodpact = 0;
 
         this.hasSavageHowl = false; this.savageHowlCooldownTimer = 0;
-        this.isSavageHowlAttackSpeedBuffActive = false; this.savageHowlAttackSpeedBuffTimer = 0;
+        this.isSavageHowlAttackSpeedBuffActive = false;
+        this.savageHowlAttackSpeedBuffTimer = 0;
 
         this.evolutionReRollsRemaining = MAX_EVOLUTION_REROLLS;
         this.blockedEvolutionIds = [];
