@@ -111,8 +111,7 @@ function evaluateCondition(achievement, gameContext) {
     const bossManager = gameContext.bossManager;
 
     switch (conditions.type) {
-        // ... (all other cases remain the same) ...
-
+        // <<< THIS IS THE FULL, CORRECT SWITCH STATEMENT >>>
         case "event_standard_boss_tX_defeated_no_class_evo":
             if (!bossManager || !player.acquiredEvolutions) {
                 return false;
@@ -383,12 +382,10 @@ function evaluateCondition(achievement, gameContext) {
         case "player_stat_duration_gte":
             if (conditions.path && player.currentPath !== conditions.path) return false;
             
-            // Check if timer value is sufficient
             if (!player.hasOwnProperty(conditions.stat) || typeof player[conditions.stat] !== 'number' || player[conditions.stat] < conditions.durationMs) {
                 return false;
             }
 
-            // If a stat threshold is defined, check it as well
             if (conditions.statThreshold !== undefined) {
                 if (conditions.stat === "berserkerRageHighDurationTimer") {
                     if (player.berserkerRagePercentage <= conditions.statThreshold) return false;
@@ -398,18 +395,27 @@ function evaluateCondition(achievement, gameContext) {
             }
             
             return true;
-
-        // NEW ACHIEVEMENT LOGIC
-        case "mage_ability_full_charge_uses":
-            if (player.currentPath !== 'mage' || !player.mageFullChargeUses) {
+        
+        // <<< THIS IS THE FIX (Part 2) >>>
+        case "event_mage_ability_used_with_min_charge":
+            if (player.currentPath !== 'mage' || !gameContext.eventFlags || !gameContext.eventFlags.mage_omega_laser_used) {
                 return false;
             }
-            const count = player.mageFullChargeUses[conditions.abilityId] || 0;
-            return count >= conditions.requiredUses;
-        
-        // OLD, to be removed or replaced
-        case "event_kinetic_cascade_mage":
-            return false; // This logic is now handled by the player object itself
+            const eventData_Kinetic = gameContext.eventFlags.mage_omega_laser_used_data || {};
+            if (eventData_Kinetic.charge >= conditions.minCharge) {
+                 // The event happened, now we need to check how many times it has happened.
+                 // We'll use the player object to store a persistent counter for this run.
+                 if (!player.mageFullChargeUses) {
+                     player.mageFullChargeUses = {};
+                 }
+                 if (!player.mageFullChargeUses[conditions.abilityId]) {
+                     player.mageFullChargeUses[conditions.abilityId] = 0;
+                 }
+                 player.mageFullChargeUses[conditions.abilityId]++;
+            }
+            // Now, check if the total count meets the requirement.
+            const currentCount = player.mageFullChargeUses[conditions.abilityId] || 0;
+            return currentCount >= conditions.requiredUses;
 
         case "event_nexus_tX_defeated_flawless_run":
             if (gameContext.eventFlags && gameContext.eventFlags.event_nexus_tX_defeated_flawless_run) {
@@ -477,10 +483,10 @@ export function checkAllAchievements(gameContext) {
             "path_boss_buffed_kill",
             "event_berserker_boss_high_rage_kill", 
             "nexus_t3_defeated_no_pickups",        
-            "kinetic_cascade_mage",    
             "event_nexus_tX_defeated_flawless_run", 
             "event_nexus_tX_defeated_no_evo_interaction_use", 
-            "event_any_standard_boss_tier_X_defeated" 
+            "event_any_standard_boss_tier_X_defeated",
+            "mage_omega_laser_used" // <<< THIS IS THE FIX (Part 3)
         ];
 
         flagsToReset.forEach(flagName => {

@@ -572,10 +572,10 @@ export const allAchievements = [
         tier: achievementTiers.MASTER,
         iconPath: "assets/icons/ach_kinetic_cascade.png", 
         unlockConditions: {
-            type: "mage_ability_full_charge_uses",
+            type: "event_mage_ability_used_with_min_charge", // <<< THIS IS THE FIX (Part 1)
             abilityId: "omegaLaser_LMB_Mage",
             requiredUses: 2,
-            requiredCharge: 2
+            minCharge: 100 // Use the actual 0-100 charge value here
         }
     },
     
