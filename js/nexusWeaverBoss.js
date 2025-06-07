@@ -344,9 +344,9 @@ export class NexusWeaverBoss extends BossNPC {
         this.playerCollisionStunTimer = 0; 
         this.recoilVelX = 0;
         this.recoilVelY = 0;
-        this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE = 1; 
-        this.AEGIS_PASSIVE_BOSS_STUN_DURATION = 50;
-        this.isCollidingWithPlayer = false; // <<< NEW
+        this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE = 12; // Increased
+        this.AEGIS_PASSIVE_BOSS_STUN_DURATION = 200; // Increased
+        this.aegisRamJustDamaged = false;
     }
 
     lastDamageSourcePlayer() {
@@ -599,50 +599,56 @@ export class NexusWeaverBoss extends BossNPC {
         }
         
         const isCurrentlyColliding = checkCollision(this, playerInstance);
-        const justStartedColliding = isCurrentlyColliding && !this.isCollidingWithPlayer;
-
+        
         if (isCurrentlyColliding) {
             const playerIsTeleporting = (playerInstance.teleporting && playerInstance.teleportEffectTimer > 0);
             const playerIsCurrentlyShieldOvercharging = isPlayerShieldOvercharging;
-            const playerIsDamageImmuneFromRecentHit = (postDamageImmunityTimer !== undefined && postDamageImmunityTimer > 0);
             const canPlayerPhysicallyInteract = !playerIsTeleporting && !playerIsCurrentlyShieldOvercharging;
-            
+        
             if (canPlayerPhysicallyInteract) {
                 if (playerInstance.hasAegisPathHelm) {
-                    // <<< BUG FIX: Reverted to the simpler, correct logic >>>
                     if (playerInstance.aegisRamCooldownTimer <= 0) {
-                        if (gameContext && gameContext.playerCollidedWithBoss !== undefined) {
-                            gameContext.playerCollidedWithBoss = { boss: this, type: "aegisOffensiveRam" };
+                        if (!this.aegisRamJustDamaged) {
+                            if (gameContext.playerCollidedWithBoss !== undefined) {
+                                gameContext.playerCollidedWithBoss = { boss: this, type: "aegisOffensiveRam" };
+                                this.aegisRamJustDamaged = true;
+                                // Add strong knockback here for successful ram
+                                const pushAngleBoss = Math.atan2(this.y - playerInstance.y, this.x - playerInstance.x);
+                                const knockbackForce = CONSTANTS.AEGIS_PATH_BOSS_KNOCKBACK_FORCE * 1.2; // Extra oomph for Nexus
+                                this.recoilVelX += Math.cos(pushAngleBoss) * knockbackForce;
+                                this.recoilVelY += Math.sin(pushAngleBoss) * knockbackForce;
+                                this.playerCollisionStunTimer = Math.max(this.playerCollisionStunTimer, this.AEGIS_PASSIVE_BOSS_STUN_DURATION * 2.5);
+                                this.speed = 0;
+                            }
                         }
                     } else {
-                        // This part handles the passive knockback when ram is on cooldown
+                        this.aegisRamJustDamaged = false; // Cooldown is active, so we can ram again once it's over
                         const pushAngleBoss = Math.atan2(this.y - playerInstance.y, this.x - playerInstance.x);
                         this.recoilVelX += Math.cos(pushAngleBoss) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE;
                         this.recoilVelY += Math.sin(pushAngleBoss) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE;
                         this.playerCollisionStunTimer = Math.max(this.playerCollisionStunTimer, this.AEGIS_PASSIVE_BOSS_STUN_DURATION);
                         this.speed = 0;
                         const playerPushAngle = Math.atan2(playerInstance.y - this.y, playerInstance.x - this.x);
-                        playerInstance.velX += Math.cos(playerPushAngle) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE * 0.3;
-                        playerInstance.velY += Math.sin(playerPushAngle) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE * 0.3;
+                        playerInstance.velX += Math.cos(playerPushAngle) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE * 0.4; // Stronger self-recoil
+                        playerInstance.velY += Math.sin(playerPushAngle) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE * 0.4;
                     }
                 } else {
-                    // Player is NOT Aegis Path
+                    const playerIsDamageImmuneFromRecentHit = (postDamageImmunityTimer !== undefined && postDamageImmunityTimer > 0);
                     if (!playerIsDamageImmuneFromRecentHit && this.playerCollisionStunTimer <= 0 && !this.isFeared) {
-                        if(gameContext && gameContext.playerCollidedWithBoss !== undefined) {
+                        if (gameContext.playerCollidedWithBoss !== undefined) {
                              gameContext.playerCollidedWithBoss = { boss: this, type: "standardPlayerDamage" };
                         }
                         const pushAngleBoss = Math.atan2(this.y - playerInstance.y, this.x - playerInstance.x);
-                        this.recoilVelX = Math.cos(pushAngleBoss) * PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.1; 
-                        this.recoilVelY = Math.sin(pushAngleBoss) * PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.1;
-                        this.playerCollisionStunTimer = 100; 
+                        this.recoilVelX = Math.cos(pushAngleBoss) * PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.7; // Increased knockback
+                        this.recoilVelY = Math.sin(pushAngleBoss) * PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.7; // Increased knockback
+                        this.playerCollisionStunTimer = 200; // Longer stun
                         this.speed = 0;
                     }
                 }
             }
+        } else {
+            this.aegisRamJustDamaged = false; // Not colliding, so reset the flag
         }
-        
-        // No longer need to track previous state this way
-        // this.isCollidingWithPlayer = isCurrentlyColliding;
     }
 
     takeDamage(amount, ray, playerInstance, context = {}) { 

@@ -26,6 +26,7 @@ export class MirrorShieldBoss extends BossNPC {
         this.recoilVelY = 0;
         this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE = 1.5;
         this.AEGIS_PASSIVE_BOSS_STUN_DURATION = 80;
+        this.aegisRamJustDamaged = false;
     }
 
     draw(ctx) {
@@ -118,32 +119,35 @@ export class MirrorShieldBoss extends BossNPC {
             this.y = Math.max(this.radius, Math.min(canvasHeight - this.radius, this.y));
         }
 
-        if (checkCollision(this, playerInstance)) {
+        const isCurrentlyColliding = checkCollision(this, playerInstance);
+
+        if (isCurrentlyColliding) {
             const playerIsTeleporting = (playerInstance.teleporting && playerInstance.teleportEffectTimer > 0);
-            const playerIsCurrentlyShieldOvercharging = isPlayerShieldOvercharging; 
-            const playerIsDamageImmuneFromRecentHit = (postDamageImmunityTimer !== undefined && postDamageImmunityTimer > 0);
+            const playerIsCurrentlyShieldOvercharging = isPlayerShieldOvercharging;
             const canPlayerPhysicallyInteract = !playerIsTeleporting && !playerIsCurrentlyShieldOvercharging;
             
             if (canPlayerPhysicallyInteract) {
                 if (playerInstance.hasAegisPathHelm) {
                     if (playerInstance.aegisRamCooldownTimer <= 0) {
-                        // <<< BUG FIX: Direct check for ram readiness >>>
-                        if (gameContext && gameContext.playerCollidedWithBoss !== undefined) {
-                            gameContext.playerCollidedWithBoss = { boss: this, type: "aegisOffensiveRam" };
+                        if (!this.aegisRamJustDamaged) {
+                            if (gameContext.playerCollidedWithBoss !== undefined) {
+                                gameContext.playerCollidedWithBoss = { boss: this, type: "aegisOffensiveRam" };
+                                this.aegisRamJustDamaged = true;
+                            }
                         }
                     } else {
-                        // This part handles the passive knockback when ram is on cooldown
+                        this.aegisRamJustDamaged = false; // Cooldown is active, so we can ram again once it's over
                         const pushAngleBoss = Math.atan2(this.y - playerInstance.y, this.x - playerInstance.x);
                         this.recoilVelX += Math.cos(pushAngleBoss) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE;
                         this.recoilVelY += Math.sin(pushAngleBoss) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE;
                         this.playerCollisionStunTimer = Math.max(this.playerCollisionStunTimer, this.AEGIS_PASSIVE_BOSS_STUN_DURATION);
-                        this.speed = 0; 
+                        this.speed = 0;
                         const playerPushAngle = Math.atan2(playerInstance.y - this.y, playerInstance.x - this.x);
                         playerInstance.velX += Math.cos(playerPushAngle) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE * 0.5;
                         playerInstance.velY += Math.sin(playerPushAngle) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE * 0.5;
                     }
                 } else {
-                    // Standard player collision
+                    const playerIsDamageImmuneFromRecentHit = (postDamageImmunityTimer !== undefined && postDamageImmunityTimer > 0);
                     if (!playerIsDamageImmuneFromRecentHit && this.playerCollisionStunTimer <= 0 && !this.isFeared) { 
                         if(gameContext && gameContext.playerCollidedWithBoss !== undefined) {
                              gameContext.playerCollidedWithBoss = { boss: this, type: "standardPlayerDamage" };
@@ -156,6 +160,8 @@ export class MirrorShieldBoss extends BossNPC {
                     }
                 }
             }
+        } else {
+            this.aegisRamJustDamaged = false; // Not colliding, so reset the flag
         }
     }
 
