@@ -568,11 +568,14 @@ export const allAchievements = [
     {
         id: "kinetic_cascade_master",
         name: "Kinetic Cascade",
-        description: "As Mage, have Kinetic Conversion empower 3 different abilities (Omega Laser, Mini Gravity Well, any one numeric ability) within 30s.",
+        description: "As Mage, activate Omega Laser 2 times, each time consuming a full 100% Kinetic Charge.",
         tier: achievementTiers.MASTER,
         iconPath: "assets/icons/ach_kinetic_cascade.png", 
         unlockConditions: {
-            type: "event_kinetic_cascade_mage"
+            type: "mage_ability_full_charge_uses",
+            abilityId: "omegaLaser_LMB_Mage",
+            requiredUses: 2,
+            requiredCharge: 2
         }
     },
     

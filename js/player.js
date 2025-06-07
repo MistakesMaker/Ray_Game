@@ -224,8 +224,7 @@ export class Player {
         this.heartsCollectedThisRun = 0; 
         this.bonusPointsCollectedThisRun = 0; 
         this.nexusMinionsKilledThisNexusT3Fight = 0; 
-        this.recentKineticBoosts = []; 
-
+        this.mageFullChargeUses = {}; // NEW: For Kinetic Cascade achievement
 
         this.update = (gameContext) => {
             const { dt, keys, mouseX, mouseY, canvasWidth, canvasHeight, targets, activeBosses,
@@ -718,7 +717,7 @@ export class Player {
         this.teleportEffectTimer = 0;
         this.activeMiniWell = null;
         this.timesHit = 0; 
-        this.flawlessStreakActive = true; // <<< NEW: Reset the streak
+        this.flawlessStreakActive = true; 
         this.totalDamageDealt = 0;
         this.targetsDestroyedThisRun = 0;
         this.usedAbilityInCurrentBossFight = false;
@@ -738,7 +737,8 @@ export class Player {
         this.hasBloodpact = false; this.isBloodpactActive = false; this.bloodpactTimer = 0; this.bloodpactCooldownTimer = 0;
         this.healingThisBloodpact = 0;
 
-        this.hasSavageHowl = false; this.savageHowlCooldownTimer = 0;
+        this.hasSavageHowl = false;
+        this.savageHowlCooldownTimer = 0;
         this.isSavageHowlAttackSpeedBuffActive = false;
         this.savageHowlAttackSpeedBuffTimer = 0;
 
@@ -765,6 +765,7 @@ export class Player {
         this.bonusPointsCollectedThisRun = 0;
         this.nexusMinionsKilledThisNexusT3Fight = 0;
         this.recentKineticBoosts = [];
+        this.mageFullChargeUses = {}; // NEW
     }
 
     incrementNexusMinionsKilledThisFight() { 
@@ -1025,7 +1026,7 @@ export class Player {
         ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
         ctx.fillStyle = PLAYER_BASE_COLOR;
         ctx.fill();
-
+        
         if (this.immuneColorsList.length > 0) {
             const sliceAngle = (Math.PI * 2) / this.immuneColorsList.length;
             for (let i = 0; i < this.immuneColorsList.length; i++) {
@@ -1041,12 +1042,6 @@ export class Player {
             }
         }
         
-        ctx.beginPath(); ctx.arc(0,0,this.radius,0,Math.PI*2);
-        const isAbl = this.visualModifiers.ablativeSublayer;
-        ctx.lineWidth = isAbl ? 3 : 2; ctx.strokeStyle = isAbl ? '#B0C0FF' : '#FFFFFF'; ctx.stroke();
-        if(isAbl){ctx.beginPath();ctx.arc(0,0,this.radius-2,0,Math.PI*2);ctx.strokeStyle='rgba(160,180,255,0.3)';ctx.lineWidth=1;ctx.stroke();}
-        ctx.closePath();
-
         // <<< FIX: Moved this block to draw on top of colors and main circle outline >>>
         if (this.visualModifiers.ablativeSublayer) {
             ctx.save();
@@ -1063,6 +1058,13 @@ export class Player {
             } 
             ctx.restore();
         }
+
+        ctx.beginPath(); ctx.arc(0,0,this.radius,0,Math.PI*2);
+        const isAbl = this.visualModifiers.ablativeSublayer;
+        ctx.lineWidth = isAbl ? 3 : 2; ctx.strokeStyle = isAbl ? '#B0C0FF' : '#FFFFFF'; ctx.stroke();
+        if(isAbl){ctx.beginPath();ctx.arc(0,0,this.radius-2,0,Math.PI*2);ctx.strokeStyle='rgba(160,180,255,0.3)';ctx.lineWidth=1;ctx.stroke();}
+        ctx.closePath();
+
 
         if (this.visualModifiers.momentumInjectors) {
             const nV=2; const vAO=Math.PI/2.5; const vL=this.radius*0.4; const vW=this.radius*0.15; ctx.fillStyle='#AAAAAA'; for(let i=0;i<nV;i++){const a=-Math.PI+(i===0?-vAO:vAO); ctx.save();ctx.rotate(a);ctx.fillRect(-this.radius*0.9,-vW/2,vL,vW);ctx.restore();}}
@@ -1265,7 +1267,6 @@ export class Player {
             ctx.restore();
         }
 
-
         if (visualModifiers.momentumInjectors) {
             const nV=2; const vAO=Math.PI/2.5; const vL=radius*0.4; const vW=radius*0.15; ctx.fillStyle='#AAAAAA';
             for(let i=0;i<nV;i++){const a=-Math.PI+(i===0?-vAO:vAO); ctx.save();ctx.rotate(a);ctx.fillRect(-radius*0.9,-vW/2,vL,vW);ctx.restore();}}
@@ -1415,33 +1416,14 @@ export class Player {
 
         this.kineticCharge -= chargeToConsume;
 
-        if (this.currentPath === 'mage' && abilityType !== 'unknown' && finalDamageMultiplier > 1.0) {
-            this.recentKineticBoosts.push({ type: abilityType, timestamp: Date.now() });
-            if (this.recentKineticBoosts.length > 15) { 
-                this.recentKineticBoosts.shift();
+        // NEW: Track full charge uses for achievements
+        if (this.currentPath === 'mage' && chargeToConsume >= 100) {
+            if (!this.mageFullChargeUses[abilityType]) {
+                this.mageFullChargeUses[abilityType] = 0;
             }
-            
-            const now = Date.now();
-            const recentBoostsFiltered = this.recentKineticBoosts.filter(boost => now - boost.timestamp < 30000);
-            let typesPresent = new Set();
-            recentBoostsFiltered.forEach(b => {
-                if (b.type === 'omegaLaser_LMB_Mage') typesPresent.add('LMB');
-                else if (b.type === 'numeric_miniGravityWell_detonate') typesPresent.add('RMB_Well'); 
-                else if (b.type.startsWith('numeric_') && b.type !== 'numeric_miniGravityWell_detonate') typesPresent.add('Numeric');
-            });
-
-            if (typesPresent.size >= 3) {
-                 // The global _mainCallbacks is not ideal to access here directly.
-                 // This signaling should ideally happen via the gameContext passed to player.update.
-                 // For now, we assume signalAchievementEvent is available via a higher scope or context.
-                if (typeof _mainCallbacks !== 'undefined' && _mainCallbacks && _mainCallbacks.signalAchievementEvent) { 
-                     _mainCallbacks.signalAchievementEvent("event_kinetic_cascade_mage");
-                } else if (GameState && typeof GameState.getSignalAchievementEvent === 'function') { // Fallback if GameState holds it
-                    GameState.getSignalAchievementEvent()("event_kinetic_cascade_mage");
-                }
-                this.recentKineticBoosts = []; 
-            }
+            this.mageFullChargeUses[abilityType]++;
         }
+
 
         return finalDamageMultiplier;
     }

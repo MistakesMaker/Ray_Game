@@ -29,16 +29,40 @@
             transform: translate(-50%, -50%);
             display: none;
             flex-direction: column;
-            align-items: center;
+            align-items: stretch; /* <<< THIS IS THE FIX (Part 1) >>> */
             justify-content: center;
         }
 
         .messageScreenBase h2 { margin-top: 0; color: #55aaff; font-size: 28px; margin-bottom: 15px;}
         .messageScreenBase p { margin-bottom: 15px; font-size: 16px; }
-        .messageScreenBase button { padding: 10px 20px; font-size: 18px; background-color: #0077cc; color: white; border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.3s, transform 0.1s; box-shadow: 0 4px #004488; margin: 5px; }
+        .messageScreenBase button { 
+            padding: 10px 20px; 
+            font-size: 18px; 
+            background-color: #0077cc; 
+            color: white; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            transition: background-color 0.3s, transform 0.1s; 
+            box-shadow: 0 4px #004488; 
+            margin: 5px;
+            /* REMOVED min-width: 200px; */
+            box-sizing: border-box; 
+        }
         .messageScreenBase button:hover { background-color: #0055aa; }
         .messageScreenBase button:active { background-color: #003377; transform: translateY(2px); box-shadow: 0 2px #004488; }
         .messageScreenBase input[type="text"] { padding: 8px; font-size: 16px; margin-bottom: 10px; border-radius: 5px; border: 1px solid #ccc; width: 80%; }
+        
+        /* <<< THIS IS THE FIX (Part 2) >>> */
+        /* New container to enforce width on a group of buttons */
+        .button-container {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch; /* Makes buttons inside stretch to the container's width */
+            width: 220px; /* Set a specific width for the container */
+            margin: 0 auto; /* Center the container */
+        }
+
 
         .settingsSection { margin-bottom: 10px; display: flex; flex-direction: column; align-items: center;}
         .settingsToggle p { margin: 5px 0; display: flex; align-items: center; justify-content: space-between; width: 280px; padding: 3px 0;}
@@ -818,10 +842,13 @@
     <div id="startScreen" class="messageScreenBase">
         <h2>Light Blaster Omega II</h2>
         <p>Arrows/WASD: Move, Mouse: Aim & Shoot. Defeat Bosses for Upgrades! 1/2/3: Use Abilities.</p>
-        <button id="startGameButton">Start Game</button>
-        <button id="settingsButton">Settings</button>
-        <button id="viewHighScoresButton">High Scores</button>
-        <button id="viewAchievementsButton">Achievements</button> <!-- NEW BUTTON -->
+        <!-- <<< THIS IS THE FIX (Part 3) >>> -->
+        <div class="button-container">
+            <button id="startGameButton">Start Game</button>
+            <button id="viewAchievementsButton">Achievements</button>
+            <button id="viewHighScoresButton">High Scores</button>
+            <button id="settingsButton">Settings</button>
+        </div>
         <div id="startScreenHighScores" style="margin-top:20px; font-size: 0.9em;"></div>
     </div>
 
@@ -840,9 +867,12 @@
 
     <div id="pauseScreen" class="messageScreenBase">
         <h2>Paused</h2>
-        <button id="resumeGameButton">Resume</button>
-        <button id="pauseSettingsButton">Settings</button>
-        <button id="pauseMainMenuButton">Main Menu</button>
+        <!-- <<< THIS IS THE FIX (Part 3) >>> -->
+        <div class="button-container">
+            <button id="resumeGameButton">Resume</button>
+            <button id="pauseSettingsButton">Settings</button>
+            <button id="pauseMainMenuButton">Main Menu</button>
+        </div>
     </div>
 
     <div id="pausePlayerStatsPanel">

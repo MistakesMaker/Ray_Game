@@ -111,7 +111,8 @@ function evaluateCondition(achievement, gameContext) {
     const bossManager = gameContext.bossManager;
 
     switch (conditions.type) {
-        // <<< NEW, MORE RELIABLE LOGIC FOR GLASS CANNON >>>
+        // ... (all other cases remain the same) ...
+
         case "event_standard_boss_tX_defeated_no_class_evo":
             if (!bossManager || !player.acquiredEvolutions) {
                 return false;
@@ -398,8 +399,17 @@ function evaluateCondition(achievement, gameContext) {
             
             return true;
 
+        // NEW ACHIEVEMENT LOGIC
+        case "mage_ability_full_charge_uses":
+            if (player.currentPath !== 'mage' || !player.mageFullChargeUses) {
+                return false;
+            }
+            const count = player.mageFullChargeUses[conditions.abilityId] || 0;
+            return count >= conditions.requiredUses;
+        
+        // OLD, to be removed or replaced
         case "event_kinetic_cascade_mage":
-            return !!(gameContext.eventFlags && gameContext.eventFlags.kinetic_cascade_mage);
+            return false; // This logic is now handled by the player object itself
 
         case "event_nexus_tX_defeated_flawless_run":
             if (gameContext.eventFlags && gameContext.eventFlags.event_nexus_tX_defeated_flawless_run) {
@@ -462,9 +472,6 @@ export function checkAllAchievements(gameContext) {
             "tX_boss_defeated_high_hp",
             "nexus_weaver_defeated_no_abilities_strict",
             "standard_boss_tX_defeated_no_class_evo",
-            // DO NOT RESET the multi-boss flags here, as they are now checked directly from the bossManager
-            // "multi_unique_standard_boss_flawless", 
-            // "multi_unique_boss_flawless_any_type",
             "nexus_t3_defeated_no_minions_killed", 
             "path_boss_ability_only_kill",
             "path_boss_buffed_kill",
