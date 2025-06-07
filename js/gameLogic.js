@@ -204,8 +204,8 @@ export function getDecoys() { return decoys; }
 export function getBossDefeatEffects() { return bossDefeatEffects; }
 export function getBossManagerInstance() { return bossManager; }
 export function getLootDrops() { return lootDrops; }
-// NEW: Export a getter for the single entity spawner instance
 export function getEntitySpawnerInstance() { return entitySpawner; }
+
 
 export function updateCanvasDimensionsLogic(width, height) {
     if (_canvas) {
@@ -629,38 +629,41 @@ export function updateGame(deltaTime) {
                 rays.splice(i,1);
              }
          }
+    }
 
-         if (player && !(player.teleporting && player.teleportEffectTimer > 0) && !player.isShieldOvercharging) {
-             for(let i=hearts.length-1;i>=0;i--){
-                 const h=hearts[i];
-                 if(checkCollision(player,h)){
-                     player.heartsCollectedThisRun++; // <<< For The Unpicker
-                     let wasAtFullHp = (player.hp === player.maxHp);
-                     hearts.splice(i,1);
-                     player.gainHealth(CONSTANTS.HP_REGEN_PER_PICKUP + player.hpPickupBonus, (hp,maxHp)=>UIManager.updateHealthDisplay(hp,maxHp));
-                     playSound(heartSound);
-                     if (wasAtFullHp) {
-                        if (_mainCallbacks.handleFullHealthHeartPickup) {
-                            _mainCallbacks.handleFullHealthHeartPickup(player);
-                        } else {
-                            activeBuffNotifications.push({ text: "Max HP! +10 Score!", timer: CONSTANTS.BUFF_NOTIFICATION_DURATION});
-                            GameState.incrementScore(10);
-                            UIManager.updateScoreDisplay(GameState.getScore());
-                        }
-                     }
-                     GameState.setPostPopupImmunityTimer(CONSTANTS.POST_POPUP_IMMUNITY_DURATION * 0.75);
+    // THIS IS THE FIX: The pickup logic is now outside the immunity check block
+    if (player) {
+         for(let i=hearts.length-1;i>=0;i--){
+             const h=hearts[i];
+             if(checkCollision(player,h)){
+                 player.heartsCollectedThisRun++; // <<< For The Unpicker
+                 let wasAtFullHp = (player.hp === player.maxHp);
+                 hearts.splice(i,1);
+                 player.gainHealth(CONSTANTS.HP_REGEN_PER_PICKUP + player.hpPickupBonus, (hp,maxHp)=>UIManager.updateHealthDisplay(hp,maxHp));
+                 playSound(heartSound);
+                 if (wasAtFullHp) {
+                    if (_mainCallbacks.handleFullHealthHeartPickup) {
+                        _mainCallbacks.handleFullHealthHeartPickup(player);
+                    } else {
+                        activeBuffNotifications.push({ text: "Max HP! +10 Score!", timer: CONSTANTS.BUFF_NOTIFICATION_DURATION});
+                        GameState.incrementScore(10);
+                        UIManager.updateScoreDisplay(GameState.getScore());
+                    }
                  }
+                 // Keep the immunity frame for pickups to prevent accidental double-hits
+                 GameState.setPostPopupImmunityTimer(CONSTANTS.POST_POPUP_IMMUNITY_DURATION * 0.75);
              }
-             for(let i=bonusPoints.length - 1; i >= 0; i--){
-                 const bp = bonusPoints[i];
-                 if(checkCollision(player, bp)){
-                     player.bonusPointsCollectedThisRun++; // <<< For The Unpicker
-                     bonusPoints.splice(i,1); GameState.incrementScore(CONSTANTS.BONUS_POINT_VALUE); UIManager.updateScoreDisplay(GameState.getScore()); if(_mainCallbacks.checkForNewColorUnlock) _mainCallbacks.checkForNewColorUnlock(); playSound(bonusPickupSound);
-                     isScreenShaking = true;screenShakeTimer = CONSTANTS.SCREEN_SHAKE_DURATION_BONUS; currentShakeMagnitude = CONSTANTS.SCREEN_SHAKE_MAGNITUDE_BONUS; currentShakeType = 'bonus'; playSound(screenShakeSound);
-                 }
+         }
+         for(let i=bonusPoints.length - 1; i >= 0; i--){
+             const bp = bonusPoints[i];
+             if(checkCollision(player, bp)){
+                 player.bonusPointsCollectedThisRun++; // <<< For The Unpicker
+                 bonusPoints.splice(i,1); GameState.incrementScore(CONSTANTS.BONUS_POINT_VALUE); UIManager.updateScoreDisplay(GameState.getScore()); if(_mainCallbacks.checkForNewColorUnlock) _mainCallbacks.checkForNewColorUnlock(); playSound(bonusPickupSound);
+                 isScreenShaking = true;screenShakeTimer = CONSTANTS.SCREEN_SHAKE_DURATION_BONUS; currentShakeMagnitude = CONSTANTS.SCREEN_SHAKE_MAGNITUDE_BONUS; currentShakeType = 'bonus'; playSound(screenShakeSound);
              }
          }
     }
+
 
     for (let i = bossDefeatEffects.length - 1; i >= 0; i--) {
         const effect = bossDefeatEffects[i];
