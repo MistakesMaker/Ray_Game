@@ -24,7 +24,8 @@ import {
     getLootDrops as importedGameLogicGetLootDrops,
     getAbilityContextForPlayerLogic,
     getScreenShakeParams as importedGameLogicGetScreenShakeParams,
-    updateCanvasDimensionsLogic as importedUpdateCanvasDimensionsLogic
+    updateCanvasDimensionsLogic as importedUpdateCanvasDimensionsLogic,
+    getEntitySpawnerInstance as importedGetEntitySpawnerInstance // NEW: Import getter for spawner
 } from './gameLogic.js';
 import * as AchievementManager from './achievementManager.js';
 
@@ -42,6 +43,7 @@ import {
     lootChoiceScreen,
     countdownOverlay,
     pauseScreen,
+    abilityCooldownUI as uiAbilityCooldownUI, // NEW: Import for exclusion zone calculation
 } from './ui.js';
 import { initializeRayPool, getPooledRay, getReadableColorName as getReadableColorNameFromUtils } from './utils.js';
 import {
@@ -65,6 +67,7 @@ let lastEvolutionScore = 0;
 let wasLastEvolutionScoreBased = true;
 let currentPlayerNameForHighScores = "CHAMPION";
 let currentRunId = null;
+let entitySpawnerInstance = null; // NEW: Hold the spawner instance
 
 const inputState = {
     keys: { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false, w: false, a: false, s: false, d: false },
@@ -98,6 +101,7 @@ let gameLogicGetLootDropsFunc = null;
 let getAbilityContextForPlayerFuncFromGameLogic = null;
 let gameLogicGetScreenShakeParamsFunc = null;
 let gameLogicUpdateCanvasDimensionsFunc = null;
+let gameLogicGetEntitySpawnerInstanceFunc = null; // NEW
 
 function checkPlayerIntegrity(label) {
     const p = gameLogicGetPlayerFunc ? gameLogicGetPlayerFunc() : null;
@@ -108,6 +112,37 @@ function checkPlayerIntegrity(label) {
     }
 }
 
+// NEW: Function to calculate UI zones and update the spawner
+function updateSpawnerUIExclusionZones() {
+    if (!entitySpawnerInstance) return;
+
+    const zones = [];
+    const padding = 15; // Add some padding around the UI elements
+
+    // Top-right UI (High scores)
+    if (uiHighScoreContainer && uiHighScoreContainer.offsetParent !== null) {
+        const rect = uiHighScoreContainer.getBoundingClientRect();
+        zones.push({
+            left: rect.left - padding,
+            top: rect.top - padding,
+            right: rect.right + padding,
+            bottom: rect.bottom + padding,
+        });
+    }
+
+    // Bottom ability bar
+    if (uiAbilityCooldownUI && uiAbilityCooldownUI.offsetParent !== null) {
+        const rect = uiAbilityCooldownUI.getBoundingClientRect();
+        zones.push({
+            left: rect.left - padding,
+            top: rect.top - padding,
+            right: rect.right + padding,
+            bottom: rect.bottom + padding,
+        });
+    }
+
+    entitySpawnerInstance.updateUIExclusionZones(zones);
+}
 
 function setCanvasDimensions() {
     if (!gameCanvasElement) return;
@@ -149,6 +184,9 @@ function setCanvasDimensions() {
             uiPausePlayerStatsPanel.style.top = '20px';
         }
     }
+    
+    // NEW: Update exclusion zones on resize
+    updateSpawnerUIExclusionZones();
 }
 
 function getGameContextForAchievements() {
@@ -524,6 +562,10 @@ function initGame() {
 
     if (initializeGameLogicFunc) {
         initializeGameLogicFunc(gameCanvasElement, inputState, mainCallbacksForLogic, CONSTANTS.PLAYER_SPEED_BASE);
+        // NEW: Get the single instance of the spawner after it's created.
+        if (gameLogicGetEntitySpawnerInstanceFunc) {
+            entitySpawnerInstance = gameLogicGetEntitySpawnerInstanceFunc();
+        }
     } else {
     }
 
@@ -1008,6 +1050,7 @@ initializeAudio(audioDomElementsForInit);
 document.addEventListener('DOMContentLoaded', async () => {
     try {
         const gameLogicModule = await import('./gameLogic.js');
+        
         initializeGameLogicFunc = gameLogicModule.initializeGameLogic;
         gameLogicUpdateFunc = gameLogicModule.updateGame;
         gameLogicDrawFunc = gameLogicModule.drawGame;
@@ -1022,6 +1065,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         getAbilityContextForPlayerFuncFromGameLogic = gameLogicModule.getAbilityContextForPlayerLogic;
         gameLogicGetScreenShakeParamsFunc = gameLogicModule.getScreenShakeParams;
         gameLogicUpdateCanvasDimensionsFunc = gameLogicModule.updateCanvasDimensionsLogic;
+        gameLogicGetEntitySpawnerInstanceFunc = gameLogicModule.getEntitySpawnerInstance; // NEW
 
     } catch (e) {
         document.body.innerHTML = `<div style="color: white; text-align: center; padding-top: 50px;"><h1>Error Loading Game</h1><p>Could not load critical game components. Please check the console for details.</p></div>`;
@@ -1030,12 +1074,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     AchievementManager.initializeAchievements();
 
     setupEventListeners(gameCanvasElement, gameContextForEventListeners);
-    // <<< MODIFIED: Pass the achievement checker to the game loop initializer >>>
     initGameLoop(
         GameState.isGameOver, 
         GameState.isGameRunning, 
         GameState.isAnyPauseActive,
-        () => AchievementManager.checkAllAchievements(getGameContextForAchievements()) // The new callback
+        () => AchievementManager.checkAllAchievements(getGameContextForAchievements())
     );
     setCanvasDimensions();
 

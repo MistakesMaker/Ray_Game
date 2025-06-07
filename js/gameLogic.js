@@ -204,6 +204,8 @@ export function getDecoys() { return decoys; }
 export function getBossDefeatEffects() { return bossDefeatEffects; }
 export function getBossManagerInstance() { return bossManager; }
 export function getLootDrops() { return lootDrops; }
+// NEW: Export a getter for the single entity spawner instance
+export function getEntitySpawnerInstance() { return entitySpawner; }
 
 export function updateCanvasDimensionsLogic(width, height) {
     if (_canvas) {

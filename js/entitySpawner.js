@@ -15,6 +15,7 @@ class EntitySpawner {
         // Store references if needed, or get them dynamically via gameContext in update
         this.canvasWidth = 0;
         this.canvasHeight = 0;
+        this.uiExclusionZones = []; // NEW: To store rectangles of UI elements
     }
 
     updateCanvasDimensions(width, height) {
@@ -22,10 +23,15 @@ class EntitySpawner {
         this.canvasHeight = height;
     }
 
+    // NEW: Method to update the forbidden zones
+    updateUIExclusionZones(zones) {
+        this.uiExclusionZones = zones || [];
+    }
+
     reset() {
         this.targetSpawnTimer = CONSTANTS.TARGET_SPAWN_INTERVAL_MS / 2;
         this.heartSpawnTimer = CONSTANTS.HEART_SPAWN_INTERVAL_MS / 2;
-        this.bonusPointSpawnTimer = CONSTANTS.BONUS_POINT_SPAWN_INTERVAL_MS / 2;
+        this.bonusPointSpawnTimer = CONSTANTS.BONUS_POINT_INTERVAL_MS / 2;
     }
 
     _canSpawn(gameContext) {
@@ -39,10 +45,26 @@ class EntitySpawner {
         return true;
     }
 
-    _validateSpawnPosition(x, y, radius, player) {
+    _validateSpawnPosition(x, y, radius, player, entityType) { // MODIFIED: Added entityType
         if (!player) return true; // If no player context, assume valid (e.g., initial spawn)
         const distToPlayer = Math.sqrt((x - player.x)**2 + (y - player.y)**2);
-        return distToPlayer > player.radius + radius + 75; // Ensure minimum distance from player
+        
+        // Check distance from player
+        if (distToPlayer <= player.radius + radius + 75) {
+            return false;
+        }
+
+        // NEW: Check against UI exclusion zones ONLY for pickups
+        if (entityType === 'heart' || entityType === 'bonusPoint') {
+            for (const zone of this.uiExclusionZones) {
+                // Check if the spawn point (x, y) is inside the zone
+                if (x > zone.left && x < zone.right && y > zone.top && y < zone.bottom) {
+                    return false; // Invalid position
+                }
+            }
+        }
+
+        return true; // All checks passed, position is valid
     }
 
     spawnTarget(gameContext) {
@@ -53,7 +75,8 @@ class EntitySpawner {
         do {
             sX = Math.random() * (this.canvasWidth - 2 * r) + r;
             sY = Math.random() * (this.canvasHeight - 2 * r) + r;
-            validPosition = this._validateSpawnPosition(sX, sY, r, gameContext.player);
+            // MODIFIED: Pass entity type. 'target' is allowed anywhere.
+            validPosition = this._validateSpawnPosition(sX, sY, r, gameContext.player, 'target');
             attempts++;
         } while (!validPosition && attempts < 50);
 
@@ -73,7 +96,8 @@ class EntitySpawner {
         do {
             sX = Math.random() * (this.canvasWidth - 2 * vR) + vR;
             sY = Math.random() * (this.canvasHeight - 2 * vR) + vR;
-            validPosition = this._validateSpawnPosition(sX, sY, cR, gameContext.player);
+            // MODIFIED: Pass entity type to enforce exclusion zones
+            validPosition = this._validateSpawnPosition(sX, sY, cR, gameContext.player, 'heart');
             attempts++;
         } while (!validPosition && attempts < 50);
         
@@ -92,7 +116,8 @@ class EntitySpawner {
         do {
             sX = Math.random() * (this.canvasWidth - 2 * r) + r;
             sY = Math.random() * (this.canvasHeight - 2 * r) + r;
-            validPosition = this._validateSpawnPosition(sX, sY, r, gameContext.player);
+            // MODIFIED: Pass entity type to enforce exclusion zones
+            validPosition = this._validateSpawnPosition(sX, sY, r, gameContext.player, 'bonusPoint');
             attempts++;
         } while (!validPosition && attempts < 50);
 
