@@ -53,7 +53,7 @@ import { PlayerGravityWell, Ray } from './ray.js';
 import { NexusWeaverBoss } from './nexusWeaverBoss.js'; 
 import { BossNPC } from './bossBase.js'; 
 
-const AEGIS_RAM_COOLDOWN = 1000;
+const AEGIS_RAM_COOLDOWN = 300; 
 
 // Aegis Charge Visual Constants
 const AEGIS_CHARGE_INDICATOR_RADIUS_OFFSET = 8;
@@ -764,7 +764,7 @@ export class Player {
         this.heartsCollectedThisRun = 0;
         this.bonusPointsCollectedThisRun = 0;
         this.nexusMinionsKilledThisNexusT3Fight = 0;
-        this.mageFullChargeUses = {}; // NEW
+        this.mageFullChargeUses = {};
     }
 
     incrementNexusMinionsKilledThisFight() { 
@@ -1215,7 +1215,7 @@ export class Player {
             ctx.shadowBlur = helmGlowRadius_; ctx.shadowColor = helmGlowColor_;
             ctx.beginPath(); ctx.moveTo(0, -radius * 1.8);
             ctx.lineTo(-radius * 0.8, -radius * 0.5);
-            ctx.quadraticCurveTo(0, -radius * 0.1, radius * 0.8, -radius * 0.5);
+            ctx.quadraticCurveTo(0, -radius * 0.1, radius * 0.8, -this.radius * 0.5);
             ctx.closePath(); ctx.fill(); ctx.stroke();
             ctx.shadowBlur = 0; ctx.shadowColor = "transparent";
             ctx.fillStyle = "yellow"; ctx.beginPath(); ctx.arc(0, -radius * 1.5, radius * 0.15, 0, Math.PI * 2); ctx.fill();
@@ -1285,6 +1285,8 @@ export class Player {
         const postDamageTimerFromCtx = gameContext.postDamageImmunityTimer || 0;
         const bossManager = gameContext.getBossManager ? gameContext.getBossManager() : null;
 
+        const isTrueDamage = damageContext && damageContext.isTrueDamage;
+
         let effectiveDamageTakenMultiplier = this.damageTakenMultiplier;
         if (this.isAegisChargingDash && this.currentPath === 'aegis') {
             effectiveDamageTakenMultiplier *= (1 - AEGIS_CHARGE_DR_DURING_DASH);
@@ -1325,7 +1327,7 @@ export class Player {
 
         this.timeSinceLastHit = 0; 
         this.timesHit++;
-        this.flawlessStreakActive = false; // <<< The streak is broken on the first hit
+        this.flawlessStreakActive = false;
         let damageToTake; let hittingRayObject = null;
 
         if (typeof hittingRayOrAmount === 'object' && hittingRayOrAmount !== null && hittingRayOrAmount instanceof Ray) {
@@ -1333,17 +1335,18 @@ export class Player {
             damageToTake = hittingRayObject.damageValue !== undefined ? hittingRayObject.damageValue : RAY_DAMAGE_TO_PLAYER;
         } else if (typeof hittingRayOrAmount === 'number') { 
             damageToTake = hittingRayOrAmount;
-        } else if (typeof hittingRayOrAmount === 'object' && hittingRayOrAmount !== null && typeof hittingRayOrAmount.damage === 'number'){ // For direct damage objects like Pulse Nova
+        } else if (typeof hittingRayOrAmount === 'object' && hittingRayOrAmount !== null && typeof hittingRayOrAmount.damage === 'number'){ 
              damageToTake = hittingRayOrAmount.damage;
         }
         else { 
             damageToTake = RAY_DAMAGE_TO_PLAYER; 
         }
 
-        damageToTake *= effectiveDamageTakenMultiplier;
-
-        if (hittingRayObject && hittingRayObject.isBossProjectile && this.visualModifiers.ablativeSublayer) {
-            damageToTake *= (1 - (this.bossDamageReduction || 0));
+        if (!isTrueDamage) {
+            damageToTake *= effectiveDamageTakenMultiplier;
+            if (hittingRayObject && hittingRayObject.isBossProjectile && this.visualModifiers.ablativeSublayer) {
+                damageToTake *= (1 - (this.bossDamageReduction || 0));
+            }
         }
 
         damageToTake = Math.max(1, Math.round(damageToTake));
@@ -1351,7 +1354,6 @@ export class Player {
         this.hp -= damageToTake;
         if (this.hp < 0) this.hp = 0;
 
-        // <<< BUG FIX: Changed condition to be more specific >>>
         if (bossManager && bossManager.activeBosses.length > 0) {
             this.damageTakenThisBossFight += damageToTake;
         }
@@ -1599,8 +1601,6 @@ export class Player {
 
     activateOmegaLaser_LMB_Mage(abilityContext) {
         if (this.hasOmegaLaser && !this.isFiringOmegaLaser && this.omegaLaserCooldownTimer <= 0) {
-            // <<< THIS IS THE FIX >>>
-            // Signal an event with the charge data instead of checking here.
             if (abilityContext.signalAchievementEvent) {
                 abilityContext.signalAchievementEvent("mage_omega_laser_used", {
                     charge: this.kineticCharge
@@ -1651,7 +1651,9 @@ export class Player {
         }
         if (abilityContext && abilityContext.updateAbilityCooldownCallback) abilityContext.updateAbilityCooldownCallback(this);
     }
+    
     activateSeismicSlam_RMB_Aegis(abilityContext) {
+        // <<< THIS IS THE FIX >>>
         if (this.hasSeismicSlam && this.seismicSlamCooldownTimer <= 0) {
             if(abilityContext.activeBuffNotificationsArray) abilityContext.activeBuffNotificationsArray.push({ text: `Seismic Slam!`, timer: BUFF_NOTIFICATION_DURATION });
 
@@ -1821,19 +1823,17 @@ export class Player {
                 if (Math.hypot(this.x - boss.x, this.y - boss.y) < AEGIS_CHARGE_AOE_RADIUS + boss.radius) {
                     if (boss.takeDamage) {
                         const bossHpBeforeImpact = boss.health;
-                        // <<< BUG FIX: Pass correct context for Battering Ram >>>
                         const dmgDone = boss.takeDamage(baseDamage, null, this, {isAbility: true, abilityType: 'aegisCharge'});
                         if (dmgDone > 0) {
                              this.totalDamageDealt += dmgDone;
                              this.aegisChargeBossDamageDealtThisRun += dmgDone;
 
-                            // Check for Warp Slam achievement
                             if (this.isAegisTeleportImpactPending && 
-                                this.aegisTeleportImpactTimer > 0 && // Ensure impact is within the teleport window
+                                this.aegisTeleportImpactTimer > 0 && 
                                 bossHpBeforeImpact > 0 && 
                                 boss.health <= 0 && 
                                 signalAchievementEvent) {
-                                signalAchievementEvent("event_aegis_teleport_impact_kill"); // No extra data needed as achievement checks path
+                                signalAchievementEvent("event_aegis_teleport_impact_kill");
                             }
                         }
                     }

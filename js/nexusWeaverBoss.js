@@ -344,8 +344,9 @@ export class NexusWeaverBoss extends BossNPC {
         this.playerCollisionStunTimer = 0; 
         this.recoilVelX = 0;
         this.recoilVelY = 0;
-        this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE = 12; // Increased
-        this.AEGIS_PASSIVE_BOSS_STUN_DURATION = 200; // Increased
+        // <<< THIS IS THE FIX >>>
+        this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE = 3.5; // Tuned value
+        this.AEGIS_PASSIVE_BOSS_STUN_DURATION = 150; 
         this.aegisRamJustDamaged = false;
     }
 
@@ -502,23 +503,16 @@ export class NexusWeaverBoss extends BossNPC {
         }
          const normalizedDtFactor = dt / (1000 / 60) || 1;
 
-        if (this.isFeared) {
-            this.isSpawning = false;
-            this.spawnTellTimer = 0;
-            this.pulseNovaActive = false;
-            this.pulseNovaTimer = 0;
-        } else if (this.playerCollisionStunTimer > 0) { 
-            this.playerCollisionStunTimer -= dt;
-            this.x += this.recoilVelX * normalizedDtFactor;
-            this.y += this.recoilVelY * normalizedDtFactor;
-            this.recoilVelX *= 0.85; 
-            this.recoilVelY *= 0.85;
-            if (Math.abs(this.recoilVelX) < 0.01) this.recoilVelX = 0;
-            if (Math.abs(this.recoilVelY) < 0.01) this.recoilVelY = 0;
-            if (this.playerCollisionStunTimer <= 0) {
-                this.speed = this.baseSpeed;
-            }
-        } else { 
+        this.x += this.recoilVelX * normalizedDtFactor;
+        this.y += this.recoilVelY * normalizedDtFactor;
+        this.recoilVelX *= 0.92;
+        this.recoilVelY *= 0.92;
+        if (Math.abs(this.recoilVelX) < 0.01) this.recoilVelX = 0;
+        if (Math.abs(this.recoilVelY) < 0.01) this.recoilVelY = 0;
+
+        if (this.playerCollisionStunTimer > 0) this.playerCollisionStunTimer -= dt;
+
+        if (!this.isFeared && this.playerCollisionStunTimer <= 0) {
             if (this.hitStunTimer <= 0) {
                 const angleToPlayer = Math.atan2(playerInstance.y - this.y, playerInstance.x - this.x);
                 const distToPlayer = Math.hypot(playerInstance.x - this.x, playerInstance.y - this.y);
@@ -534,8 +528,6 @@ export class NexusWeaverBoss extends BossNPC {
                     this.y += (Math.random() - 0.5) * targetSpeed * 0.3 * normalizedDtFactor;
                 }
             }
-            this.x = Math.max(this.radius, Math.min(canvasWidth - this.radius, this.x));
-            this.y = Math.max(this.radius, Math.min(canvasHeight - this.radius, this.y));
 
             if (!this.isSpawning) {
                 this.spawnTimer -= dt;
@@ -551,36 +543,44 @@ export class NexusWeaverBoss extends BossNPC {
                 }
             }
             this.tryPulseNova(playerInstance, dt, gameContext);
-            if (this.pulseNovaActive) {
-                this.pulseNovaTimer -= dt;
-                const novaProgress = 1 - (this.pulseNovaTimer / CONSTANTS.PULSE_NOVA_DURATION); 
-                this.pulseNovaCurrentRadius = this.pulseNovaMaxRadius * Math.sqrt(novaProgress); 
-                if (this.pulseNovaTimer <= 0) {
-                    this.pulseNovaActive = false;
-                } else {
-                    const distToPlayerNova = Math.hypot(playerInstance.x - this.x, playerInstance.y - this.y);
-                    const effectivePlayerRadiusForNova = playerInstance.radius * 0.8;
-                    const expansionProgress = 1 - (this.pulseNovaTimer / CONSTANTS.PULSE_NOVA_DURATION);
-                    let currentNovaWaveThickness = Math.max(1, 12 - (expansionProgress * 12));
-                     if (expansionProgress >= 0.85) {
-                         currentNovaWaveThickness = 1.5 + (expansionProgress - 0.85) * 15;
-                     }
-                    const novaEdgeOuter = this.pulseNovaCurrentRadius + effectivePlayerRadiusForNova + (currentNovaWaveThickness * 0.5);
-                    const novaEdgeInner = this.pulseNovaCurrentRadius - effectivePlayerRadiusForNova - (currentNovaWaveThickness * 0.5); 
-                    
-                    if (distToPlayerNova < novaEdgeOuter && distToPlayerNova > novaEdgeInner) {
-                        if (gameContext && gameContext.callbacks && gameContext.callbacks.onPlayerBossAttackCollision) {
-                            gameContext.callbacks.onPlayerBossAttackCollision({
-                                damage: CONSTANTS.PULSE_NOVA_DAMAGE,
-                                sourceBoss: this,
-                                type: 'pulse_nova'
-                            });
-                        }
+        }
+        
+        if (this.isFeared) {
+            this.isSpawning = false;
+            this.spawnTellTimer = 0;
+            this.pulseNovaActive = false;
+            this.pulseNovaTimer = 0;
+        }
+        
+        if (this.pulseNovaActive) {
+            this.pulseNovaTimer -= dt;
+            const novaProgress = 1 - (this.pulseNovaTimer / CONSTANTS.PULSE_NOVA_DURATION); 
+            this.pulseNovaCurrentRadius = this.pulseNovaMaxRadius * Math.sqrt(novaProgress); 
+            if (this.pulseNovaTimer <= 0) {
+                this.pulseNovaActive = false;
+            } else {
+                const distToPlayerNova = Math.hypot(playerInstance.x - this.x, playerInstance.y - this.y);
+                const effectivePlayerRadiusForNova = playerInstance.radius * 0.8;
+                const expansionProgress = 1 - (this.pulseNovaTimer / CONSTANTS.PULSE_NOVA_DURATION);
+                let currentNovaWaveThickness = Math.max(1, 12 - (expansionProgress * 12));
+                 if (expansionProgress >= 0.85) {
+                     currentNovaWaveThickness = 1.5 + (expansionProgress - 0.85) * 15;
+                 }
+                const novaEdgeOuter = this.pulseNovaCurrentRadius + effectivePlayerRadiusForNova + (currentNovaWaveThickness * 0.5);
+                const novaEdgeInner = this.pulseNovaCurrentRadius - effectivePlayerRadiusForNova - (currentNovaWaveThickness * 0.5); 
+                
+                if (distToPlayerNova < novaEdgeOuter && distToPlayerNova > novaEdgeInner) {
+                    if (gameContext && gameContext.callbacks && gameContext.callbacks.onPlayerBossAttackCollision) {
+                        gameContext.callbacks.onPlayerBossAttackCollision({
+                            damage: CONSTANTS.PULSE_NOVA_DAMAGE,
+                            sourceBoss: this,
+                            type: 'pulse_nova'
+                        });
                     }
                 }
             }
-        } 
-
+        }
+        
         const safeCallbacks = gameContext && gameContext.callbacks ? gameContext.callbacks : {};
         const minionGameContext = { 
             playerCollidedWithMinion: safeCallbacks.onPlayerMinionCollision,
@@ -612,24 +612,21 @@ export class NexusWeaverBoss extends BossNPC {
                             if (gameContext.playerCollidedWithBoss !== undefined) {
                                 gameContext.playerCollidedWithBoss = { boss: this, type: "aegisOffensiveRam" };
                                 this.aegisRamJustDamaged = true;
-                                // Add strong knockback here for successful ram
                                 const pushAngleBoss = Math.atan2(this.y - playerInstance.y, this.x - playerInstance.x);
-                                const knockbackForce = CONSTANTS.AEGIS_PATH_BOSS_KNOCKBACK_FORCE * 1.2; // Extra oomph for Nexus
+                                const knockbackForce = CONSTANTS.AEGIS_PATH_BOSS_KNOCKBACK_FORCE * 1.2;
                                 this.recoilVelX += Math.cos(pushAngleBoss) * knockbackForce;
                                 this.recoilVelY += Math.sin(pushAngleBoss) * knockbackForce;
-                                this.playerCollisionStunTimer = Math.max(this.playerCollisionStunTimer, this.AEGIS_PASSIVE_BOSS_STUN_DURATION * 2.5);
-                                this.speed = 0;
+                                this.playerCollisionStunTimer = Math.max(this.playerCollisionStunTimer, this.AEGIS_PASSIVE_BOSS_STUN_DURATION);
                             }
                         }
                     } else {
-                        this.aegisRamJustDamaged = false; // Cooldown is active, so we can ram again once it's over
+                        this.aegisRamJustDamaged = false; 
                         const pushAngleBoss = Math.atan2(this.y - playerInstance.y, this.x - playerInstance.x);
                         this.recoilVelX += Math.cos(pushAngleBoss) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE;
                         this.recoilVelY += Math.sin(pushAngleBoss) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE;
                         this.playerCollisionStunTimer = Math.max(this.playerCollisionStunTimer, this.AEGIS_PASSIVE_BOSS_STUN_DURATION);
-                        this.speed = 0;
                         const playerPushAngle = Math.atan2(playerInstance.y - this.y, playerInstance.x - this.x);
-                        playerInstance.velX += Math.cos(playerPushAngle) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE * 0.4; // Stronger self-recoil
+                        playerInstance.velX += Math.cos(playerPushAngle) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE * 0.4;
                         playerInstance.velY += Math.sin(playerPushAngle) * this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE * 0.4;
                     }
                 } else {
@@ -639,16 +636,18 @@ export class NexusWeaverBoss extends BossNPC {
                              gameContext.playerCollidedWithBoss = { boss: this, type: "standardPlayerDamage" };
                         }
                         const pushAngleBoss = Math.atan2(this.y - playerInstance.y, this.x - playerInstance.x);
-                        this.recoilVelX = Math.cos(pushAngleBoss) * PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.7; // Increased knockback
-                        this.recoilVelY = Math.sin(pushAngleBoss) * PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.7; // Increased knockback
-                        this.playerCollisionStunTimer = 200; // Longer stun
-                        this.speed = 0;
+                        this.recoilVelX = Math.cos(pushAngleBoss) * PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.7;
+                        this.recoilVelY = Math.sin(pushAngleBoss) * PLAYER_BOUNCE_FORCE_FROM_BOSS * 0.7;
+                        this.playerCollisionStunTimer = 200;
                     }
                 }
             }
         } else {
-            this.aegisRamJustDamaged = false; // Not colliding, so reset the flag
+            this.aegisRamJustDamaged = false;
         }
+
+        this.x = Math.max(this.radius, Math.min(canvasWidth - this.radius, this.x));
+        this.y = Math.max(this.radius, Math.min(canvasHeight - this.radius, this.y));
     }
 
     takeDamage(amount, ray, playerInstance, context = {}) { 

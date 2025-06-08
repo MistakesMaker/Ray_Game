@@ -61,6 +61,11 @@ export const GRAVITY_RAY_NEW_PROJECTILES_PER_ABSORBED_RAY = 2;
 export const GRAVITY_WELL_SCATTER_RAY_LIFETIME = 3000;
 export const TELEPORT_IMMUNITY_DURATION = 500;
 export const GRAVITY_RAY_SPAWN_ANIM_DURATION = 750;
+// <<< THIS IS THE FIX (Part 1/3) >>>
+export const GRAVITY_WELL_TRUE_DAMAGE_DELAY = 2000; // ms player must be inside before damage starts
+export const GRAVITY_WELL_TRUE_DAMAGE_INTERVAL = 333; // ms between each tick of damage
+export const GRAVITY_WELL_TRUE_DAMAGE_AMOUNT = 10;   // The "true" damage per tick
+
 
 // Score & UI Constants
 export const EVOLUTION_SCORE_INTERVAL = 100;

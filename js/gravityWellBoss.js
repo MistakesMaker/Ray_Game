@@ -7,7 +7,8 @@ import {
     GRAVITY_RAY_EXPLOSION_DURATION, GRAVITY_RAY_DETONATION_EXPLOSION_COLOR,
     GRAVITY_RAY_NEW_PROJECTILES_PER_ABSORBED_RAY, GRAVITY_WELL_SCATTER_RAY_LIFETIME,
     BOSS_PROJECTILE_COLOR_DEFAULT, RAY_RADIUS, BASE_RAY_SPEED,
-    PLAYER_BOUNCE_FORCE_FROM_BOSS, SCATTERED_ABSORBED_RAY_COLOR
+    PLAYER_BOUNCE_FORCE_FROM_BOSS, SCATTERED_ABSORBED_RAY_COLOR,
+    GRAVITY_WELL_TRUE_DAMAGE_DELAY, GRAVITY_WELL_TRUE_DAMAGE_INTERVAL, GRAVITY_WELL_TRUE_DAMAGE_AMOUNT
 } from './constants.js';
 import { playSound, stopSound, gravityWellChargeSound, gravityWellExplodeSound } from './audio.js';
 
@@ -32,6 +33,9 @@ export class GravityWellBoss extends BossNPC {
         this.AEGIS_PASSIVE_BOSS_RECOIL_FORCE = 1.0; 
         this.AEGIS_PASSIVE_BOSS_STUN_DURATION = 50;
         this.aegisRamJustDamaged = false;
+        // <<< THIS IS THE FIX (Part 3/3) - Step 1: Initialize new properties >>>
+        this.playerInsideTimer = 0;
+        this.trueDamageTimer = 0;
     }
 
     draw(ctx) {
@@ -253,6 +257,31 @@ export class GravityWellBoss extends BossNPC {
                     }
                 }
             });
+
+            // <<< THIS IS THE FIX (Part 3/3) - Step 2: Implement true damage logic >>>
+            if (checkCollision(playerInstance, this.gravityRay)) {
+                this.playerInsideTimer += dt;
+                if (this.playerInsideTimer >= GRAVITY_WELL_TRUE_DAMAGE_DELAY) {
+                    this.trueDamageTimer -= dt;
+                    if (this.trueDamageTimer <= 0) {
+                        this.trueDamageTimer = GRAVITY_WELL_TRUE_DAMAGE_INTERVAL;
+                        const damageDealt = playerInstance.takeDamage(
+                            GRAVITY_WELL_TRUE_DAMAGE_AMOUNT, 
+                            gameContext, // Pass game context
+                            { isTrueDamage: true } // Pass damage context with the new flag
+                        );
+                         if (damageDealt > 0 && gameContext.CONSTANTS) {
+                            if (gameContext.playerPostDamageImmunityTimer === undefined || gameContext.playerPostDamageImmunityTimer <= 0) {
+                                // This is an older reference, GameState is preferred but we maintain compatibility
+                                gameContext.playerPostDamageImmunityTimer = gameContext.CONSTANTS.POST_DAMAGE_IMMUNITY_DURATION;
+                            }
+                        }
+                    }
+                }
+            } else {
+                this.playerInsideTimer = 0;
+                this.trueDamageTimer = 0;
+            }
          } else if (this.gravityRay && !this.gravityRay.isActive) {
             this.gravityRay = null;
             if(stopSound && gravityWellChargeSound) stopSound(gravityWellChargeSound);

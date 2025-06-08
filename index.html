@@ -29,7 +29,7 @@
             transform: translate(-50%, -50%);
             display: none;
             flex-direction: column;
-            align-items: stretch; /* <<< THIS IS THE FIX (Part 1) >>> */
+            align-items: stretch; 
             justify-content: center;
         }
 
@@ -46,14 +46,21 @@
             transition: background-color 0.3s, transform 0.1s; 
             box-shadow: 0 4px #004488; 
             margin: 5px;
-            /* REMOVED min-width: 200px; */
             box-sizing: border-box; 
         }
         .messageScreenBase button:hover { background-color: #0055aa; }
         .messageScreenBase button:active { background-color: #003377; transform: translateY(2px); box-shadow: 0 2px #004488; }
-        .messageScreenBase input[type="text"] { padding: 8px; font-size: 16px; margin-bottom: 10px; border-radius: 5px; border: 1px solid #ccc; width: 80%; }
+        /* <<< THIS IS THE FIX >>> */
+        .messageScreenBase input[type="text"] {
+            display: block; /* Ensure it behaves as a block element */
+            padding: 8px;
+            font-size: 16px;
+            margin: 0 auto 10px; /* Replaces margin-bottom and centers horizontally */
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            width: 80%;
+        }
         
-        /* <<< THIS IS THE FIX (Part 2) >>> */
         /* New container to enforce width on a group of buttons */
         .button-container {
             display: flex;
@@ -762,7 +769,7 @@
             background-color: #4a4a7a;
             color: transparent; /* Hide the placeholder ? if an image is loaded */
         }
-        /* <<< THIS IS THE FIX >>> */
+        
         .achievement-entry.unlocked .achievement-icon::after {
             content: '✔️';
             position: absolute;
@@ -842,7 +849,7 @@
     <div id="startScreen" class="messageScreenBase">
         <h2>Light Blaster Omega II</h2>
         <p>Arrows/WASD: Move, Mouse: Aim & Shoot. Defeat Bosses for Upgrades! 1/2/3: Use Abilities.</p>
-        <!-- <<< THIS IS THE FIX (Part 3) >>> -->
+        
         <div class="button-container">
             <button id="startGameButton">Start Game</button>
             <button id="viewAchievementsButton">Achievements</button>
@@ -867,7 +874,7 @@
 
     <div id="pauseScreen" class="messageScreenBase">
         <h2>Paused</h2>
-        <!-- <<< THIS IS THE FIX (Part 3) >>> -->
+        
         <div class="button-container">
             <button id="resumeGameButton">Resume</button>
             <button id="pauseSettingsButton">Settings</button>
