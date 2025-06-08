@@ -631,12 +631,11 @@ export function updateGame(deltaTime) {
          }
     }
 
-    // THIS IS THE FIX: The pickup logic is now outside the immunity check block
     if (player) {
          for(let i=hearts.length-1;i>=0;i--){
              const h=hearts[i];
              if(checkCollision(player,h)){
-                 player.heartsCollectedThisRun++; // <<< For The Unpicker
+                 player.heartsCollectedThisRun++;
                  let wasAtFullHp = (player.hp === player.maxHp);
                  hearts.splice(i,1);
                  player.gainHealth(CONSTANTS.HP_REGEN_PER_PICKUP + player.hpPickupBonus, (hp,maxHp)=>UIManager.updateHealthDisplay(hp,maxHp));
@@ -650,14 +649,13 @@ export function updateGame(deltaTime) {
                         UIManager.updateScoreDisplay(GameState.getScore());
                     }
                  }
-                 // Keep the immunity frame for pickups to prevent accidental double-hits
                  GameState.setPostPopupImmunityTimer(CONSTANTS.POST_POPUP_IMMUNITY_DURATION * 0.75);
              }
          }
          for(let i=bonusPoints.length - 1; i >= 0; i--){
              const bp = bonusPoints[i];
              if(checkCollision(player, bp)){
-                 player.bonusPointsCollectedThisRun++; // <<< For The Unpicker
+                 player.bonusPointsCollectedThisRun++;
                  bonusPoints.splice(i,1); GameState.incrementScore(CONSTANTS.BONUS_POINT_VALUE); UIManager.updateScoreDisplay(GameState.getScore()); if(_mainCallbacks.checkForNewColorUnlock) _mainCallbacks.checkForNewColorUnlock(); playSound(bonusPickupSound);
                  isScreenShaking = true;screenShakeTimer = CONSTANTS.SCREEN_SHAKE_DURATION_BONUS; currentShakeMagnitude = CONSTANTS.SCREEN_SHAKE_MAGNITUDE_BONUS; currentShakeType = 'bonus'; playSound(screenShakeSound);
              }
@@ -707,6 +705,11 @@ export function updateGame(deltaTime) {
 
 export function drawGame() {
     if (!_ctx) return;
+    // <<< THIS IS THE FIX >>>
+    if (_mainCallbacks && _mainCallbacks.getTimerVisibility) {
+        UIManager.updateGameTimerDisplay(GameState.getGameplayTimeElapsed(), _mainCallbacks.getTimerVisibility());
+    }
+
     _ctx.save();
     const currentShakeParams = getScreenShakeParams();
     if (currentShakeParams.isScreenShaking && currentShakeParams.screenShakeTimer > 0 && !GameState.isAnyPauseActive() && !GameState.isGameOver()) {

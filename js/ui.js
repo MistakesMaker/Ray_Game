@@ -10,6 +10,8 @@ export const activeBuffIndicator = document.getElementById('activeBuffIndicator'
 export const uiHighScoreContainer = document.getElementById('highScoreContainer');
 export const highScoreListDisplay = document.getElementById('highScoreList');
 export const startScreenHighScoresDiv = document.getElementById('startScreenHighScores');
+// <<< THIS IS THE FIX >>>
+export const gameTimerDisplay = document.getElementById('gameTimerDisplay');
 
 export const startScreen = document.getElementById('startScreen');
 export const settingsScreen = document.getElementById('settingsScreen');

@@ -32,7 +32,8 @@ import {
     highScoreCategorySelect,
     playerPreviewCanvas,
     playerPreviewPlaceholder,
-    statsPanelWrapper
+    statsPanelWrapper,
+    gameTimerDisplay // <<< THIS IS THE FIX (Part 2/3)
 } from './ui.js';
 import { getReadableColorName as getReadableColorNameFromUtils } from './utils.js';
 import { Player } from './player.js';
@@ -70,6 +71,17 @@ export function formatMillisecondsToTime(ms) {
     if (milliseconds.length === 1) milliseconds = "0" + milliseconds;
 
     return minutes + ":" + seconds + "." + milliseconds;
+}
+
+// <<< THIS IS THE FIX (Part 2/3) >>>
+export function updateGameTimerDisplay(elapsedTime, isVisible) {
+    if (!gameTimerDisplay) return;
+    if (isVisible) {
+        gameTimerDisplay.style.display = 'block';
+        gameTimerDisplay.textContent = formatMillisecondsToTime(elapsedTime);
+    } else {
+        gameTimerDisplay.style.display = 'none';
+    }
 }
 
 function handleGlobalPreviewMouseMove(e) {

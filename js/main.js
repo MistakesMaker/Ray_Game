@@ -25,7 +25,7 @@ import {
     getAbilityContextForPlayerLogic,
     getScreenShakeParams as importedGameLogicGetScreenShakeParams,
     updateCanvasDimensionsLogic as importedUpdateCanvasDimensionsLogic,
-    getEntitySpawnerInstance as importedGetEntitySpawnerInstance // NEW: Import getter for spawner
+    getEntitySpawnerInstance as importedGetEntitySpawnerInstance 
 } from './gameLogic.js';
 import * as AchievementManager from './achievementManager.js';
 
@@ -43,7 +43,7 @@ import {
     lootChoiceScreen,
     countdownOverlay,
     pauseScreen,
-    abilityCooldownUI as uiAbilityCooldownUI, // NEW: Import for exclusion zone calculation
+    abilityCooldownUI as uiAbilityCooldownUI,
 } from './ui.js';
 import { initializeRayPool, getPooledRay, getReadableColorName as getReadableColorNameFromUtils } from './utils.js';
 import {
@@ -67,7 +67,8 @@ let lastEvolutionScore = 0;
 let wasLastEvolutionScoreBased = true;
 let currentPlayerNameForHighScores = "CHAMPION";
 let currentRunId = null;
-let entitySpawnerInstance = null; // NEW: Hold the spawner instance
+let entitySpawnerInstance = null;
+let showInGameTimer = false; 
 
 const inputState = {
     keys: { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false, w: false, a: false, s: false, d: false },
@@ -101,7 +102,7 @@ let gameLogicGetLootDropsFunc = null;
 let getAbilityContextForPlayerFuncFromGameLogic = null;
 let gameLogicGetScreenShakeParamsFunc = null;
 let gameLogicUpdateCanvasDimensionsFunc = null;
-let gameLogicGetEntitySpawnerInstanceFunc = null; // NEW
+let gameLogicGetEntitySpawnerInstanceFunc = null;
 
 function checkPlayerIntegrity(label) {
     const p = gameLogicGetPlayerFunc ? gameLogicGetPlayerFunc() : null;
@@ -112,14 +113,12 @@ function checkPlayerIntegrity(label) {
     }
 }
 
-// NEW: Function to calculate UI zones and update the spawner
 function updateSpawnerUIExclusionZones() {
     if (!entitySpawnerInstance) return;
 
     const zones = [];
-    const padding = 15; // Add some padding around the UI elements
+    const padding = 15;
 
-    // Top-right UI (High scores)
     if (uiHighScoreContainer && uiHighScoreContainer.offsetParent !== null) {
         const rect = uiHighScoreContainer.getBoundingClientRect();
         zones.push({
@@ -130,7 +129,6 @@ function updateSpawnerUIExclusionZones() {
         });
     }
 
-    // Bottom ability bar
     if (uiAbilityCooldownUI && uiAbilityCooldownUI.offsetParent !== null) {
         const rect = uiAbilityCooldownUI.getBoundingClientRect();
         zones.push({
@@ -185,7 +183,6 @@ function setCanvasDimensions() {
         }
     }
     
-    // NEW: Update exclusion zones on resize
     updateSpawnerUIExclusionZones();
 }
 
@@ -209,7 +206,6 @@ function getGameContextForAchievements() {
     };
 }
 
-// Helper to get full context for player methods if needed
 function getGameContextForPlayerUpdate() {
     return {
         dt: 0, // Should be set by caller if time-dependent
@@ -555,14 +551,13 @@ function initGame() {
             if (eventData && Object.keys(eventData).length > 0) {
                 eventFlagsForAchievements[eventName + "_data"] = eventData;
             }
-            // Per-frame check now handles this, so this call can be removed if desired, but is harmless.
             AchievementManager.checkAllAchievements(getGameContextForAchievements());
-        }
+        },
+        getTimerVisibility: () => showInGameTimer
     };
 
     if (initializeGameLogicFunc) {
         initializeGameLogicFunc(gameCanvasElement, inputState, mainCallbacksForLogic, CONSTANTS.PLAYER_SPEED_BASE);
-        // NEW: Get the single instance of the spawner after it's created.
         if (gameLogicGetEntitySpawnerInstanceFunc) {
             entitySpawnerInstance = gameLogicGetEntitySpawnerInstanceFunc();
         }
@@ -849,6 +844,27 @@ function getGameContextForBossManager(lootManagerInstance) {
     };
 };
 
+function loadTimerSetting() {
+    const storedSetting = localStorage.getItem('lightBlasterTimerEnabled');
+    showInGameTimer = storedSetting === 'true'; 
+    const timerToggleButton = document.getElementById('timerToggleButton');
+    if (timerToggleButton) {
+        timerToggleButton.textContent = showInGameTimer ? 'ON' : 'OFF';
+    }
+}
+
+function toggleTimerSetting() {
+    showInGameTimer = !showInGameTimer;
+    localStorage.setItem('lightBlasterTimerEnabled', showInGameTimer);
+    const timerToggleButton = document.getElementById('timerToggleButton');
+    if (timerToggleButton) {
+        timerToggleButton.textContent = showInGameTimer ? 'ON' : 'OFF';
+    }
+    // <<< THIS IS THE FIX >>>
+    // Immediately update the display, even if the main game loop is paused.
+    UIManager.updateGameTimerDisplay(GameState.getGameplayTimeElapsed(), showInGameTimer);
+}
+
 
 const gameContextForEventListeners = {
     inputState,
@@ -872,6 +888,7 @@ const gameContextForEventListeners = {
         viewDetailedHighScores: () => { showDetailedHighScores(); },
         viewAchievements: () => { showAchievementsScreen(); },
         toggleSound: () => { toggleSoundEnabled(); applyMusicPlayStateWrapper(); },
+        toggleTimer: toggleTimerSetting,
         updateMusicVolume, updateSfxVolume: updateSpecificSfxVolume,
         goBackFromSettings: () => {
             const targetScreenElement = UIManager.getPreviousScreenForSettings() || startScreen;
@@ -924,7 +941,7 @@ const gameContextForEventListeners = {
             }
         },
         redrawEvolutionOptions: redrawEvolutionOptionsInternal,
-        onPlayerBossCollision: (collisionData) => { // collisionData = { boss: bossThatHit, type: "aegisOffensiveRam" | "standardPlayerDamage" }
+        onPlayerBossCollision: (collisionData) => { 
             const cp = gameLogicGetPlayerFunc();
             if (!cp) return;
         
@@ -934,14 +951,13 @@ const gameContextForEventListeners = {
                 if (cp.hasAegisPathHelm && typeof cp.handleAegisCollisionWithBoss === 'function') {
                     cp.handleAegisCollisionWithBoss(bossThatHit, getGameContextForPlayerUpdate());
                 }
-                // Aegis player takes no body damage from a successful offensive ram signal
             } else if (collisionData.type === "standardPlayerDamage") {
                 if (!cp.isShieldOvercharging && (!cp.teleporting || cp.teleportEffectTimer <= 0) && GameState.getPostDamageImmunityTimer() <= 0) {
-                    let damageAmount = bossThatHit.tier * 5; // Example base damage
+                    let damageAmount = bossThatHit.tier * 5; 
                     
                     const dmgDealt = cp.takeDamage(
                         damageAmount,
-                        { // gameContext for takeDamage
+                        { 
                             postPopupImmunityTimer: GameState.getPostPopupImmunityTimer(), 
                             postDamageImmunityTimer: GameState.getPostDamageImmunityTimer(), 
                             score: GameState.getScore(), 
@@ -955,21 +971,18 @@ const gameContextForEventListeners = {
                     );
                     if (dmgDealt > 0) {
                         GameState.setPostDamageImmunityTimer(CONSTANTS.POST_DAMAGE_IMMUNITY_DURATION);
-                        // Standard player bounce back
                         const collisionAnglePlayer = Math.atan2(cp.y - bossThatHit.y, cp.x - bossThatHit.x);
                         cp.velX = Math.cos(collisionAnglePlayer) * CONSTANTS.PLAYER_BOUNCE_FORCE_FROM_BOSS;
                         cp.velY = Math.sin(collisionAnglePlayer) * CONSTANTS.PLAYER_BOUNCE_FORCE_FROM_BOSS;
                     }
                 }
             }
-            // If player is Aegis and ram is on cooldown, the boss script handles minor recoil,
-            // and this callback isn't invoked with a type that causes player damage from body collision.
         },
         onPlayerMinionCollision: (minionThatHit) => {
             const cp = gameLogicGetPlayerFunc();
              if (cp && !cp.isShieldOvercharging && (!cp.teleporting || cp.teleportEffectTimer <= 0) && GameState.getPostDamageImmunityTimer() <= 0) {
                 const dmgDealt = cp.takeDamage(minionThatHit.damage, 
-                    { /* gameContext for takeDamage */ 
+                    { 
                         postPopupImmunityTimer: GameState.getPostPopupImmunityTimer(), postDamageImmunityTimer: GameState.getPostDamageImmunityTimer(), score: GameState.getScore(), updateHealthDisplayCallback:UIManager.updateHealthDisplay, endGameCallback:endGameInternal, updateScoreCallback: (amt) => { GameState.incrementScore(amt); UIManager.updateScoreDisplay(GameState.getScore()); if(gameContextForEventListeners.callbacks.checkForNewColorUnlock) gameContextForEventListeners.callbacks.checkForNewColorUnlock(); }, signalAchievementEvent: gameContextForEventListeners.callbacks.signalAchievementEvent, getBossManager: gameLogicGetBossManagerFunc
                     }, 
                     { screenShakeParams: gameLogicGetScreenShakeParamsFunc ? gameLogicGetScreenShakeParamsFunc() : {} });
@@ -980,7 +993,7 @@ const gameContextForEventListeners = {
             const cp = gameLogicGetPlayerFunc();
              if (cp && !cp.isShieldOvercharging && (!cp.teleporting || cp.teleportEffectTimer <= 0) && GameState.getPostDamageImmunityTimer() <= 0) {
                 const dmgDealt = cp.takeDamage(attackData.damage, 
-                    { /* gameContext for takeDamage */ 
+                    { 
                         postPopupImmunityTimer: GameState.getPostPopupImmunityTimer(), postDamageImmunityTimer: GameState.getPostDamageImmunityTimer(), score: GameState.getScore(), updateHealthDisplayCallback:UIManager.updateHealthDisplay, endGameCallback:endGameInternal, updateScoreCallback: (amt) => { GameState.incrementScore(amt); UIManager.updateScoreDisplay(GameState.getScore()); if(gameContextForEventListeners.callbacks.checkForNewColorUnlock) gameContextForEventListeners.callbacks.checkForNewColorUnlock(); }, signalAchievementEvent: gameContextForEventListeners.callbacks.signalAchievementEvent, getBossManager: gameLogicGetBossManagerFunc
                     }, 
                     { screenShakeParams: gameLogicGetScreenShakeParamsFunc ? gameLogicGetScreenShakeParamsFunc() : {} });
@@ -1030,7 +1043,6 @@ const gameContextForEventListeners = {
             if (eventData && Object.keys(eventData).length > 0) {
                 eventFlagsForAchievements[eventName + "_data"] = eventData;
             }
-            // Per-frame check now handles this, so this call is less critical but harmless.
             AchievementManager.checkAllAchievements(getGameContextForAchievements());
         }
     }
@@ -1065,7 +1077,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         getAbilityContextForPlayerFuncFromGameLogic = gameLogicModule.getAbilityContextForPlayerLogic;
         gameLogicGetScreenShakeParamsFunc = gameLogicModule.getScreenShakeParams;
         gameLogicUpdateCanvasDimensionsFunc = gameLogicModule.updateCanvasDimensionsLogic;
-        gameLogicGetEntitySpawnerInstanceFunc = gameLogicModule.getEntitySpawnerInstance; // NEW
+        gameLogicGetEntitySpawnerInstanceFunc = gameLogicModule.getEntitySpawnerInstance; 
 
     } catch (e) {
         document.body.innerHTML = `<div style="color: white; text-align: center; padding-top: 50px;"><h1>Error Loading Game</h1><p>Could not load critical game components. Please check the console for details.</p></div>`;
@@ -1073,6 +1085,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     AchievementManager.initializeAchievements();
 
+    loadTimerSetting();
+    const timerToggleButton = document.getElementById('timerToggleButton');
+    if (timerToggleButton) {
+        const newTimerBtn = timerToggleButton.cloneNode(true);
+        timerToggleButton.parentNode.replaceChild(newTimerBtn, timerToggleButton);
+        newTimerBtn.addEventListener('click', () => gameContextForEventListeners.callbacks.toggleTimer());
+    }
+    
     setupEventListeners(gameCanvasElement, gameContextForEventListeners);
     initGameLoop(
         GameState.isGameOver, 
