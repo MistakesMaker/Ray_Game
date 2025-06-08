@@ -15,7 +15,7 @@ export const PLAYER_RAY_INACCURACY_DURING_SHAKE = 0.2;
 export const PLAYER_BOUNCE_FORCE_FROM_BOSS = 18;
 export const PLAYER_BOUNCE_FORCE_FROM_GRAVITY_BALL = 12;
 export const DEFAULT_PLAYER_RADIUS_GROWTH_FACTOR = 0.025;
-export const CLOSE_SHAVE_HP_THRESHOLD = 10; // <<< NEW CONSTANT
+export const CLOSE_SHAVE_HP_THRESHOLD = 10; 
 
 // Ray Constants
 export const RAY_RADIUS = 6;
@@ -61,10 +61,9 @@ export const GRAVITY_RAY_NEW_PROJECTILES_PER_ABSORBED_RAY = 2;
 export const GRAVITY_WELL_SCATTER_RAY_LIFETIME = 3000;
 export const TELEPORT_IMMUNITY_DURATION = 500;
 export const GRAVITY_RAY_SPAWN_ANIM_DURATION = 750;
-// <<< THIS IS THE FIX (Part 1/3) >>>
-export const GRAVITY_WELL_TRUE_DAMAGE_DELAY = 2000; // ms player must be inside before damage starts
-export const GRAVITY_WELL_TRUE_DAMAGE_INTERVAL = 333; // ms between each tick of damage
-export const GRAVITY_WELL_TRUE_DAMAGE_AMOUNT = 10;   // The "true" damage per tick
+export const GRAVITY_WELL_TRUE_DAMAGE_DELAY = 2000; 
+export const GRAVITY_WELL_TRUE_DAMAGE_INTERVAL = 333; 
+export const GRAVITY_WELL_TRUE_DAMAGE_AMOUNT = 10;   
 
 
 // Score & UI Constants
@@ -268,7 +267,8 @@ export const BERSERKERS_ECHO_DAMAGE_PER_10_HP = 0.09;
 export const BERSERKERS_ECHO_SPEED_PER_10_HP = 0.03;
 
 export const KINETIC_INITIAL_DAMAGE_BONUS = 0.30;
-export const KINETIC_BASE_CHARGE_RATE = 1.0;
+// <<< THIS IS THE FIX >>>
+export const KINETIC_BASE_CHARGE_RATE = 1.3;
 
 // ---- NEW: Aegis Path (Juggernaut) Constants ----
 export const AEGIS_PATH_BASE_COLLISION_DAMAGE = 1; 

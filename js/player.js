@@ -106,7 +106,8 @@ export class Player {
         this.magePathTimeElapsed = 0;
         this.kineticConversionScaleTimer = 0;
         this.kineticConversionScaleInterval = 60000;
-        this.kineticConversionScalingFactor = 1.1;
+        // <<< THIS IS THE FIX >>>
+        this.kineticConversionScalingFactor = 1.3;
 
         this.currentOmegaLaserKineticBoost = 1.0;
         this.currentGravityWellKineticBoost = 1.0;
@@ -1653,7 +1654,6 @@ export class Player {
     }
     
     activateSeismicSlam_RMB_Aegis(abilityContext) {
-        // <<< THIS IS THE FIX >>>
         if (this.hasSeismicSlam && this.seismicSlamCooldownTimer <= 0) {
             if(abilityContext.activeBuffNotificationsArray) abilityContext.activeBuffNotificationsArray.push({ text: `Seismic Slam!`, timer: BUFF_NOTIFICATION_DURATION });
 
